@@ -6,7 +6,7 @@ import { StyleSheet } from "react-native-unistyles";
 
 import { BrandMark } from "@/components/brand";
 import { Button, Card, Field, Row, Text } from "@/components/ui";
-import { createApi, DEFAULT_SERVER, looksLikeToken } from "@/src/lib/api";
+import { createApi, DEFAULT_SERVER, looksLikeToken, requestDemoToken } from "@/src/lib/api";
 import { signIn } from "@/src/lib/auth";
 import type { Me } from "@/src/lib/types";
 
@@ -18,6 +18,25 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [me, setMe] = useState<Me | null>(null);
+  // "Coba demo / Reviewer": a demo code (from the store listing's review notes) instead of a token.
+  const [demo, setDemo] = useState(false);
+  const [code, setCode] = useState("");
+
+  async function demoSignIn() {
+    setError(null);
+    if (!code.trim()) return setError("Masukkan kode demo. / Enter the demo code.");
+    setBusy(true);
+    try {
+      const creds = { server: server.trim().replace(/\/+$/, ""), token: "" };
+      creds.token = (await requestDemoToken(creds.server, code)).token;
+      await signIn(creds, await createApi(creds).me());
+      router.replace("/");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function check() {
     setError(null);
@@ -64,6 +83,21 @@ export default function Login() {
               <Button title="Back" variant="ghost" onPress={() => setMe(null)} />
             </Row>
           </Card>
+        ) : demo ? (
+          <>
+            <Card>
+              <Text variant="label">Coba demo / Reviewer</Text>
+              <Text tone="muted">
+                Akun demo berisi data contoh (bukan data asli) dan direset setiap hari. Demo account with made-up data, reset every day.
+              </Text>
+            </Card>
+            <Field label="Kode demo / Demo code" value={code} onChangeText={setCode} autoCapitalize="none" autoCorrect={false} error={error} />
+            {advanced ? (
+              <Field label="Server" value={server} onChangeText={setServer} autoCapitalize="none" autoCorrect={false} keyboardType="url" />
+            ) : null}
+            <Button title="Masuk ke demo / Open the demo" onPress={demoSignIn} loading={busy} />
+            <Button title="Pakai token / Use a token" variant="ghost" small onPress={() => { setDemo(false); setError(null); }} />
+          </>
         ) : (
           <>
             <Field label="Token" value={token} onChangeText={setToken} placeholder="brk_…" autoCapitalize="none" autoCorrect={false} secureTextEntry error={error} />
@@ -75,6 +109,7 @@ export default function Login() {
               <Button title="Open JoyoArto on the web" variant="ghost" small onPress={() => void Linking.openURL(`${server.replace(/\/+$/, "")}/settings`)} />
               <Button title={advanced ? "Hide server" : "Server…"} variant="ghost" small onPress={() => setAdvanced(!advanced)} />
             </Row>
+            <Button title="Coba demo / Reviewer" variant="secondary" onPress={() => { setDemo(true); setError(null); }} />
           </>
         )}
       </View>
