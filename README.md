@@ -170,7 +170,8 @@ Expo SDK 58 development build (custom native code), TypeScript, `react-native-un
 (`theme.ts`, converted from `packages/ui/src/styles/globals.css`). The web app stays the main UI; the phone app does:
 
 - **Sign in** with a personal access token (`brk_…`, web Settings → API tokens, `finance:read finance:write`), kept in
-  `expo-secure-store`. `GET /api/me` shows which household and user it belongs to.
+  `expo-secure-store`. `GET /api/me` shows which household and user it belongs to. **Coba demo / Reviewer** takes a demo
+  code instead (see "Demo account" below).
 - **Home**: this month's money in/out and balances per account (`GET /api/reports/dashboard`), quick add
   (`POST /api/transactions/quick`, `capturedVia: manual`).
 - **Notification capture (Android)**: `modules/notification-capture` is a local Expo module (Kotlin) with a
@@ -222,10 +223,26 @@ without a phone: `bun scripts/e2e-capture.ts http://localhost:3500 brk_…` runs
 queue and checks what the server saved (use a throwaway local household). From the emulator, the local server is
 `http://10.0.2.2:3500` (sign-in screen → Server…).
 
+### Demo account (store reviewers, screenshots)
+
+A separate demo user (`demo-reviewer`) and household (`demo-household`) with made-up data: Jago pockets, a GoPay wallet,
+about three months of categorized spending at public brands, pending quick adds, budgets, rules and a saved plan
+scenario (`packages/api/src/services/demo.ts`, ids and restrictions in `lib/demo.ts`).
+
+- **Off unless the Worker secret `DEMO_LOGIN_CODE` is set.** The code is typed on the Android sign-in screen (**Coba
+  demo / Reviewer**: `POST /api/demo/token` → a 7-day `brk_` token) or on the web login page (**Demo account**:
+  `POST /api/auth/sign-in/demo` → a session). Both compare in constant time and are rate limited per IP.
+- **Resets:** every demo sign-in rebuilds the household (same WIB day = same data), and a daily cron (03:00 WIB) does
+  too. Operators can call `POST /api/admin/demo/reset`. The demo user's sessions and tokens survive a reset.
+- **Restricted:** no invites, joining/leaving/deleting households, account deletion, tokens longer than a day,
+  email-in or OAuth AI connections (FORBIDDEN with `data.demo`). Always Pro. Everything else, writes included, works.
+- Reviewer instructions for the store consoles: docs/HANDOFF.md.
+
 ## Public pages and waitlist
 
 - `/` shows the landing page to visitors (Bahasa Indonesia first, English via the toggle or `?lang=en`); signed-in users
-  get the dashboard. `/demo` reads Jago/GoPay statement PDFs in the browser with the same parsers
+  get the dashboard. Its `#android` section (and the More page's "Pasang di Android") gives the two steps to join the
+  Android closed test (links in `apps/web/src/lib/app-links.ts`); iOS is "segera". `/demo` reads Jago/GoPay statement PDFs in the browser with the same parsers
   (`lib/statements/summary.ts`; `sample.ts` is a made-up statement for "try a sample") and uploads nothing.
 - `POST /api/waitlist` (oRPC `waitlist.join`, public): email (lowercased, one row per address; the answer never says
   whether it was already there), optional name, banks, source/utm, locale, and a `website` honeypot. Rate limited per
@@ -361,7 +378,7 @@ bun run deploy              # builds apps/web, deploys the worker
 
 Secrets (`wrangler secret put`, in apps/server): `BETTER_AUTH_SECRET` (set), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
 `ANTHROPIC_API_KEY` (optional), and for Joyo Pro `JOYO_INTERNAL_KEY` (the same value as on JoyoRogo's server; unset = billing
-off). No payment secrets: JoyoRogo sells Joyo Pro.
+off). `DEMO_LOGIN_CODE` (optional) turns on the store reviewers' demo account. No payment secrets: JoyoRogo sells Joyo Pro.
 `ALLOWED_EMAILS` and `ADMIN_EMAILS` (comma-separated) are not in wrangler.jsonc: `deploy.yml` passes them with
 `wrangler deploy --var` from the `production` environment's variables (GitHub → Settings → Environments), and refuses
 to deploy without them. Deploying by hand: `bunx wrangler deploy --var ALLOWED_EMAILS:you@example.com --var ADMIN_EMAILS:you@example.com`.

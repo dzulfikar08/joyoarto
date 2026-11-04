@@ -57,3 +57,47 @@ the Atur project **BRK** (workspace `joyodigitama`).
    Play service account invited to the JoyoArto app, RTDN pointed at the same topic, and the App Store notification URL
    set to JoyoRogo's `/api/billing/apple/notifications` (JoyoRogo docs/play-billing.md section 4 and billing-status.md).
    The app must call JoyoRogo with a JoyoRogo session (same Google account), not JoyoArto's.
+8. **Store review: demo account (built, needs the secret).** Reviewers (Google Play now, the App Store later) and
+   screenshots use a separate demo user and household with made-up data (`packages/api/src/services/demo.ts`): Jago
+   pockets, a GoPay wallet, about three months of categorized spending at public brands, pending quick adds, budgets and
+   a saved plan scenario. It never touches a real household.
+   - **Turn it on:** pick a code (long and random enough not to be guessed, for example 3 words + digits) and set it as
+     a Worker secret: `cd apps/server && bunx wrangler secret put DEMO_LOGIN_CODE`. Unset = demo login is off
+     everywhere. Never put the code in the repo; it goes only into the store consoles' review notes.
+   - **Seeding:** nothing to run. Every demo sign-in rebuilds the data (same day, same data), and the Worker's daily cron
+     (`0 20 * * *`, 03:00 WIB) resets it when the secret is set. By hand: signed in as an `ADMIN_EMAILS` account,
+     `POST /api/admin/demo/reset` (or `fetch("/api/admin/demo/reset", { method: "POST", credentials: "include" })` from
+     the browser console on app.arto.joyorogo.com).
+   - **Where reviewers sign in:** Android sign-in screen → **Coba demo / Reviewer** → code → **Masuk ke demo**
+     (`POST /api/demo/token`, a 7-day `brk_` token). Web: /login → **Demo account (reviewers)** → code
+     (`POST /api/auth/sign-in/demo`, a session). Both are rate limited per IP (5 a minute).
+   - **What the demo can't do:** invite people, join, leave or delete households, delete the account, create tokens that
+     last longer than a day, turn on email-in, or connect an AI app over OAuth. It is always Pro. Writes are allowed and
+     vanish at the next reset (note: a second reviewer signing in resets the data for both).
+   - **Play Console → App content → App access** → "All or some functionality is restricted" → add instructions
+     (replace `<DEMO_CODE>` with the secret's value only in the console):
+
+     ```
+     [Bahasa Indonesia]
+     JoyoArto memakai akun pribadi. Untuk review, pakai akun demo berisi data contoh:
+     1. Buka aplikasi. Di layar masuk, ketuk "Coba demo / Reviewer".
+     2. Masukkan kode demo: <DEMO_CODE>
+     3. Ketuk "Masuk ke demo / Open the demo".
+     Data demo bukan data asli dan direset setiap hari. Izin notifikasi (Akses notifikasi) bersifat opsional;
+     aplikasi tetap bisa dipakai tanpanya.
+
+     [English]
+     JoyoArto uses personal accounts. For review, please use the demo account with made-up data:
+     1. Open the app. On the sign-in screen, tap "Coba demo / Reviewer".
+     2. Enter the demo code: <DEMO_CODE>
+     3. Tap "Masuk ke demo / Open the demo".
+     The demo data is not real and resets every day. Notification access is optional; the app works without it.
+     ```
+
+     Later, App Store Connect → App Review Information: tick "Sign-in required", put `demo` as the user name and the
+     code as the password, and paste the same text into Notes.
+9. **Android testers (landing page).** The landing page (`#android`), its FAQ and the signed-in More page send people to
+   the two steps: join https://groups.google.com/g/joyoarto-testers, then opt in at
+   https://play.google.com/apps/testing/com.joyodigitama.joyoarto. Check that the group is set to "Anyone can join" and
+   is the tester list of the closed track. Links live in `apps/web/src/lib/app-links.ts`; when the app goes public,
+   point them at the store listing. iOS shows "segera" until a TestFlight link exists.
