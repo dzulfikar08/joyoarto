@@ -3,7 +3,7 @@
 
     asc-ci-profile.py <bundle id> <Apple Distribution certificate serial, hex> <out .mobileprovision> [CAPABILITY ...]
 
-Registers the bundle id when it is missing and enables each CAPABILITY (APP_GROUPS, ...) it does not have yet. Then
+Registers the bundle id when it is missing and enables each CAPABILITY (APPLE_ID_AUTH, APP_GROUPS, ...) it does not have yet. Then
 finds the certificate on App Store Connect by serial, reuses the ACTIVE IOS_APP_STORE profile "joyo-ci <bundle id>
 <cert id>" or creates it (an INVALID one is deleted first: enabling a capability invalidates profiles), writes the
 profile and prints "<uuid>", a tab, "<profile name>". Needs ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_PATH (.p8 key with
@@ -91,12 +91,16 @@ bundle_pk = bundle_ids[0]["id"]
 
 # Enabling a capability invalidates the bundle id's profiles; the INVALID ones are deleted below and made again.
 have = {c["attributes"]["capabilityType"] for c in call("GET", f"/v1/bundleIds/{bundle_pk}/bundleIdCapabilities")["data"]}
+# Sign in with Apple has no default configuration; the API wants one explicitly (as JoyoRogo's enable-capabilities.py).
+SETTINGS = {
+    "APPLE_ID_AUTH": [{"key": "APPLE_ID_AUTH_APP_CONSENT", "options": [{"key": "PRIMARY_APP_CONSENT"}]}],
+}
 for capability in wanted_capabilities:
     if capability in have:
         continue
     call("POST", "/v1/bundleIdCapabilities", {"data": {
         "type": "bundleIdCapabilities",
-        "attributes": {"capabilityType": capability},
+        "attributes": {"capabilityType": capability, **({"settings": SETTINGS[capability]} if capability in SETTINGS else {})},
         "relationships": {"bundleId": {"data": {"type": "bundleIds", "id": bundle_pk}}},
     }})
     print(f"{bundle}: enabled {capability}", file=sys.stderr)

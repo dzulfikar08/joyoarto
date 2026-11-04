@@ -212,6 +212,8 @@ security cms -D -i "$APPDIR/embedded.mobileprovision" > "$OUT/profile.plist"
 [ -z "$(plist "$OUT/profile.plist" ProvisionedDevices)" ] || fail "embedded profile lists devices (not an App Store profile)"
 codesign -d --entitlements :- "$APPDIR" > "$OUT/entitlements.plist" 2> /dev/null
 [ "$(plist "$OUT/entitlements.plist" get-task-allow)" = false ] || fail "get-task-allow is not false"
+# Sign in with Apple (App Store guideline 4.8: the app offers Google sign-in). Without the entitlement the Apple sheet fails.
+plist "$OUT/entitlements.plist" com.apple.developer.applesignin | grep -q Default || fail "no Sign in with Apple entitlement (com.apple.developer.applesignin)"
 codesign --verify --deep --strict "$APPDIR" || fail "code signature does not verify"
 authority=$(codesign -dvv "$APPDIR" 2>&1 | sed -n 's/^Authority=\(Apple Distribution.*\)/\1/p')
 [ -n "$authority" ] || fail "not signed with an Apple Distribution identity"
