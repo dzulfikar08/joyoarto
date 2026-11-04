@@ -1,6 +1,6 @@
 # Android APK for the JoyoArto app (apps/mobile). Builds on GitHub's runners, never on the laptop.
 #
-# Runs on pushes that touch apps/mobile, and by hand:
+# Manual only (a sideload APK; Play builds come from release-android.yml):
 #   gh workflow run android.yml -R dzulfikar08/joyoarto --ref <branch> [-f variant=debug]
 #   gh run download <run-id> -R dzulfikar08/joyoarto -n joyoarto-android-apk
 #   adb install -r joyoarto-release.apk
@@ -22,10 +22,6 @@ on:
         description: "ABIs (comma-separated)"
         type: string
         default: arm64-v8a
-  push:
-    paths:
-      - "apps/mobile/**"
-      - ".github/workflows/android.yml"
 
 permissions:
   contents: read
