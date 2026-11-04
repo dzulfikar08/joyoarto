@@ -5,11 +5,12 @@ import { Badge } from "@baroka/ui/components/badge";
 import { buttonVariants } from "@baroka/ui/components/button";
 import { cn } from "@baroka/ui/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Check, Plus } from "lucide-react";
+import { ArrowRight, Check, Plus, Smartphone, Users } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { PricingPlans } from "@/components/pricing";
 import { PublicFooter, PublicHeader, REPO_URL, WaitlistForm } from "@/components/public";
+import { ANDROID_SECTION_ID, ANDROID_TESTERS_GROUP_EMAIL, ANDROID_TESTERS_GROUP_URL, ANDROID_TESTING_URL } from "@/lib/app-links";
 import { useLang } from "@/lib/lang";
 
 type T = (id: ReactNode, en: ReactNode) => ReactNode;
@@ -24,6 +25,7 @@ export function Landing() {
         <Hero t={t} />
         <HowItWorks t={t} />
         <Features t={t} />
+        <AndroidTesters t={t} />
         <Privacy t={t} />
         <Pricing t={t} />
         <Waitlist t={t} />
@@ -78,6 +80,9 @@ function Hero({ t }: { t: T }) {
             <Link to="/demo" className={buttonVariants({ variant: "outline", size: "lg", className: "border-transparent" })}>
               {t("Coba demo, tanpa akun", "Try the demo, no account")} <ArrowRight aria-hidden />
             </Link>
+            <a href={`#${ANDROID_SECTION_ID}`} className={buttonVariants({ variant: "secondary", size: "lg" })}>
+              <Smartphone aria-hidden /> {t("Jadi tester Android", "Test the Android app")}
+            </a>
           </div>
           <p className="mt-3 text-sm text-muted-foreground">
             {t("Demo-nya jalan di browser kamu. Statement nggak diunggah ke mana-mana.", "The demo runs in your browser. Your statement is not uploaded anywhere.")}
@@ -242,12 +247,11 @@ function Features({ t }: { t: T }) {
     },
     {
       icon: <Icon d="M7 2h10a2 2 0 012 2v16a2 2 0 01-2 2H7a2 2 0 01-2-2V4a2 2 0 012-2zm4 17h2" />,
-      title: t("Aplikasi HP & baca notifikasi", "Mobile app & notification capture"),
+      title: t("Aplikasi Android & baca notifikasi", "Android app & notification capture"),
       body: t(
-        "Sekarang lewat web di HP dan iOS Shortcuts. Aplikasi Android yang bisa baca notifikasi bank: segera.",
-        "Today: the web app on your phone and iOS Shortcuts. An Android app that reads bank notifications: soon.",
+        "Aplikasi Android (tahap uji di Google Play) mencatat dari notifikasi Jago & GoPay dan menerima PDF statement. iPhone: segera, sementara pakai web dan iOS Shortcuts.",
+        "The Android app (testing on Google Play) captures from Jago & GoPay notifications and takes statement PDFs. iPhone: soon; meanwhile use the web app and iOS Shortcuts.",
       ),
-      soon: true,
     },
   ];
   return (
@@ -271,6 +275,80 @@ function Features({ t }: { t: T }) {
             <p className="mt-1.5 text-sm text-muted-foreground">{f.body}</p>
           </div>
         ))}
+      </div>
+    </Section>
+  );
+}
+
+/** Android closed testing: join the Google Group, then opt in on Play (lib/app-links.ts). iOS comes later via TestFlight. */
+function AndroidTesters({ t }: { t: T }) {
+  const steps = [
+    {
+      n: "1",
+      icon: <Users aria-hidden className="size-5" />,
+      title: t("Gabung grup tester", "Join the testers' group"),
+      body: t(
+        "Siapa pun bisa gabung. Pakai akun Google yang sama dengan di HP-mu.",
+        "Anyone can join. Use the same Google account as on your phone.",
+      ),
+      href: ANDROID_TESTERS_GROUP_URL,
+      cta: t("Buka Google Groups", "Open Google Groups"),
+      small: ANDROID_TESTERS_GROUP_EMAIL,
+    },
+    {
+      n: "2",
+      icon: <Smartphone aria-hidden className="size-5" />,
+      title: t("Daftar jadi tester, lalu pasang", "Opt in, then install"),
+      body: t(
+        "Ketuk “Jadi penguji” di halaman Google Play, lalu pasang JoyoArto dari Play Store. Update-nya datang lewat Play juga.",
+        "Tap “Become a tester” on the Google Play page, then install JoyoArto from the Play Store. Updates come through Play too.",
+      ),
+      href: ANDROID_TESTING_URL,
+      cta: t("Daftar di Google Play", "Opt in on Google Play"),
+    },
+  ];
+  return (
+    <Section id={ANDROID_SECTION_ID}>
+      <div className="grid gap-8 rounded-[2rem] bg-card p-6 sm:p-10 lg:grid-cols-[1fr_1.2fr] lg:items-start">
+        <div>
+          <p className="text-sm font-bold text-primary">{t("Aplikasi HP", "Phone app")}</p>
+          <h2 className="mt-1.5 text-[1.75rem] leading-tight font-extrabold tracking-tight text-balance sm:text-4xl">
+            {t("Jadi tester aplikasi Android JoyoArto.", "Test the JoyoArto Android app.")}
+          </h2>
+          <p className="mt-3 text-pretty text-muted-foreground">
+            {t(
+              "Aplikasinya sudah di Google Play, masih tahap uji. Catat cepat, baca notifikasi Jago & GoPay, dan kirim PDF statement langsung dari HP. Dua langkah untuk memasangnya:",
+              "It is on Google Play, still in testing. Quick add, capture from Jago & GoPay notifications, and send statement PDFs straight from your phone. Two steps to install it:",
+            )}
+          </p>
+          <p className="mt-5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <Badge tone="warning">{t("Segera", "Soon")}</Badge>
+            {t("iPhone: segera lewat TestFlight. Sementara itu, pakai web di Safari.", "iPhone: coming soon via TestFlight. Meanwhile, use the web app in Safari.")}
+          </p>
+        </div>
+        <ol className="space-y-3">
+          {steps.map((s) => (
+            <li key={s.n} className="rounded-3xl bg-muted/60 p-5">
+              <div className="flex items-start gap-3.5">
+                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-sm font-extrabold text-primary-foreground">{s.n}</span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold tracking-tight">{s.title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{s.body}</p>
+                  <a
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener"
+                    className="mt-3 inline-flex min-h-11 items-center gap-2.5 rounded-xl bg-foreground px-4 text-sm font-semibold text-background transition-opacity hover:opacity-90 focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
+                  >
+                    {s.icon}
+                    {s.cta}
+                  </a>
+                  {s.small && <p className="mt-2 text-xs break-all text-muted-foreground">{s.small}</p>}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ol>
       </div>
     </Section>
   );
@@ -419,8 +497,15 @@ function Faq({ t }: { t: T }) {
     [
       t("Ada aplikasi HP?", "Is there a mobile app?"),
       t(
-        "Web-nya enak dipakai di HP, dan ada iOS Shortcuts buat catat cepat. Aplikasi Android dan pencatatan dari notifikasi: segera.",
-        "The web app works well on phones, and iOS Shortcuts can quick-add. An Android app and capture from notifications: soon.",
+        "Ada untuk Android, sudah di Google Play dalam tahap uji: catat cepat, baca notifikasi Jago dan GoPay, dan kirim PDF statement dari HP. Versi iPhone segera lewat TestFlight; sementara itu web-nya enak dipakai di HP dan ada iOS Shortcuts buat catat cepat.",
+        "Yes for Android, on Google Play in testing: quick add, capture from Jago and GoPay notifications, and send statement PDFs from your phone. An iPhone version is coming via TestFlight; meanwhile the web app works well on phones and iOS Shortcuts can quick-add.",
+      ),
+    ],
+    [
+      t("Gimana cara pasang aplikasi Android-nya?", "How do I install the Android app?"),
+      t(
+        "Dua langkah. Pertama, gabung grup Google joyoarto-testers (groups.google.com/g/joyoarto-testers, siapa pun bisa gabung) pakai akun Google yang ada di HP-mu. Kedua, buka play.google.com/apps/testing/com.joyodigitama.joyoarto, ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store.",
+        "Two steps. First, join the joyoarto-testers Google Group (groups.google.com/g/joyoarto-testers, anyone can join) with the Google account on your phone. Second, open play.google.com/apps/testing/com.joyodigitama.joyoarto, tap “Become a tester”, then install JoyoArto from the Play Store.",
       ),
     ],
     [

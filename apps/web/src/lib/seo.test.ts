@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { ANDROID_TESTERS_GROUP_URL, ANDROID_TESTING_URL } from "./app-links";
 import { CONTACT_EMAIL, SITE_URL } from "./brand";
 import { PUBLIC_PATHS } from "./hosts";
 import { FAQ, OG_CARDS, PAGES, jsonLd, pageFor } from "./seo";
@@ -52,4 +53,12 @@ test("the server's security.txt contact is brand.ts's, and the server knows the 
 
 test("share cards exist as files, one per page", () => {
   for (const c of OG_CARDS) expect(Bun.file(join(web, "public", c.file)).size).toBeGreaterThan(0);
+});
+
+test("the home page's crawler body has the Android tester steps and the iOS note", () => {
+  const body = pageFor("/")!.body();
+  expect(body).toContain(`href="${ANDROID_TESTERS_GROUP_URL}"`);
+  expect(body).toContain(`href="${ANDROID_TESTING_URL}"`);
+  expect(body).toContain("TestFlight");
+  expect(FAQ.some((f) => f.a.includes("apps/testing/com.joyodigitama.joyoarto"))).toBe(true);
 });
