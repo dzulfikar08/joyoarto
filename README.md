@@ -183,10 +183,18 @@ router types, `src/lib/orpc.ts`). Structure and conventions for new screens: `ap
 - **Transactions**: search, filters (account, category or uncategorized, status, date range), infinite list by day,
   per-row categorize with a searchable picker and "remember for this merchant" (a rule that also fills in its past
   uncategorized rows), detail and edit (merchant, note; amount/date/description/account and delete for pending rows).
-- **Add sheet** (centre button): type it ("kopi 25rb gopay"), `capture.parse` drafts it, review, Save = quick add
-  (pending). Voice comes later (`src/lib/voice.ts`).
-- **More**: profile with the Google photo, Import, Accounts, Plan, Household, Settings, appearance, sign out. Accounts,
-  Plan, Household and the Joyo AI tab are placeholders for now.
+- **Add sheet** (centre button): say it (up to 60 s; expo-audio, sent to `/api/capture/transcribe`, Workers AI
+  Whisper, not stored; the only permission the app asks for, the first time the mic is tapped) or type it ("kopi 25rb
+  gopay"), `capture.parse` drafts it, review, Save = quick add (pending).
+- **Joyo AI** tab: the web's chat, streamed (the app reads `POST /api/joyo/chat` as server-sent events with
+  `expo/fetch`; oRPC's own stream decoder needs web streams Hermes lacks), markdown answers, "reading …" tool chips,
+  proposals with Confirm/Dismiss, history, starter prompts, the off and daily-cap states, and an optional own API key in
+  the phone's secure storage (removed at sign-out). On iOS nothing points to buying more.
+- **Plan & simulate** (More → Plan): the web's planner with the same templates, editors, verdicts, projection chart,
+  side by side and household saved scenarios (a scenario saved on the phone opens with the same blocks on the web). The
+  unsaved draft stays on the phone, per household.
+- **More**: profile with the Google photo, Import, Accounts, Plan, Household, Settings, appearance, sign out. Accounts
+  and Household are placeholders for now.
 - **Notification capture (Android)**: `modules/notification-capture` is a local Expo module (Kotlin) with a
   `NotificationListenerService`. Capture is off by default. When it is on, the service drops every notification whose
   package is not allow-listed (Bank Jago `com.jago.digitalBanking`, Gojek `com.gojek.app`, GoPay `com.gojek.gopay`,

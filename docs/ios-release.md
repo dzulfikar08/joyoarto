@@ -103,8 +103,13 @@ signature verifies with an Apple Distribution identity; no `NotificationCaptureM
 ## What is in the iOS app
 
 - **Same JS app as Android**: Sign in with Apple, Google sign-in (once the iOS OAuth client exists,
-  `docs/mobile-auth.md`), token and demo sign-in, the dashboard, transactions, the add sheet, statement PDF import with
-  the document picker (`expo-document-picker`, needs no permission text).
+  `docs/mobile-auth.md`), token and demo sign-in, the dashboard, transactions, the add sheet (typed or spoken), Joyo AI
+  chat, Plan & simulate, statement PDF import with the document picker (`expo-document-picker`, needs no permission
+  text).
+- **Joyo AI on iOS**: a Free daily cap reads "That's all of today's Joyo AI questions. They come back tomorrow (WIB), or
+  use your own API key." (no Joyo Pro, JoyoRogo or price; `src/lib/joyo.ts` `availability` / `chatErrorMessage`). The
+  own-key sheet has no "Get a key" link out on iOS. If App Review objects to the own API key as an unlock outside
+  In-App Purchase, hide the key sheet when `storeSafe` (one condition in `app/(tabs)/joyo.tsx`).
 - **Sign in with Apple** (guideline 4.8, because Google sign-in is offered): the `com.apple.developer.applesignin`
   entitlement (`ios.usesAppleSignIn`), and the workflow enables the `APPLE_ID_AUTH` capability on the bundle id before
   it makes the profile. The IPA check fails without the entitlement.
