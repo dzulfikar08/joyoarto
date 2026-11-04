@@ -90,6 +90,7 @@ function Root() {
         <Stack.Screen name="plan" options={{ title: "Plan & simulate" }} />
         <Stack.Screen name="household" options={{ title: "Household" }} />
         <Stack.Screen name="settings" options={{ title: "Settings" }} />
+        <Stack.Screen name="data-privacy" options={{ title: "Data & privacy" }} />
       </Stack>
       {session ? <AddSheet /> : null}
       <ToastHost />
