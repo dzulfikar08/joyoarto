@@ -133,3 +133,13 @@ the Atur project **BRK** (workspace `joyodigitama`).
      bump, 6.9" screenshots from a demo household, review notes, and a decision on In-App Purchase for Joyo Pro
      (`docs/ios-release.md` "Joyo Pro and App Review": first review with no purchase UI or link out, then JoyoFit's
      StoreKit flow through JoyoRogo if Apple asks).
+11. **Phone app v2 (Google/Apple sign-in, dashboard, transactions, add sheet).** Built; owner steps in
+    `docs/mobile-auth.md`:
+    - Google Cloud project `joyorogo` → Credentials: two Android OAuth clients for `com.joyodigitama.joyoarto` (release /
+      upload key SHA-1 from the keystore on the Linux box or the CI log line `signing key SHA1`, and Play's app-signing
+      SHA-1 from Play Console → App integrity), optionally a third for the CI debug key. One iOS client (bundle id
+      `com.joyodigitama.joyoarto`, team `F6Q6UFUK69`): put its id in `apps/mobile/app.json` `extra.googleIosClientId`
+      and in `wrangler.jsonc` `GOOGLE_NATIVE_CLIENT_IDS`.
+    - Sign in with Apple: nothing to click (the iOS workflow enables `APPLE_ID_AUTH`); check the identifier afterwards.
+    - Deploy the server (bearer sessions, `APPLE_BUNDLE_IDS`) before shipping the app build that uses them.
+    - Follow-ups for agents: `apps/mobile/AGENTS.md` "Screens still to build".
