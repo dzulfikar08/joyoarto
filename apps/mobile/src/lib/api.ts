@@ -55,7 +55,7 @@ const TIMEOUT_MS = 30_000;
 export function createApi(creds: Credentials, fetchImpl: FetchLike = fetch, options: ApiOptions = {}) {
   const base = creds.server.replace(/\/+$/, "");
 
-  async function request<T>(method: string, path: string, opts: { query?: Record<string, string | undefined>; body?: unknown; form?: FormData; timeoutMs?: number } = {}): Promise<T> {
+  async function request<T>(method: string, path: string, opts: { query?: Record<string, string | undefined>; body?: unknown; form?: FormData; timeoutMs?: number; signal?: AbortSignal } = {}): Promise<T> {
     const qs = new URLSearchParams(Object.entries(opts.query ?? {}).filter((e): e is [string, string] => e[1] !== undefined)).toString();
     const headers: Record<string, string> = { Authorization: `Bearer ${creds.token}`, Accept: "application/json" };
     let body: BodyInit | undefined;
@@ -66,6 +66,8 @@ export function createApi(creds: Credentials, fetchImpl: FetchLike = fetch, opti
     }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? TIMEOUT_MS);
+    const abort = () => controller.abort();
+    opts.signal?.addEventListener("abort", abort);
     let res: Response;
     try {
       res = await fetchImpl(`${base}/api${path}${qs ? `?${qs}` : ""}`, { method, headers, body, signal: controller.signal });
@@ -73,6 +75,7 @@ export function createApi(creds: Credentials, fetchImpl: FetchLike = fetch, opti
       throw new ApiError(controller.signal.aborted ? "The server took too long to answer." : "No connection to the server.", 0);
     } finally {
       clearTimeout(timer);
+      opts.signal?.removeEventListener("abort", abort);
     }
     const text = await res.text();
     let json: unknown = null;
@@ -116,6 +119,15 @@ export function createApi(creds: Credentials, fetchImpl: FetchLike = fetch, opti
       form.append("file", file as unknown as Blob);
       form.append("commit", commit ? "true" : "false");
       return request<StatementResult>("POST", "/imports/statement-file", { form, timeoutMs: 120_000 });
+    },
+    /**
+     * POST /api/capture/transcribe: multipart with `audio` (the voice note, at most about 60 s). The server passes it to
+     * Whisper and drops it; neither the audio nor the text is stored. Returns the text for capture.parse.
+     */
+    transcribe: (file: UploadFile, signal?: AbortSignal) => {
+      const form = new FormData();
+      form.append("audio", file as unknown as Blob);
+      return request<{ text: string }>("POST", "/capture/transcribe", { form, timeoutMs: 45_000, signal });
     },
   };
 }

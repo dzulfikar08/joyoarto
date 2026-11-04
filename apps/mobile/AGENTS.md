@@ -26,11 +26,12 @@ iOS compiles and ships through TestFlight. Read the repo's README.md "Mobile app
 | `app/accounts.tsx`, `account/[id].tsx` + `components/accounts/` | Accounts (archived collapsed), detail, add/edit sheet, archive. |
 | `app/household.tsx`, `settings.tsx`, `data-privacy.tsx` + `components/settings/` | Members, invites (share sheet), switch; billing (`src/lib/billing.ts`), Claude, API tokens, theme; export and deletion. |
 | `components/session-only.tsx` | `useHasSession()` / `SessionOnlyNote`: tokens, invites, email-in, export and deletion need a Google/Apple sign-in. |
-| `app/plan.tsx` | Placeholder (`components/coming-soon.tsx`) for the follow-up screen. |
+| `app/plan.tsx`, `components/plan/` | Plan & simulate: baseline, scenario editors (loans with sale terms, baby, one-offs, monthly costs, income changes), projection chart, side by side, saved scenarios. State and form mapping: `src/lib/plan-state.ts` (same block shape as the web's `view`); draft per household on the phone: `src/lib/plan-draft.ts`. |
+| `app/(tabs)/joyo.tsx`, `components/joyo/` | Joyo AI chat: streamed answers (`src/lib/joyo-stream.ts`), markdown from the shared parser, tool chips, proposal cards, history, own API key (`src/lib/joyo-byok.ts`, secure store). |
 | `components/ui/` | The UI kit. Import from `@/components/ui`. |
 | `components/nav/floating-tab-bar.tsx` | The tab bar (port of JoyoRogo's). |
 | `components/charts/` | react-native-svg charts (donut, cash flow, pace). |
-| `components/add/add-sheet.tsx` | Type → parse → review → save (quick add). |
+| `components/add/add-sheet.tsx` | Say it or type it → parse → review → save (quick add). Voice: `src/lib/voice.ts` (expo-audio) and `src/lib/voice-state.ts` (pure). |
 | `components/transactions/` | Row, category sheet (with "remember merchant" rule), filter sheet. |
 | `components/data.ts` | Shared reads (`useAccounts`, `useCategories`, picker groups, `useMe`) and `invalidateLedger()`. |
 | `src/lib/` | Pure logic and bindings: API clients, session, query policy, formatting, options, filters, dashboard maths. |
@@ -43,8 +44,11 @@ iOS compiles and ships through TestFlight. Read the repo's README.md "Mobile app
   lists: `orpc.transactions.search.infiniteOptions(...)`; writes: `useMutation({ mutationFn: (v) => client.x.y(v) })`
   then `invalidateLedger()` (or invalidate `orpc.<router>.key()`). Output types: `Out<AppRouterClient["x"]["y"]>` from
   `src/lib/rpc.ts`.
-- The REST client (`src/lib/api.ts`) stays for multipart uploads (statement PDFs, later voice notes) and for the
-  headless capture task. Both send `Authorization: Bearer <token>` from the session (`src/lib/auth.ts`).
+- The REST client (`src/lib/api.ts`) stays for multipart uploads (statement PDFs, voice notes) and for the headless
+  capture task.
+- **Streams**: oRPC's event-iterator decoding needs `TextDecoderStream`/`TransformStream`, which Hermes lacks. For a
+  streamed procedure call its REST route with `expo/fetch` and decode the server-sent events with
+  `src/lib/joyo-stream.ts` (`createSseDecoder`, `createUtf8Decoder`, `streamJoyoChat` as the example). Both send `Authorization: Bearer <token>` from the session (`src/lib/auth.ts`).
 - Pure runtime helpers from `@baroka/api/lib/*` may be imported when they have no server dependencies
   (`amount-text`, `money`); never import services, routers or anything touching D1.
 - Errors: `errorMessage(e, { storeSafe })` from `src/lib/errors.ts` for anything shown. On iOS (`storeSafe`) never show
@@ -87,12 +91,7 @@ tested) holds `{ server, token, kind, me }`.
 
 Each replaces a placeholder or a "coming" note; the web page is the spec.
 
-- Done: **Import**, **Accounts**, **Household / Settings / Billing / Data & privacy**, **Budgets editing** (Nov 2026).
-- **Plan & simulate** (`app/plan.tsx`): `plan.baseline/simulate/compare/templates/scenarios.*`; web `routes/plan.tsx`.
-- **Joyo AI chat** (`app/(tabs)/joyo.tsx`): `joyo.*` (streamed events, proposals with Confirm/Dismiss), JoyoRogo's chat
-  UI for reference; web `routes/joyo.tsx`.
-- **Voice quick add**: `src/lib/voice.ts` is the hook the add sheet already calls (expo-audio, multipart to
-  `/api/capture/transcribe`, then `capture.parse`). Adds the microphone permission: update `app.json`, the iOS IPA check
-  in `scripts/ios/build-ios.sh` (it refuses any `NS*UsageDescription`) and docs/ios-release.md's App Privacy answers.
+- Done: **Import**, **Accounts**, **Household / Settings / Billing / Data & privacy**, **Budgets editing**, **Plan &
+  simulate**, **Joyo AI chat**, **Voice quick add** (Nov 2026).
 - **OTA updates** (expo-updates + EAS Update like
   JoyoRogo's docs/ota.md; needs an EAS project id from the owner).
