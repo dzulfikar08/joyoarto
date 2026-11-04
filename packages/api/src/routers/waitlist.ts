@@ -8,7 +8,7 @@ import * as waitlist from "../services/waitlist";
 const tags = ["waitlist"];
 
 /** Operators only: a signed-in browser session whose email is in ADMIN_EMAILS. */
-const adminProcedure = sessionProcedure.use(async ({ context, next }) => {
+export const adminProcedure = sessionProcedure.use(async ({ context, next }) => {
   const admins = context.request?.adminEmails ?? [];
   const [u] = await context.db.select({ email: schema.user.email }).from(schema.user).where(eq(schema.user.id, context.principal.userId));
   if (!u || !admins.includes(u.email.toLowerCase())) throw new ORPCError("FORBIDDEN", { message: "Only JoyoArto's operators can see this." });

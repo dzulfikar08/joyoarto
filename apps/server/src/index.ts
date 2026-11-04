@@ -2,6 +2,7 @@ import type { AiConfig, RequestInfo, ServerConfig } from "@baroka/api/context";
 import { DEFAULT_CHAT_MODEL, DEFAULT_WORKERS_AI_MODEL } from "@baroka/api/lib/joyo-ai/chat";
 import { capFrom } from "@baroka/api/lib/joyo-ai/limits";
 import { appRouter } from "@baroka/api/routers/index";
+import { seedDemo } from "@baroka/api/services/demo";
 import { SmartCoercionPlugin } from "@orpc/json-schema";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
@@ -38,6 +39,15 @@ app.use(
 );
 
 registerMcpRoutes(app);
+
+// Demo codes are guessable only by trying: a few attempts a minute per IP (the waitlist's limiter, its own bucket).
+app.post("/api/auth/sign-in/demo", async (c, next) => {
+  const limiter = env.WAITLIST_LIMITER;
+  if (limiter && !(await limiter.limit({ key: `demo:${c.req.header("CF-Connecting-IP") ?? "unknown"}` })).success) {
+    return c.json({ message: "Too many attempts. Try again in a minute." }, 429);
+  }
+  return next();
+});
 
 app.on(["POST", "GET"], "/api/auth/*", (c) => getAuth().handler(c.req.raw));
 
@@ -86,7 +96,10 @@ function requestInfo(request: Request): RequestInfo {
   };
 }
 
-const serverConfig: ServerConfig = { importEmailDomain: env.IMPORT_EMAIL_DOMAIN?.trim().toLowerCase() || null };
+const serverConfig: ServerConfig = {
+  importEmailDomain: env.IMPORT_EMAIL_DOMAIN?.trim().toLowerCase() || null,
+  demoCode: env.DEMO_LOGIN_CODE?.trim() || null,
+};
 
 const effort = env.JOYO_AI_EFFORT?.trim();
 
@@ -139,8 +152,12 @@ app.get("/", (c) => c.text("JoyoArto API. Docs: /api/docs, MCP: /mcp"));
 // installed yet, storage cleared) the shared files cannot be handed to the page, so the import page says so.
 app.post("/share-target", (c) => c.redirect(`${(env.APP_URL ?? "").replace(/\/$/, "")}/import?shared=failed`, 303));
 
-/** HTTP (Hono) and inbound email (Cloudflare Email Routing, see ./email.ts) on the same Worker. */
+/** HTTP (Hono), inbound email (Cloudflare Email Routing, see ./email.ts) and the daily cron on the same Worker. */
 export default {
   fetch: app.fetch,
   email: (message: ForwardableEmailMessage) => handleEmail(message),
+  // Daily (wrangler.jsonc triggers): the demo account's made-up data starts over, when demo login is on.
+  scheduled: async (_controller: ScheduledController, _env: unknown, ctx: ExecutionContext) => {
+    if (env.DEMO_LOGIN_CODE?.trim()) ctx.waitUntil(seedDemo(getDb()).then((r) => console.log("demo reset", r)));
+  },
 } satisfies ExportedHandler;

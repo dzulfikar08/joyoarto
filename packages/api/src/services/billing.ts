@@ -9,6 +9,7 @@ import { and, count, eq, gt, isNull, sql } from "drizzle-orm";
 
 import type { Principal } from "../context";
 import type { BillingConfig } from "../lib/billing/config";
+import { isDemoUser } from "../lib/demo";
 import { localEntitlement, resolveEntitlement, wibMonth } from "../lib/billing/entitlement";
 import type { Entitlement } from "../lib/billing/entitlement";
 import { JoyoProUnauthorized, answerIsPro, cacheRow, failOpen, fetchJoyoPricing, fetchJoyoPro } from "../lib/billing/joyo-pro";
@@ -110,6 +111,7 @@ export async function joyoStatus(db: Database, userId: string, config: BillingCo
 export type UserPlan = { entitlement: Entitlement; limits: PlanLimits; joyo: JoyoStatus | null };
 
 const SELF_HOST: UserPlan = { entitlement: { plan: "pro", source: "selfhost", until: null }, limits: PLAN_LIMITS.pro, joyo: null };
+const DEMO: UserPlan = { entitlement: { plan: "pro", source: "grant", until: null }, limits: PLAN_LIMITS.pro, joyo: null };
 
 /**
  * The user's plan now. Without billing (self-host, tests) everyone is Pro and nothing is read. `askJoyo: "always"`
@@ -123,6 +125,8 @@ export async function userPlan(
   opts: { now?: Date; askJoyo?: "ifNeeded" | "always" } = {},
 ): Promise<UserPlan> {
   if (!config?.enforced) return SELF_HOST;
+  // Store reviewers see everything.
+  if (isDemoUser(userId)) return DEMO;
   const now = opts.now ?? new Date();
   const [u] = await db.select({ email: schema.user.email, createdAt: schema.user.createdAt }).from(schema.user).where(eq(schema.user.id, userId));
   const local = u ? localEntitlement({ config, email: u.email, userCreatedAt: u.createdAt, now }) : null;

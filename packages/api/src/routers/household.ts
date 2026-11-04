@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { readProcedure, sessionProcedure, writeProcedure } from "../index";
+import { refuseDemo } from "../lib/demo";
 import * as account from "../services/account";
 import * as household from "../services/household";
 
@@ -48,7 +49,10 @@ export const householdRouter = {
       summary: "Delete the active household and all its finance data (owner, session only; type its name to confirm)",
     })
     .input(account.deleteHouseholdInput)
-    .handler(({ context, input }) => account.deleteHousehold(context.db, context.principal, input)),
+    .handler(({ context, input }) => {
+      refuseDemo(context.principal.userId, "deleteHousehold");
+      return account.deleteHousehold(context.db, context.principal, input);
+    }),
   leave: writeProcedure
     .route({
       method: "POST",
@@ -56,7 +60,10 @@ export const householdRouter = {
       tags,
       summary: "Leave the active household (not as its last owner)",
     })
-    .handler(({ context }) => household.leaveHousehold(context.db, context.principal)),
+    .handler(({ context }) => {
+      refuseDemo(context.principal.userId, "leaveHousehold");
+      return household.leaveHousehold(context.db, context.principal);
+    }),
 
   members: {
     setRole: writeProcedure
@@ -88,7 +95,10 @@ export const householdRouter = {
         summary: "Invite an email address (owner); the link is shown once",
       })
       .input(household.inviteInput)
-      .handler(({ context, input }) => household.createInvite(context.db, context.principal, input, context.billing)),
+      .handler(({ context, input }) => {
+        refuseDemo(context.principal.userId, "invite");
+        return household.createInvite(context.db, context.principal, input, context.billing);
+      }),
     revoke: writeProcedure
       .route({
         method: "DELETE",
@@ -115,6 +125,9 @@ export const householdRouter = {
         summary: "Join the invite's household and make it active",
       })
       .input(household.tokenInput)
-      .handler(({ context, input }) => household.acceptInvite(context.db, context.principal, input, context.billing)),
+      .handler(({ context, input }) => {
+        refuseDemo(context.principal.userId, "acceptInvite");
+        return household.acceptInvite(context.db, context.principal, input, context.billing);
+      }),
   },
 };

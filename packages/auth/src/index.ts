@@ -31,6 +31,11 @@ export type AuthHooks = {
   onUserCreated?: (user: { id: string; name: string }) => Promise<void>;
   /** Lets an email that is not on ALLOWED_EMAILS sign up (a pending household invite). */
   canSignUp?: (email: string) => Promise<boolean>;
+  /**
+   * The store reviewers' demo account: checks the code (DEMO_LOGIN_CODE) and resets the demo data. Unset = no
+   * /sign-in/demo endpoint at all.
+   */
+  demoSignIn?: (code: string) => Promise<{ ok: true; userId: string } | { ok: false; reason: "off" | "wrong" }>;
 };
 
 export type BarokaAuth = ReturnType<typeof createAuth>;
@@ -57,6 +62,32 @@ function devLogin(enabled: boolean): BetterAuthPlugin {
             if (!session) throw new APIError("INTERNAL_SERVER_ERROR", { message: "Could not create a dev session" });
             await setSessionCookie(ctx, { session, user });
             return ctx.json({ user });
+          }),
+        }
+      : {},
+  };
+}
+
+/** Web sign-in to the demo account with a demo code (packages/api/src/services/demo.ts decides and seeds). */
+function demoLogin(signIn: AuthHooks["demoSignIn"]): BetterAuthPlugin {
+  return {
+    id: "demo-login",
+    endpoints: signIn
+      ? {
+          signInDemo: createAuthEndpoint("/sign-in/demo", { method: "POST" }, async (ctx) => {
+            const code = typeof (ctx.body as { code?: unknown } | undefined)?.code === "string" ? (ctx.body as { code: string }).code : "";
+            if (!code.trim() || code.length > 200) throw new APIError("BAD_REQUEST", { message: "Enter the demo code." });
+            const result = await signIn(code);
+            if (!result.ok) {
+              if (result.reason === "off") throw new APIError("NOT_FOUND", { message: "Demo login is not available on this server." });
+              throw new APIError("UNAUTHORIZED", { message: "That demo code is not right." });
+            }
+            const adapter = ctx.context.internalAdapter;
+            const user = await adapter.findUserById(result.userId);
+            const session = user && (await adapter.createSession(user.id));
+            if (!user || !session) throw new APIError("INTERNAL_SERVER_ERROR", { message: "Could not start a demo session" });
+            await setSessionCookie(ctx, { session, user });
+            return ctx.json({ user: { id: user.id, name: user.name } });
           }),
         }
       : {},
@@ -194,6 +225,6 @@ export function createAuth(env: AuthConfig, database: Database, hooks: AuthHooks
       defaultCookieAttributes: { sameSite: "none", secure: true, httpOnly: true },
     },
     disabledPaths: ["/token"],
-    plugins: [devLogin(Boolean(env.DEV_LOGIN)), ...mcpPlugins(env)],
+    plugins: [devLogin(Boolean(env.DEV_LOGIN)), demoLogin(hooks.demoSignIn), ...mcpPlugins(env)],
   });
 }

@@ -39,6 +39,11 @@ export type Env = BillingEnv & {
   JOYO_AI_DAILY_CAP?: string;
   /** Voice notes plus AI parses per member per day (default 60). */
   JOYO_CAPTURE_DAILY_CAP?: string;
+  /**
+   * Secret. The code store reviewers type to reach the demo account (made-up data, reset daily). Unset = demo login off.
+   * Never commit it: `wrangler secret put DEMO_LOGIN_CODE`.
+   */
+  DEMO_LOGIN_CODE?: string;
 };
 
 export const env = workerEnv as unknown as Env;

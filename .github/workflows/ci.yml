@@ -43,6 +43,7 @@ jobs:
       - name: Tests
         run: |
           (cd packages/api && bun test src)
+          (cd packages/auth && bun test src)
           (cd apps/web && bun test src)
           (cd apps/server && bun test src)
       - name: Lint

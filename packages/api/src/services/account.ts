@@ -469,7 +469,7 @@ export async function disconnectApp(db: Database, p: Pick<Principal, "userId">, 
 // ------------------------------------------------------------------------------------------------ deletion
 
 /** Deletes a household and everything in it. Transactions first, in pages, so no single statement runs long. */
-async function purgeHousehold(db: Database, householdId: string): Promise<{ transactions: number }> {
+export async function purgeHousehold(db: Database, householdId: string): Promise<{ transactions: number }> {
   let transactions = 0;
   for (;;) {
     const page = db.select({ id: t.id }).from(t).where(eq(t.householdId, householdId)).limit(DELETE_PAGE);
