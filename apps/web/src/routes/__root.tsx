@@ -2,11 +2,16 @@ import type { QueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { hostRedirect } from "@/lib/hosts";
 import { Link, Outlet, createRootRouteWithContext, useRouterState } from "@tanstack/react-router";
+import { Suspense, lazy, useEffect } from "react";
 import BottomNav, { BOTTOM_NAV_SPACE, DesktopBar } from "@/components/bottom-nav";
-import { AddSheet } from "@/components/add-sheet";
 import { Wordmark } from "@/components/kit";
-import { UpgradeSheet } from "@/components/upgrade";
+import { NotFound } from "@/components/not-found";
 import { sessionQuery } from "@/lib/auth";
+import { syncHead } from "@/lib/head";
+
+// Signed-in only: kept out of the entry chunk so the public pages do not download the add sheet (comboboxes, voice).
+const AddSheet = lazy(() => import("@/components/add-sheet").then((m) => ({ default: m.AddSheet })));
+const UpgradeSheet = lazy(() => import("@/components/upgrade").then((m) => ({ default: m.UpgradeSheet })));
 
 function Shell() {
   const path = useRouterState({ select: (s) => s.location.pathname });
@@ -17,6 +22,8 @@ function Shell() {
   const nav = !bare && !!session;
   // The chat keeps its composer at the bottom of the screen and manages its own spacing.
   const chat = path === "/joyo";
+  // Title, description, canonical and share tags follow client-side navigation (first loads are prerendered).
+  useEffect(() => syncHead(path), [path]);
   return (
     <div className="min-h-dvh bg-background">
       {nav && <DesktopBar />}
@@ -35,8 +42,10 @@ function Shell() {
       {nav && (
         <>
           <BottomNav />
-          <AddSheet />
-          <UpgradeSheet />
+          <Suspense fallback={null}>
+            <AddSheet />
+            <UpgradeSheet />
+          </Suspense>
         </>
       )}
     </div>
@@ -51,4 +60,5 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     if (to) window.location.replace(to);
   },
   component: Shell,
+  notFoundComponent: NotFound,
 });

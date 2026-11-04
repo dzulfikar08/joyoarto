@@ -17,11 +17,13 @@ import { handleEmail } from "./email";
 import { env } from "./env";
 import { registerMcpPublicCors, registerMcpRoutes } from "./mcp";
 import { resolvePrincipal } from "./principal";
+import { registerSeoRoutes } from "./seo";
 import { getAuth, getDb } from "./services";
 
 const app = new Hono();
 
 app.use(logger());
+registerSeoRoutes(app);
 registerMcpPublicCors(app);
 app.use(
   "/*",

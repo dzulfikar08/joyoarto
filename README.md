@@ -344,8 +344,9 @@ After changing `packages/db/src/schema`, run `bun run db:generate` and apply the
 ## Deploy (Cloudflare)
 
 One worker (`baroka`, config in `apps/server/wrangler.jsonc`) serves the web app's static build and the API on the same
-origin, so auth cookies stay first-party. Live at https://app.arto.joyorogo.com (landing page: https://arto.joyorogo.com) (D1 database `baroka`). The web app's public origin for canonical/OG tags is
-`VITE_PUBLIC_URL` in `apps/web/.env.production`.
+origin, so auth cookies stay first-party. Live at https://app.arto.joyorogo.com (landing page: https://arto.joyorogo.com) (D1 database `baroka`). The public origin for canonical URLs, share
+tags and the sitemap is `SITE_URL` in `apps/web/src/lib/brand.ts`; search and link previews are described in
+[docs/SEO.md](docs/SEO.md).
 
 ```sh
 bun run db:migrate:remote   # after a schema change
@@ -358,7 +359,7 @@ Secrets (`wrangler secret put`, in apps/server): `BETTER_AUTH_SECRET` (set), `GO
 `wrangler deploy --var` from the `production` environment's variables (GitHub → Settings → Environments), and refuses
 to deploy without them. Deploying by hand: `bunx wrangler deploy --var ALLOWED_EMAILS:you@example.com --var ADMIN_EMAILS:you@example.com`.
 Google OAuth redirect URI: `https://app.arto.joyorogo.com/api/auth/callback/google`. Moving to a custom
-domain means updating the four URL vars in wrangler.jsonc, `VITE_PUBLIC_URL`, the Google redirect URI, and reconnecting Claude.
+domain means updating the four URL vars in wrangler.jsonc, `SITE_URL`/`APP_ORIGIN` in brand.ts (and the hosts in `apps/web/index.html`, `public/_headers`, `apps/server/src/seo.ts`), the Google redirect URI, and reconnecting Claude.
 
 ## Connecting Claude
 

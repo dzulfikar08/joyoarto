@@ -19,8 +19,10 @@
     "directory": "../web/dist",
     "not_found_handling": "single-page-application",
     // /share-target: the PWA share target. The service worker answers it; this is the fallback when it is not installed.
-    // Static files (manifest.webmanifest, sw.js, icons) are served from assets.
-    "run_worker_first": ["/api/*", "/rpc/*", "/mcp", "/.well-known/*", "/share-target"]
+    // /robots.txt differs per host (apps/server/src/seo.ts); /.well-known/security.txt is answered there too.
+    // Static files (manifest.webmanifest, sw.js, icons, sitemap.xml, og/*) and the public pages are served from
+    // assets, with headers from apps/web/public/_headers (X-Robots-Tag: noindex on every host but arto.joyorogo.com).
+    "run_worker_first": ["/api/*", "/rpc/*", "/mcp", "/.well-known/*", "/share-target", "/robots.txt"]
   },
   "d1_databases": [
     {

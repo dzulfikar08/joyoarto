@@ -36,6 +36,7 @@ jobs:
         run: |
           bunx vite build
           bunx tsc --noEmit
+          bunx tsc --noEmit -p tsconfig.scripts.json
       - name: Packages and server typecheck
         run: |
           for p in packages/api packages/db packages/auth packages/ui apps/server; do echo "== $p"; (cd $p && bunx tsc --noEmit); done
@@ -43,5 +44,6 @@ jobs:
         run: |
           (cd packages/api && bun test src)
           (cd apps/web && bun test src)
+          (cd apps/server && bun test src)
       - name: Lint
         run: bunx oxlint
