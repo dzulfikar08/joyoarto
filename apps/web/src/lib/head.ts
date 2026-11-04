@@ -1,7 +1,7 @@
 // Keeps <head> in step with client-side navigation between public pages. The first load already has the right tags
 // (scripts/prerender.ts writes them per page); this only matters after the router changes page without a reload.
 
-import { LANDING_HOST, OG_SIZE, SITE_NAME, pageFor, url } from "./seo";
+import { LANDING_HOST, OG_SIZE, SITE_NAME, pageFor, url, ogPath } from "./seo";
 
 function setMeta(attr: "name" | "property", key: string, value: string) {
   let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
@@ -42,7 +42,7 @@ export function syncHead(pathname: string) {
     return;
   }
   const social = page.social ?? { title: page.title, description: page.description };
-  const image = url(`/${page.og.file}`);
+  const image = url(ogPath(page.og));
   document.title = page.title;
   setMeta("name", "description", page.description);
   setCanonical(url(page.path));

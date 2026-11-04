@@ -24,6 +24,13 @@ export const PRO_MONTHLY_IDR = [15000, 29000, 49000] as const;
 export type OgCard = { file: string; eyebrow?: string; title: [string, string]; sub: string; alt: string };
 
 const card = (c: OgCard) => c;
+/**
+ * Bump when the cards change (scripts/og.ts): WhatsApp, Telegram, X and Facebook cache share images by URL for days,
+ * so a new ?v= makes them fetch the new picture.
+ */
+export const OG_VERSION = "20261104b";
+/** Absolute-path URL of a share card, versioned for scraper caches. */
+export const ogPath = (c: Pick<OgCard, "file">) => `/${c.file}?v=${OG_VERSION}`;
 export const OG = {
   home: card({
     file: "og/home.png",
@@ -41,7 +48,7 @@ export const OG = {
   pricing: card({
     file: "og/pricing.png",
     eyebrow: "Harga",
-    title: ["Gratis untuk mulai.", "Pro untuk sekeluarga."],
+    title: ["Gratis untuk mulai.", "Satu Pro, tiga aplikasi."],
     sub: "Satu langganan Joyo Pro: JoyoArto, JoyoRogo dan JoyoFit.",
     alt: "Harga JoyoArto: gratis untuk mulai, Joyo Pro satu langganan untuk JoyoArto, JoyoRogo dan JoyoFit.",
   }),
@@ -197,7 +204,7 @@ export const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;")
 export function headTags(page: PublicPage): string {
   const canonical = url(page.path);
   const social = page.social ?? { title: page.title, description: page.description };
-  const image = url(`/${page.og.file}`);
+  const image = url(ogPath(page.og));
   const meta = (attr: "name" | "property", key: string, value: string | number) => `<meta ${attr}="${key}" content="${esc(String(value))}" />`;
   return [
     `<title>${esc(page.title)}</title>`,
@@ -262,7 +269,7 @@ export function jsonLd(page: PublicPage): Record<string, unknown> {
       inLanguage: "id-ID",
       isPartOf: { "@id": SITE_ID },
       about: { "@id": APP_ID },
-      primaryImageOfPage: { "@type": "ImageObject", url: url(`/${page.og.file}`), width: OG_SIZE.width, height: OG_SIZE.height },
+      primaryImageOfPage: { "@type": "ImageObject", url: url(ogPath(page.og)), width: OG_SIZE.width, height: OG_SIZE.height },
     },
   ];
   if (page.path === "/" || page.path === "/pricing") graph.push(softwareApplication());
@@ -289,7 +296,7 @@ function softwareApplication(): Record<string, unknown> {
     applicationCategory: "FinanceApplication",
     operatingSystem: "Web, Android",
     inLanguage: ["id-ID", "en-US"],
-    image: url(`/${OG.home.file}`),
+    image: url(ogPath(OG.home)),
     publisher: { "@id": ORG_ID },
     license: "https://www.gnu.org/licenses/agpl-3.0.html",
     isAccessibleForFree: true,
