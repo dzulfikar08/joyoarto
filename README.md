@@ -275,39 +275,45 @@ editable draft, then Save, which is `transactions.quickAdd` (pending, as before)
 
 ## JoyoArto Pro (billing)
 
-JoyoArto is AGPL and free to self-host; the hosted service sells **Pro**, bought for the **household** (every member
-shares it). Ported from JoyoRogo's billing.
+JoyoArto is AGPL and free to self-host. On the hosted service the paid plan is **Joyo Pro**: one subscription per
+**account**, shared by JoyoRogo, JoyoFit and JoyoArto. **JoyoRogo's server is the only billing authority** (as it already
+is for JoyoFit): Joyo Pro is bought, renewed and managed in JoyoRogo with the same Google account. JoyoArto sells
+nothing, holds no payment credentials and receives no payment webhooks.
 
 - **Free vs Pro** live in one module, `packages/api/src/lib/billing/plans.ts`: Free has manual entries, quick add and CSV
-  import, 2 statement imports a month (WIB, counted in `usage_counter` when an import saves rows; previews are refused
-  once they are used), 5 hosted Joyo AI questions a day and 2 members (pending invites count). Pro: unlimited statement
-  imports (bulk, email-in, share-to-app), the server's `JOYO_AI_DAILY_CAP`, 6 members, saved Plan scenarios and the
-  Claude connector (MCP). The REST API, tokens and the phone app work on Free.
+  import, 2 statement imports a month per user (WIB, counted in `usage_counter` when an import saves rows; previews are
+  refused once they are used), 5 hosted Joyo AI questions a day and households of 2 (pending invites count). Pro:
+  unlimited statement imports (bulk, email-in, share-to-app), the server's `JOYO_AI_DAILY_CAP`, 6 members, saved Plan
+  scenarios and the Claude connector (MCP). The REST API, tokens and the phone app work on Free.
+- **Per account, not per household.** Every limit follows the **acting user's** plan; a household has no plan. Member
+  seats follow the **inviter's** plan (an invite without a known inviter gets the Free limit). Email-in follows the
+  sender's plan.
 - **Enforcement** is server-side (`services/billing.ts`): a limit throws `FORBIDDEN` with `data: { upgrade: true,
-  feature }`; the web client's interceptor (`apps/web/src/lib/orpc.ts`) opens the upgrade sheet. A Free household's MCP
-  connector stays connected but every tool answers that it needs Pro. Downgrades delete nothing: saved scenarios stay
-  readable and editable, only new ones need Pro.
-- **Plan resolution** (`lib/billing/entitlement.ts`): billing off → everyone Pro; a member on `PRO_EMAILS`/`ADMIN_EMAILS`
-  → Pro; a live paid entitlement (`household_entitlement`, one row per provider: `active`/`canceled` until `period_end`,
-  `past_due` for 7 more days) → Pro; households created before `PRO_GRANDFATHER_CREATED_BEFORE` → Pro until
-  `PRO_GRANDFATHER_UNTIL`; new households → `PRO_TRIAL_DAYS` of Pro; else Free.
-- **Limits apply only with `PAYWALL=1` and a gateway's secrets set**, so a self-host (or the hosted server before its
-  DOKU keys are in) never shows prompts nobody can act on.
-- **DOKU Checkout** (IDR: QRIS, e-wallets, VA), the primary gateway: `billing.checkout` creates an `ART-…` order in
-  `billing_order` and DOKU's hosted page; the buyer returns to `/payment?order=…`, which polls and offers "check payment"
-  (`billing.checkOrder` asks DOKU's status API). Prepaid months, never auto-renewed; they stack after any Pro time the
-  household has (trial and grandfathered included). Webhook `POST /api/billing/doku/webhook`: HMAC signature, amount
-  check, and a single pending → paid flip in one D1 batch, so replays extend once. Sandbox (`DOKU_ENV`) until switched.
-- **Polar** (USD cards, merchant of record, auto-renewing): `billing.polarCheckout`, `billing.portal` (cancel, invoices).
-  The household id is Polar's `external_customer_id`. Webhook `POST /api/billing/polar/webhook`: Standard Webhooks
-  signature, deliveries recorded in `billing_event` by `webhook-id`, older `modified_at` never overwrites newer state.
-- **Founder price**: `PRO_FOUNDER_*_IDR` for the first `PRO_FOUNDER_SLOTS` paying households; a household that bought at
-  it keeps it. Prices are wrangler vars (placeholders until the owner confirms them); the pricing page and landing read
-  them from `billing.pricing`.
-- **Store billing later**: `household_entitlement.provider` already allows `google_play` and `apple`; a Play purchase
-  becomes another row for the household and the same resolver picks it up.
-- Web: `/pricing` (public), the landing page's Pricing section, Settings → Billing (plan, renewal, usage, orders, card
-  portal), `/payment`.
+  feature }`; the web client's interceptor (`apps/web/src/lib/orpc.ts`) opens the upgrade sheet. A Free user's MCP
+  connector stays connected but every tool answers that it needs Pro. Downgrades delete nothing.
+- **Plan resolution** (`lib/billing/entitlement.ts`, `services/billing.ts` `userPlan`): billing off → everyone Pro; email
+  on `PRO_EMAILS`/`ADMIN_EMAILS` → Pro; accounts created before `PRO_GRANDFATHER_CREATED_BEFORE` → Pro until
+  `PRO_GRANDFATHER_UNTIL`; new accounts → `PRO_TRIAL_DAYS` of Pro; else **Joyo Pro from JoyoRogo**; else Free. Limit
+  checks skip the JoyoRogo call while a local rule already grants Pro; Settings → Billing always asks.
+- **Asking JoyoRogo** (`lib/billing/joyo-pro.ts`): `POST {JOYOROGO_API_URL}/api/internal/joyo-pro/status` with header
+  `x-joyo-internal-key: JOYO_INTERNAL_KEY` and body `{ googleSub?, email }` → `{ pro, until, plan, source }`. Both apps sign
+  in with the same Google OAuth client, so `googleSub` is better-auth's `account.accountId` for provider `google`; the
+  email is sent only when verified. Answers are cached per user in `joyo_pro_status` (Pro 10 minutes, not-Pro 2). If
+  JoyoRogo is unreachable or refuses the key, a user it confirmed stays Pro for at most 24 h past the last end it
+  confirmed (a lifetime grant stays); a user it never confirmed stays Free; a failed call is not retried for that user
+  for a minute.
+- **Billing is on only with `PAYWALL=1` and `JOYO_INTERNAL_KEY` set.** No key (a self-host) = billing off, everyone Pro,
+  no pricing page, nothing sent to JoyoRogo.
+- **Prices** are JoyoRogo's own, read at runtime from its public `GET /api/config` (cached 10 minutes per isolate), so
+  they never drift: the founder ladder step (today `10:15000/149000,60:29000/199000,:49000/349000`), the
+  "X slots left at this price, then Rp Y" promo and the USD price. If JoyoRogo does not answer, the page shows no
+  numbers and points to JoyoRogo.
+- **Buying:** "Upgrade" links to `JOYO_PRO_URL` (JoyoRogo's `/pro`) with `?from=joyoarto`. Pro shows up in JoyoArto at
+  the next check (within ~2 minutes for a user who was Free).
+- Web: `/pricing` (public), the landing page's Pricing section, Settings → Billing (plan and until from JoyoRogo, usage,
+  "Manage in JoyoRogo").
+- **Phone app purchases (later):** Google Play and App Store purchases in the JoyoArto app will go through JoyoRogo's
+  `/api/billing/google` and `/api/billing/apple`, like JoyoFit (docs/HANDOFF.md).
 
 ## Data & privacy (UU PDP)
 
@@ -353,7 +359,8 @@ bun run deploy              # builds apps/web, deploys the worker
 ```
 
 Secrets (`wrangler secret put`, in apps/server): `BETTER_AUTH_SECRET` (set), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
-`ANTHROPIC_API_KEY` (optional), and for Pro billing `DOKU_CLIENT_ID`, `DOKU_SECRET_KEY`, `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET`.
+`ANTHROPIC_API_KEY` (optional), and for Joyo Pro `JOYO_INTERNAL_KEY` (the same value as on JoyoRogo's server; unset = billing
+off). No payment secrets: JoyoRogo sells Joyo Pro.
 `ALLOWED_EMAILS` and `ADMIN_EMAILS` (comma-separated) are not in wrangler.jsonc: `deploy.yml` passes them with
 `wrangler deploy --var` from the `production` environment's variables (GitHub → Settings → Environments), and refuses
 to deploy without them. Deploying by hand: `bunx wrangler deploy --var ALLOWED_EMAILS:you@example.com --var ADMIN_EMAILS:you@example.com`.

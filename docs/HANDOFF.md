@@ -32,6 +32,28 @@ the Atur project **BRK** (workspace `joyodigitama`).
 3. **README rewrite with screenshots:** take them from production using a demo household (never the owner's real data). Cover the phone and desktop dashboard, transactions, import, plan, Joyo AI and the Claude connector.
 4. **Uncategorized transactions (about 29):** ask the owner about the remaining merchants and personal transfers (see `search_transactions uncategorized=true` in the live ledger; never list counterparties in the repo).
 5. **Backlog in Atur:** BCA PDF parser (waiting on a sample), Plan upgrade-path UX, shorter share links, BCA CSV check against a real export, Cloudflare WAF skip for /api and /mcp, audit pruning cron, own Google OAuth brand.
-6. **Pro billing (built, not live):** README "JoyoArto Pro". Before launch: confirm prices, founder offer, grandfather date
-   and refund policy (wrangler vars, `/syarat`); set the DOKU (sandbox first) and Polar secrets and webhook URLs; switch
-   `DOKU_ENV`/`POLAR_SERVER` to `production`. Limits stay off until a gateway's secrets exist.
+6. **Joyo Pro (built, not live).** JoyoArto no longer sells anything: Joyo Pro is one subscription per account, sold by
+   JoyoRogo (the only billing authority) and shared by JoyoRogo, JoyoFit and JoyoArto (README "JoyoArto Pro"). Before
+   limits go live:
+   - JoyoRogo must deploy `POST /api/internal/joyo-pro/status` (header `x-joyo-internal-key`, body
+     `{ googleSub?, email }`, answer `{ pro, until, plan, source }`, 401 on a wrong key) and accept `?from=joyoarto` on
+     `/pro`. A return URL back to JoyoArto after paying would be nice; JoyoRogo's `/pro` only takes a same-site `next` today.
+   - Generate one random key and set it as the Worker secret `JOYO_INTERNAL_KEY` on **both** Workers (JoyoArto's
+     `baroka` and JoyoRogo's server): `wrangler secret put JOYO_INTERNAL_KEY`. `PAYWALL` is already `"1"` in
+     wrangler.jsonc, so setting the key turns the Free limits on.
+   - Both apps must keep signing in with the same Google OAuth client (they do today), or `googleSub` stops matching and
+     only the verified email is left.
+   - Check the grandfather date: accounts created before `PRO_GRANDFATHER_CREATED_BEFORE` (2026-11-05, WIB) keep Pro until
+     2027-02-01. Move it to the launch day if launch is later.
+   - Migrations 0009/0010 drop the old household billing tables (never used in production: no gateway secrets were set)
+     and add `joyo_pro_status` and a per-user `usage_counter`. `deploy.yml` applies them. Remove any old `DOKU_*` /
+     `POLAR_*` secrets from the `baroka` Worker if they were ever set.
+7. **Phone app purchases (later, don't build yet).** When the JoyoArto Android/iOS app sells Joyo Pro in-app, do it the
+   way JoyoFit does: the app buys JoyoRogo's store products with Play Billing / StoreKit, then posts the purchase to
+   **JoyoRogo's** `POST /api/billing/google` (`{ purchaseToken, packageName: "com.joyodigitama.joyoarto" }`) and
+   `POST /api/billing/apple`. JoyoRogo verifies, credits the account and answers; JoyoArto then sees Pro through the
+   status call. On JoyoRogo's side that needs: the JoyoArto package in `GOOGLE_PLAY_PRODUCTS` / `GOOGLE_PLAY_PACKAGE_NAMES`
+   and its bundle id in `APPLE_PRODUCTS` / `APPLE_BUNDLE_IDS`, store products created in the JoyoArto app listings, the
+   Play service account invited to the JoyoArto app, RTDN pointed at the same topic, and the App Store notification URL
+   set to JoyoRogo's `/api/billing/apple/notifications` (JoyoRogo docs/play-billing.md section 4 and billing-status.md).
+   The app must call JoyoRogo with a JoyoRogo session (same Google account), not JoyoArto's.
