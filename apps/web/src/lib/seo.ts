@@ -42,8 +42,8 @@ export const OG = {
     file: "og/pricing.png",
     eyebrow: "Harga",
     title: ["Gratis untuk mulai.", "Pro untuk sekeluarga."],
-    sub: "Satu langganan Joyo Pro untuk seluruh rumah tangga, dalam rupiah.",
-    alt: "Harga JoyoArto: gratis untuk mulai, Joyo Pro untuk seluruh rumah tangga.",
+    sub: "Satu langganan Joyo Pro: JoyoArto, JoyoRogo dan JoyoFit.",
+    alt: "Harga JoyoArto: gratis untuk mulai, Joyo Pro satu langganan untuk JoyoArto, JoyoRogo dan JoyoFit.",
   }),
   legal: card({
     file: "og/legal.png",
@@ -73,7 +73,7 @@ export const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Berapa harganya?",
-    a: "Ada paket Free (catat manual, CSV, 2 import statement sebulan) dan Pro untuk seluruh rumah tangga, dalam rupiah, bayar per bulan atau per tahun. Rumah tangga yang beli lebih awal dapat harga founder. Kalau mau gratis sepenuhnya, kodenya open source: silakan host sendiri.",
+    a: "Ada paket Free (catat manual, CSV, 2 import statement sebulan) dan Joyo Pro: satu langganan per akun yang juga membuka Pro di JoyoRogo dan JoyoFit, dibeli di JoyoRogo per bulan atau per tahun. Harga terbarunya ada di halaman Harga. Kalau mau gratis sepenuhnya, kodenya open source: silakan host sendiri.",
   },
   {
     q: "Apakah JoyoArto nyambung langsung ke rekening bank?",
@@ -155,7 +155,7 @@ export const PAGES: PublicPage[] = [
     sources: ["src/routes/pricing.tsx", "src/components/pricing.tsx"],
     title: "Harga JoyoArto: Gratis untuk Mulai, Joyo Pro untuk Keluarga",
     description:
-      "Mulai gratis. Joyo Pro untuk seluruh rumah tangga: import e-statement tanpa batas, konektor Claude dan simulasi rencana keuangan keluarga. Harga dalam rupiah.",
+      "Mulai gratis. Joyo Pro, satu langganan untuk JoyoArto, JoyoRogo dan JoyoFit: import e-statement tanpa batas, konektor Claude dan simulasi rencana keluarga.",
     og: OG.pricing,
     priority: 0.8,
     body: pricingBody,
@@ -356,7 +356,7 @@ function demoBody(): string {
 function pricingBody(): string {
   return wrap(
     `<h1>Harga JoyoArto</h1>` +
-      `<p>Gratis untuk mulai: catat manual, quick add, import CSV dan beberapa import statement sebulan. Joyo Pro untuk seluruh rumah tangga: import e-statement tanpa batas, konektor Claude (MCP), simulasi rencana yang disimpan, dan lebih banyak anggota. Satu langganan, semua anggota rumah tangga ikut Pro. Harga dalam rupiah.</p>` +
+      `<p>Gratis untuk mulai: catat manual, quick add, import CSV dan beberapa import statement sebulan. Joyo Pro, satu langganan per akun yang juga membuka Pro di JoyoRogo dan JoyoFit: import e-statement tanpa batas, konektor Claude (MCP), simulasi rencana yang disimpan, dan lebih banyak anggota. Dibeli di JoyoRogo, harga dalam rupiah.</p>` +
       `<p>Kodenya open source (AGPL), jadi kamu juga bisa host sendiri secara gratis. <a href="https://app.arto.joyorogo.com/login">Mulai gratis</a>.</p>`,
   );
 }
