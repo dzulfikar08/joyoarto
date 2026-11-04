@@ -87,7 +87,8 @@
             ]
           }
         ]
-      }
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.joyodigitama.joyoarto",
@@ -109,6 +110,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-apple-authentication",
       [
         "expo-secure-store",
         {
@@ -159,6 +161,10 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "googleWebClientId": "915036968874-0ne1edkq0laljg6cdlnksor1hqpj9gfr.apps.googleusercontent.com",
+      "googleIosClientId": ""
     }
   }
 }

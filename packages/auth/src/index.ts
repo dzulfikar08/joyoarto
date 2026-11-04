@@ -7,7 +7,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthEndpoint, createAuthMiddleware } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
-import { jwt } from "better-auth/plugins";
+import { bearer, jwt } from "better-auth/plugins";
 
 import { MCP_OFFLINE_SCOPE, MCP_PATH, MCP_SCOPES } from "./mcp-scopes";
 
@@ -24,6 +24,16 @@ export type AuthConfig = {
   DEV_LOGIN?: string;
   /** Comma-separated emails allowed to sign up. Empty = anyone with a Google account. */
   ALLOWED_EMAILS?: string;
+  /**
+   * Comma-separated extra Google OAuth client ids whose ID tokens are accepted (`aud`). The phone app's native Google
+   * Sign-In on iOS gets tokens for the iOS client; Android's are for GOOGLE_CLIENT_ID (the web client) already.
+   */
+  GOOGLE_NATIVE_CLIENT_IDS?: string;
+  /**
+   * Comma-separated iOS bundle ids for native Sign in with Apple (the identity token's audience). Empty = Apple off.
+   * No Services ID or key: the app sends Apple's identity token, verified against Apple's JWKS.
+   */
+  APPLE_BUNDLE_IDS?: string;
 };
 
 export type AuthHooks = {
@@ -185,6 +195,39 @@ function nativeRegistration(redirectUris: unknown): boolean {
   });
 }
 
+/** A comma-separated list, trimmed, without empties or repeats. */
+export function parseList(raw: string | undefined): string[] {
+  return [...new Set((raw ?? "").split(",").map((v) => v.trim()).filter(Boolean))];
+}
+
+/** Sign-in providers: Google (web redirect, and ID tokens from the phone app), Apple (phone app only). */
+export function socialProviders(env: Pick<AuthConfig, "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET" | "GOOGLE_NATIVE_CLIENT_IDS" | "APPLE_BUNDLE_IDS">) {
+  const apple = parseList(env.APPLE_BUNDLE_IDS);
+  return {
+    ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+      ? {
+          google: {
+            // The first id is the web client (redirect flow); every id is an accepted ID-token audience.
+            clientId: [env.GOOGLE_CLIENT_ID, ...parseList(env.GOOGLE_NATIVE_CLIENT_IDS).filter((id) => id !== env.GOOGLE_CLIENT_ID)],
+            clientSecret: env.GOOGLE_CLIENT_SECRET,
+            overrideUserInfoOnSignIn: true,
+          },
+        }
+      : {}),
+    ...(apple.length
+      ? {
+          apple: {
+            clientId: apple[0]!,
+            appBundleIdentifier: apple[0]!,
+            audience: apple,
+            // Apple sends the name only on the first authorization (the app passes it along); never store an empty one.
+            mapProfileToUser: (profile: { name?: unknown }) => (profile.name ? {} : { name: "JoyoArto" }),
+          },
+        }
+      : {}),
+  };
+}
+
 export function parseEmails(raw: string | undefined): string[] {
   return (raw ?? "")
     .split(",")
@@ -198,13 +241,10 @@ export function createAuth(env: AuthConfig, database: Database, hooks: AuthHooks
     database: drizzleAdapter(database, { provider: "sqlite", schema: { ...authSchema, ...oauthSchema } }),
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
-    trustedOrigins: env.CORS_ORIGIN.split(",")
-      .map((o) => o.trim())
-      .filter(Boolean),
-    socialProviders:
-      env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
-        ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET, overrideUserInfoOnSignIn: true } }
-        : {},
+    // joyoarto:// is the phone app (it signs in with ID tokens and sends no cookies or Origin, so this only matters for
+    // a callbackURL it might pass).
+    trustedOrigins: [...parseList(env.CORS_ORIGIN), "joyoarto://"],
+    socialProviders: socialProviders(env),
     databaseHooks: {
       user: {
         create: {
@@ -225,6 +265,8 @@ export function createAuth(env: AuthConfig, database: Database, hooks: AuthHooks
       defaultCookieAttributes: { sameSite: "none", secure: true, httpOnly: true },
     },
     disabledPaths: ["/token"],
-    plugins: [devLogin(Boolean(env.DEV_LOGIN)), demoLogin(hooks.demoSignIn), ...mcpPlugins(env)],
+    // bearer(): the phone app keeps its session token (set-auth-token on sign-in) in the Keychain/Keystore and sends it as
+    // `Authorization: Bearer`; apps/server/src/principal.ts tells it apart from `brk_` personal access tokens.
+    plugins: [bearer(), devLogin(Boolean(env.DEV_LOGIN)), demoLogin(hooks.demoSignIn), ...mcpPlugins(env)],
   });
 }

@@ -19,7 +19,7 @@ OpenAPI docs, and a lean web app for imports and review.
 | `packages/auth` | better-auth: Google sign-in, dev login, OAuth 2.1 provider for the MCP connector. |
 | `apps/server` | Hono on Cloudflare Workers: `/rpc` (web app), `/api/*` (REST, docs at `/api/docs`), `/mcp`, `/api/auth/*`. |
 | `packages/ui` | Design system (`@baroka/ui`): JoyoArto tokens on the JoyoRogo v2 base (Plus Jakarta Sans, warm paper canvas, arto-blue primary, gold coin accent), shadcn-style components on Base UI, sonner toasts, theme hook. |
-| `apps/mobile` | Expo (SDK 58, dev build) + react-native-unistyles: Android app (iOS compiles) for token sign-in, balances, quick add, notification capture (Jago/GoPay) and sharing statement PDFs. |
+| `apps/mobile` | Expo (SDK 58, dev build) + react-native-unistyles: the phone app (Android first, iOS via TestFlight). Google / Apple sign-in, the web's dashboard, transactions and add sheet behind a floating tab bar, notification capture (Jago/GoPay) and statement PDFs. Conventions: `apps/mobile/AGENTS.md`. |
 | `apps/web` | Vite + TanStack Router: dashboard (`/`, one `reports.dashboard` call per month), transactions (filters in the URL), import/review, accounts, settings (household, members, tokens), `/join/<token>` (invites), `/connect` (OAuth consent). |
 
 ## Conventions
@@ -167,13 +167,26 @@ merchant part of the body); `rawText` is the fallback when the format is unknown
 ## Mobile app (`apps/mobile`)
 
 Expo SDK 58 development build (custom native code), TypeScript, `react-native-unistyles` with the JoyoArto tokens
-(`theme.ts`, converted from `packages/ui/src/styles/globals.css`). The web app stays the main UI; the phone app does:
+(`theme.ts`, converted from `packages/ui/src/styles/globals.css`, light and dark), expo-router with a floating tab bar
+like the web's (Home · Transactions · + Add · Joyo AI · More), TanStack Query over a typed oRPC client (the server's
+router types, `src/lib/orpc.ts`). Structure and conventions for new screens: `apps/mobile/AGENTS.md`.
 
-- **Sign in** with a personal access token (`brk_…`, web Settings → API tokens, `finance:read finance:write`), kept in
-  `expo-secure-store`. `GET /api/me` shows which household and user it belongs to. **Coba demo / Reviewer** takes a demo
-  code instead (see "Demo account" below).
-- **Home**: this month's money in/out and balances per account (`GET /api/reports/dashboard`), quick add
-  (`POST /api/transactions/quick`, `capturedVia: manual`).
+- **Sign in** with Google (native account sheet, Android and iPhone) or Sign in with Apple (iPhone): the ID token goes to
+  better-auth (`/api/auth/sign-in/social`), whose bearer plugin returns a session token the app keeps in
+  `expo-secure-store` and sends as `Authorization: Bearer`. A personal access token (`brk_…`, web Settings → API tokens)
+  and **Coba demo / Reviewer** (a demo code, see "Demo account" below) still work. Client ids and the one-time Google
+  Cloud / Apple steps: `docs/mobile-auth.md`.
+- **Home**: the web dashboard for any month (`reports.dashboard`): money in/out, net and savings rate with deltas,
+  spending by category (donut and legend, tap to filter), cash flow (6 months), spending pace, needs attention (pending
+  quick adds, uncategorized, stale accounts), budgets, top merchants, balances. Cheap reads are cached on the device, so
+  it opens offline.
+- **Transactions**: search, filters (account, category or uncategorized, status, date range), infinite list by day,
+  per-row categorize with a searchable picker and "remember for this merchant" (a rule that also fills in its past
+  uncategorized rows), detail and edit (merchant, note; amount/date/description/account and delete for pending rows).
+- **Add sheet** (centre button): type it ("kopi 25rb gopay"), `capture.parse` drafts it, review, Save = quick add
+  (pending). Voice comes later (`src/lib/voice.ts`).
+- **More**: profile with the Google photo, Import, Accounts, Plan, Household, Settings, appearance, sign out. Accounts,
+  Plan, Household and the Joyo AI tab are placeholders for now.
 - **Notification capture (Android)**: `modules/notification-capture` is a local Expo module (Kotlin) with a
   `NotificationListenerService`. Capture is off by default. When it is on, the service drops every notification whose
   package is not allow-listed (Bank Jago `com.jago.digitalBanking`, Gojek `com.gojek.app`, GoPay `com.gojek.gopay`,

@@ -6,25 +6,28 @@ import {
   PlusJakartaSans_800ExtraBold,
   useFonts,
 } from "@expo-google-fonts/plus-jakarta-sans";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { Redirect, Stack, usePathname, useRouter } from "expo-router";
+import { addNetworkStateListener } from "expo-network";
 import { ShareIntentProvider, useShareIntentContext } from "expo-share-intent";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { AppState } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
-import { addNetworkStateListener } from "expo-network";
 
+import { AddSheet } from "@/components/add/add-sheet";
+import { ToastHost } from "@/components/ui";
 import { NotificationCapture } from "@/modules/notification-capture";
 import { syncCaptures } from "@/src/capture/sync";
 import { loadCaptures } from "@/src/capture/store";
+import { loadAppearance } from "@/src/lib/appearance";
 import { loadSession, useSession } from "@/src/lib/auth";
+import { bindQueryLifecycle, persistOptions, queryClient } from "@/src/lib/query";
 import { loadSettings, syncNativeConfig } from "@/src/lib/settings";
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
-
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
+bindQueryLifecycle();
 
 /** Keeps the capture queue moving while the app is open: on start, on foreground, on reconnect, every minute. */
 function CaptureSync() {
@@ -64,6 +67,7 @@ function Root() {
     headerTintColor: theme.colors.foreground,
     headerTitleStyle: { fontFamily: theme.fonts.bold },
     headerShadowVisible: false,
+    headerBackButtonDisplayMode: "minimal" as const,
     contentStyle: { backgroundColor: theme.colors.background },
   };
   if (session === undefined) return null;
@@ -74,15 +78,20 @@ function Root() {
       {session ? <CaptureSync /> : null}
       {session ? <ShareRouter /> : null}
       <Stack screenOptions={header}>
-        <Stack.Screen name="index" options={{ title: "JoyoArto" }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "Home" }} />
         <Stack.Screen name="login" options={{ title: "Sign in", headerShown: false }} />
-        <Stack.Screen name="quick-add" options={{ title: "Quick add", presentation: "modal" }} />
+        <Stack.Screen name="transaction/[id]" options={{ title: "Transaction" }} />
         <Stack.Screen name="captured" options={{ title: "Captured" }} />
         <Stack.Screen name="capture/[id]" options={{ title: "Capture" }} />
         <Stack.Screen name="capture-setup" options={{ title: "Notification capture" }} />
         <Stack.Screen name="import" options={{ title: "Import statements" }} />
+        <Stack.Screen name="accounts" options={{ title: "Accounts" }} />
+        <Stack.Screen name="plan" options={{ title: "Plan & simulate" }} />
+        <Stack.Screen name="household" options={{ title: "Household" }} />
         <Stack.Screen name="settings" options={{ title: "Settings" }} />
       </Stack>
+      {session ? <AddSheet /> : null}
+      <ToastHost />
     </>
   );
 }
@@ -91,7 +100,7 @@ export default function RootLayout() {
   const [fonts] = useFonts({ PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold });
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    void Promise.all([loadSession(), loadSettings().then(syncNativeConfig), loadCaptures()]).finally(() => setReady(true));
+    void Promise.all([loadSession(), loadSettings().then(syncNativeConfig), loadCaptures(), loadAppearance().catch(() => undefined)]).finally(() => setReady(true));
   }, []);
   useEffect(() => {
     if (fonts && ready) void SplashScreen.hideAsync().catch(() => undefined);
@@ -99,9 +108,9 @@ export default function RootLayout() {
   if (!fonts || !ready) return null;
   return (
     <ShareIntentProvider>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
         <Root />
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </ShareIntentProvider>
   );
 }

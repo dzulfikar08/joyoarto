@@ -72,6 +72,8 @@ if [ "$VARIANT" = play ]; then
   [ -f "$MAP" ] && cp "$MAP" "$ROOT/dist/mapping-play.txt"
   # The upload key must be the release key, never the debug one.
   "$JAVA_HOME/bin/jarsigner" -verify -verbose -certs "$ROOT/dist/joyoarto-play-$VERSION_CODE.aab" | grep -q "CN=JoyoArto" || { echo "AAB is not signed with the JoyoArto release key" >&2; exit 1; }
+  # The upload key's SHA-1 (an Android OAuth client for Google Sign-In needs it; Play's app-signing SHA-1 is in Play Console).
+  "$JAVA_HOME/bin/keytool" -printcert -jarfile "$ROOT/dist/joyoarto-play-$VERSION_CODE.aab" | grep -E "SHA1:|SHA-1:" | sed 's/^/upload key /' || true
   ls -la "$ROOT/dist/joyoarto-play-$VERSION_CODE.aab"
   exit 0
 fi
@@ -91,6 +93,10 @@ MANIFEST="$("$AAPT2" dump xmltree "$SRC" --file AndroidManifest.xml)"
 grep -q "CaptureListenerService" <<<"$MANIFEST" || { echo "CaptureListenerService missing from the manifest" >&2; exit 1; }
 grep -q "BIND_NOTIFICATION_LISTENER_SERVICE" <<<"$MANIFEST" || { echo "listener permission missing" >&2; exit 1; }
 grep -q "application/pdf" <<<"$MANIFEST" || { echo "PDF share filter missing" >&2; exit 1; }
+
+# Signing certificate SHA-1: Google Sign-In only works when an Android OAuth client (Cloud project joyorogo, package
+# com.joyodigitama.joyoarto) has this fingerprint (docs/mobile-auth.md).
+"$JAVA_HOME/bin/keytool" -printcert -jarfile "$SRC" | grep -E "SHA1:|SHA-1:" | sed 's/^/signing key /' || true
 
 mkdir -p "$ROOT/dist"
 cp "$SRC" "$ROOT/dist/joyoarto-$VARIANT.apk"

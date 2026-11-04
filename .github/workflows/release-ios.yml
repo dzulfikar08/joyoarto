@@ -123,14 +123,19 @@ jobs:
           security find-identity -v -p codesigning "$kc" | sed 's/^ *[0-9]*) [0-9A-F]* //'
           serial="$(security find-certificate -a -c 'Apple Distribution' -p "$kc" | openssl x509 -noout -serial | cut -d= -f2 | head -1)"
           mkdir -p "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
-          # No capabilities: the app has no App Group, push or extension (docs/ios-release.md). The script registers the
-          # bundle id if it is missing.
-          out="$(python3 apps/mobile/scripts/ios/asc-ci-profile.py com.joyodigitama.joyoarto "$serial" "$RUNNER_TEMP/store.mobileprovision")"
+          # One capability: Sign in with Apple (APPLE_ID_AUTH; the app's com.apple.developer.applesignin entitlement,
+          # docs/mobile-auth.md). No App Group, push or extension (docs/ios-release.md). The script registers the bundle
+          # id if it is missing and enables the capability (which invalidates the old profile; it makes a new one).
+          out="$(python3 apps/mobile/scripts/ios/asc-ci-profile.py com.joyodigitama.joyoarto "$serial" "$RUNNER_TEMP/store.mobileprovision" APPLE_ID_AUTH)"
           uuid="$(cut -f1 <<<"$out")"
           cp "$RUNNER_TEMP/store.mobileprovision" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/$uuid.mobileprovision"
           echo "EXPORT_PROFILE=$(cut -f2 <<<"$out")" >> "$GITHUB_ENV"
 
       - name: Build IPA
+        env:
+          # Optional: the iOS OAuth client id for native Google Sign-In (a public value; app.json extra.googleIosClientId
+          # works too). Unset and not in app.json = the iPhone app shows Sign in with Apple and tokens only.
+          JOYOARTO_GOOGLE_IOS_CLIENT_ID: ${{ vars.JOYOARTO_GOOGLE_IOS_CLIENT_ID }}
         run: |
           if [ "$UPLOAD" = 1 ]; then
             apps/mobile/scripts/ios/build-ios.sh --upload

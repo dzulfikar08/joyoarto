@@ -55,6 +55,11 @@
     // sends import@ (subaddressing on) or a catch-all to this Worker's email() handler (src/email.ts). Replies use
     // message.reply(), which needs no send_email binding and no verified destination. Remove to turn email import off.
     "IMPORT_EMAIL_DOMAIN": "arto.joyorogo.com",
+    // Phone app sign-in (docs/mobile-auth.md). Native Sign in with Apple: the identity token's audience is the bundle id.
+    "APPLE_BUNDLE_IDS": "com.joyodigitama.joyoarto",
+    // Native Google Sign-In on iOS gets ID tokens for the iOS OAuth client: add its id here once it exists
+    // (Android's tokens are for GOOGLE_CLIENT_ID, the web client, already). Client ids are public.
+    // "GOOGLE_NATIVE_CLIENT_IDS": "<ios client id>.apps.googleusercontent.com",
     // Joyo AI (in-app chat) and the add sheet's parser. Models are Anthropic model ids; effort: low | medium | high.
     "JOYO_AI_MODEL": "claude-opus-5-5",
     "JOYO_PARSE_MODEL": "claude-haiku-5-5",

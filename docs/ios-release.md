@@ -46,7 +46,8 @@ JoyoRogo's docs refer to as "the laptop". Run there:
 | `IOS_DIST_CERT_PASSWORD` | the `.p12` password | the random password you make below |
 
 No provisioning-profile secret: the job fetches (or creates) the App Store profile `joyo-ci com.joyodigitama.joyoarto
-<cert id>` through the API on every run, and registers the bundle id if it does not exist yet. The key id and issuer id
+<cert id>` through the API on every run, registers the bundle id if it does not exist yet, and enables Sign in with Apple
+(`APPLE_ID_AUTH`) on it. The key id and issuer id
 are identifiers, not secrets (JoyoRogo's public repo has them too); they are secrets here only so the workflow reads
 everything from one place.
 
@@ -99,8 +100,12 @@ signature verifies with an Apple Distribution identity; no `NotificationCaptureM
 
 ## What is in the iOS app
 
-- **Same JS app as Android**: token sign-in (`brk_…` from the web app, Settings, API tokens), balances, quick add,
-  statement PDF import with the document picker (`expo-document-picker`, needs no permission text).
+- **Same JS app as Android**: Sign in with Apple, Google sign-in (once the iOS OAuth client exists,
+  `docs/mobile-auth.md`), token and demo sign-in, the dashboard, transactions, the add sheet, statement PDF import with
+  the document picker (`expo-document-picker`, needs no permission text).
+- **Sign in with Apple** (guideline 4.8, because Google sign-in is offered): the `com.apple.developer.applesignin`
+  entitlement (`ios.usesAppleSignIn`), and the workflow enables the `APPLE_ID_AUTH` capability on the bundle id before
+  it makes the profile. The IPA check fails without the entitlement.
 - **Notification capture is Android only.** `modules/notification-capture/expo-module.config.json` lists only
   `android`, so iOS autolinking never adds it; the JS reads it with `requireOptionalNativeModule` (null on iOS) and
   hides the screens (`Platform.OS === "android"`). The IPA check above proves it stays out.
@@ -150,21 +155,22 @@ Indonesian, SKU `joyoarto`, bundle id `com.joyodigitama.joyoarto`. The home-scre
 Category Finance. Price Free.
 
 **Beta App Review information** (needed for the external group): contact the owner; sign-in required **yes**. The
-app signs in with a personal access token, so the "user name / password" fields carry the review login from the other
-agent's work:
+app's main sign-in is Sign in with Apple / Google, which a reviewer cannot use with an invite-only service, so the review
+login is the demo code:
 
 ```
-User name: (none: the app signs in with a code; App Store Connect wants a value, use "token")
-Password:  <REVIEW_DEMO_CODE>   (the demo household's secret code; never commit it)
-Notes:     JoyoArto is a household finance ledger. Sign in: paste the code above into the Token field and tap
-           "Check token", then "Use this account". The account is a demo household with sample bank accounts and
-           transactions. Try: Home (balances, this month), the + quick add, Import (pick a PDF bank statement from
-           Files; a sample Bank Jago statement is attached / at <SAMPLE_PDF_URL>). Notification capture is an Android
-           feature and is not in the iPhone app. Nothing is sold in the app.
+User name: demo
+Password:  <REVIEW_DEMO_CODE>   (the demo household's secret code, DEMO_LOGIN_CODE; never commit it)
+Notes:     JoyoArto is a household finance ledger and is invite-only. To review it, on the sign-in screen tap
+           "Coba demo / Reviewer", type the code above and tap "Masuk ke demo / Open the demo". The account is a demo
+           household with made-up bank accounts and transactions (reset daily). Try: Home (this month, spending by
+           category, cash flow, balances), Transactions (search, filters, tap a category to change it), the + button
+           (type "kopi 25rb gopay", review, Save), More → Import (pick a PDF bank statement from Files; a sample Bank
+           Jago statement is at <SAMPLE_PDF_URL>). Sign in with Apple and Google sign-in work for invited members.
+           Notification capture is an Android feature and is not in the iPhone app. Nothing is sold in the app.
 ```
 
-Replace the two placeholders when the demo login exists. If the code is not a `brk_` token, the sign-in screen needs
-the matching flow before review.
+Replace the two placeholders before submitting.
 
 **Export compliance.** Answered by the Info.plist key: builds show "No" for encryption without a question. If App
 Store Connect still asks (first build of a new app sometimes does): "Does your app use encryption?" Yes, only
