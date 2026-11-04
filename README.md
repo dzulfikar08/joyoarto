@@ -193,8 +193,7 @@ router types, `src/lib/orpc.ts`). Structure and conventions for new screens: `ap
 - **Plan & simulate** (More → Plan): the web's planner with the same templates, editors, verdicts, projection chart,
   side by side and household saved scenarios (a scenario saved on the phone opens with the same blocks on the web). The
   unsaved draft stays on the phone, per household.
-- **More**: profile with the Google photo, Import, Accounts, Plan, Household, Settings, appearance, sign out. Accounts
-  and Household are placeholders for now.
+- **More**: profile with the Google photo, Import, Accounts, Plan, Household, Settings, appearance, sign out.
 - **Notification capture (Android)**: `modules/notification-capture` is a local Expo module (Kotlin) with a
   `NotificationListenerService`. Capture is off by default. When it is on, the service drops every notification whose
   package is not allow-listed (Bank Jago `com.jago.digitalBanking`, Gojek `com.gojek.app`, GoPay `com.gojek.gopay`,

@@ -1,5 +1,5 @@
 // More: who is signed in (Google avatar), the screens that are not tabs, appearance, sign out. Like the web's
-// apps/web/src/routes/more.tsx. Follow-up screens (Accounts, Plan, Household) are placeholders until built.
+// apps/web/src/routes/more.tsx.
 
 import Constants from "expo-constants";
 import { useRouter, type Href } from "expo-router";
@@ -84,7 +84,7 @@ export default function More() {
 
         <ListSection>
           <ListRow icon="shield-checkmark-outline" title="Privacy policy" onPress={() => void Linking.openURL("https://arto.joyorogo.com/privasi")} />
-          {!storeSafe && session ? <ListRow icon="open-outline" title="JoyoArto on the web" subtitle="Plan, settings and Joyo AI" onPress={() => void Linking.openURL(session.server)} /> : null}
+          {!storeSafe && session ? <ListRow icon="open-outline" title="JoyoArto on the web" subtitle="The same household in the browser" onPress={() => void Linking.openURL(session.server)} /> : null}
         </ListSection>
 
         <Button title="Sign out" variant="destructive" icon="log-out-outline" onPress={confirmSignOut} />
