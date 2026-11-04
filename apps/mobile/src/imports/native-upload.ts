@@ -1,6 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 
-import { ApiError, type UploadFile } from "../lib/api";
+import { ApiError, STORE_SAFE_LIMIT_MESSAGE, type UploadFile } from "../lib/api";
+import { storeSafe } from "../lib/platform";
 import type { StatementResult } from "../lib/types";
 
 /**
@@ -46,8 +47,10 @@ export async function uploadStatementNative(server: string, token: string, file:
     // not JSON
   }
   if (res.status < 200 || res.status >= 300) {
-    const err = (json ?? {}) as { message?: string; code?: string };
-    throw new ApiError(err.message ?? `Server error ${res.status}`, res.status, err.code);
+    const err = (json ?? {}) as { message?: string; code?: string; data?: { upgrade?: boolean } };
+    // iOS never shows the server's "Joyo Pro ... in JoyoRogo" limit text (App Review 3.1.1; src/lib/platform.ts).
+    const message = storeSafe && err.data?.upgrade === true ? STORE_SAFE_LIMIT_MESSAGE : (err.message ?? `Server error ${res.status}`);
+    throw new ApiError(message, res.status, err.code);
   }
   return json as StatementResult;
 }
