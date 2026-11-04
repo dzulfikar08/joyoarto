@@ -12,6 +12,10 @@ export type Env = BillingEnv & {
   CORS_ORIGIN: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  /** Extra Google client ids accepted as ID-token audience (the phone app's iOS client). Comma-separated. */
+  GOOGLE_NATIVE_CLIENT_IDS?: string;
+  /** iOS bundle ids for native Sign in with Apple. Comma-separated; unset = Apple sign-in off. */
+  APPLE_BUNDLE_IDS?: string;
   DEV_LOGIN?: string;
   ALLOWED_EMAILS?: string;
   MCP_LIMITER?: RateLimit;

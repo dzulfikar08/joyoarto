@@ -1,20 +1,21 @@
 import { SCOPES } from "@baroka/api/context";
 import type { Principal } from "@baroka/api/context";
 import { ensureHousehold } from "@baroka/api/lib/household";
-import { principalFromToken } from "@baroka/api/services/tokens";
+import { TOKEN_PREFIX, principalFromToken } from "@baroka/api/services/tokens";
 import { schema } from "@baroka/db";
 import { eq } from "drizzle-orm";
 
 import { getAuth, getDb } from "./services";
 
 /**
- * Who a REST/RPC request speaks for: a `brk_` personal access token in Authorization, else the browser session.
+ * Who a REST/RPC request speaks for: a `brk_` personal access token in Authorization, else a session: the browser's
+ * cookie, or the phone app's session token sent as `Authorization: Bearer` (better-auth's bearer plugin).
  * OAuth access tokens of AI connections are accepted only at /mcp (apps/server/src/mcp.ts).
  */
 export async function resolvePrincipal(request: Request): Promise<Principal | null> {
   const db = getDb();
   const bearer = /^Bearer\s+(\S+)$/i.exec(request.headers.get("authorization") ?? "")?.[1];
-  if (bearer) return principalFromToken(db, bearer);
+  if (bearer?.startsWith(TOKEN_PREFIX)) return principalFromToken(db, bearer);
   const session = await getAuth().api.getSession({ headers: request.headers });
   if (!session) return null;
   let householdId: string;
