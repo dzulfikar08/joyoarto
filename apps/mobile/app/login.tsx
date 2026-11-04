@@ -8,6 +8,7 @@ import { BrandMark } from "@/components/brand";
 import { Button, Card, Field, Row, Text } from "@/components/ui";
 import { createApi, DEFAULT_SERVER, looksLikeToken, requestDemoToken } from "@/src/lib/api";
 import { signIn } from "@/src/lib/auth";
+import { storeSafe } from "@/src/lib/platform";
 import type { Me } from "@/src/lib/types";
 
 export default function Login() {
@@ -44,7 +45,7 @@ export default function Login() {
     setBusy(true);
     try {
       const creds = { server: server.trim().replace(/\/+$/, ""), token: token.trim() };
-      setMe(await createApi(creds).me());
+      setMe(await createApi(creds, fetch, { storeSafe }).me());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -106,7 +107,11 @@ export default function Login() {
             ) : null}
             <Button title="Check token" onPress={check} loading={busy} />
             <Row style={{ justifyContent: "space-between" }}>
-              <Button title="Open JoyoArto on the web" variant="ghost" small onPress={() => void Linking.openURL(`${server.replace(/\/+$/, "")}/settings`)} />
+              {storeSafe ? (
+                <Text variant="caption" tone="muted">Make a token in JoyoArto on the web: Settings → API tokens.</Text>
+              ) : (
+                <Button title="Open JoyoArto on the web" variant="ghost" small onPress={() => void Linking.openURL(`${server.replace(/\/+$/, "")}/settings`)} />
+              )}
               <Button title={advanced ? "Hide server" : "Server…"} variant="ghost" small onPress={() => setAdvanced(!advanced)} />
             </Row>
             <Button title="Coba demo / Reviewer" variant="secondary" onPress={() => { setDemo(true); setError(null); }} />

@@ -10,7 +10,8 @@ import type {
   TransactionPatch,
 } from "./types";
 
-export const DEFAULT_SERVER = "https://baroka.by.dzulfikar.com";
+/** The hosted service (app host: app, REST API, MCP). The old baroka.by.dzulfikar.com only redirects. */
+export const DEFAULT_SERVER = "https://app.arto.joyorogo.com";
 
 export class ApiError extends Error {
   constructor(
@@ -33,6 +34,17 @@ export type Credentials = { server: string; token: string };
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
+export type ApiOptions = {
+  /**
+   * iOS: a Free-plan limit (the server's FORBIDDEN with data.upgrade) gets a neutral message instead of the server's,
+   * which says where Joyo Pro is sold. App Review 3.1.1 / 3.1.3: no pointer to buying outside the App Store.
+   */
+  storeSafe?: boolean;
+};
+
+/** What a store-safe client shows for a Free-plan limit. */
+export const STORE_SAFE_LIMIT_MESSAGE = "This is not included in this account's plan. Nothing was changed.";
+
 /** A file to upload, as React Native's FormData takes it. */
 export type UploadFile = { uri: string; name: string; type: string };
 
@@ -40,7 +52,7 @@ export type ApiClient = ReturnType<typeof createApi>;
 
 const TIMEOUT_MS = 30_000;
 
-export function createApi(creds: Credentials, fetchImpl: FetchLike = fetch) {
+export function createApi(creds: Credentials, fetchImpl: FetchLike = fetch, options: ApiOptions = {}) {
   const base = creds.server.replace(/\/+$/, "");
 
   async function request<T>(method: string, path: string, opts: { query?: Record<string, string | undefined>; body?: unknown; form?: FormData; timeoutMs?: number } = {}): Promise<T> {
@@ -70,9 +82,11 @@ export function createApi(creds: Credentials, fetchImpl: FetchLike = fetch) {
       // not JSON (proxy error page)
     }
     if (!res.ok) {
-      const err = (json ?? {}) as { message?: string; code?: string };
+      const err = (json ?? {}) as { message?: string; code?: string; data?: { upgrade?: boolean } };
       const message =
-        res.status === 401
+        options.storeSafe && err.data?.upgrade === true
+          ? STORE_SAFE_LIMIT_MESSAGE
+          : res.status === 401
           ? "The token was not accepted. Create a new one in JoyoArto on the web (Settings → API tokens)."
           : res.status === 403
             ? (err.message ?? "This token is not allowed to do that (it needs finance:write).")

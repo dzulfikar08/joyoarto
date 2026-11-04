@@ -2,6 +2,7 @@ import * as SecureStore from "expo-secure-store";
 
 import { createApi, DEFAULT_SERVER, type ApiClient, type Credentials } from "./api";
 import { observable, useObservable } from "./observable";
+import { storeSafe } from "./platform";
 import type { Me } from "./types";
 
 const TOKEN_KEY = "joyoarto.token";
@@ -58,11 +59,11 @@ export function useSession() {
 /** The API client for the stored session, or null when signed out. */
 export async function getApi(): Promise<ApiClient | null> {
   const s = await loadSession();
-  return s ? createApi(s) : null;
+  return s ? createApi(s, fetch, { storeSafe }) : null;
 }
 
 export function useApi(): ApiClient {
   const s = useSession();
   if (!s) throw new Error("useApi needs a signed-in session");
-  return createApi(s);
+  return createApi(s, fetch, { storeSafe });
 }

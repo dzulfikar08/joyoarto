@@ -185,8 +185,9 @@ Expo SDK 58 development build (custom native code), TypeScript, `react-native-un
   idempotent. The notification text never leaves the phone. Low-confidence parses wait under **Captured** for a check;
   failed sends retry with backoff (on reconnect, on app foreground, each minute while open, and on the next capture).
   Account/category can be fixed before sending, or after (PATCH on the pending row).
-- **Share PDF → JoyoArto**: an `application/pdf` share target (SEND and SEND_MULTIPLE, `expo-share-intent`; the same
-  plugin adds an iOS share extension) and a document picker. Each file goes to `POST /api/imports/statement-file`
+- **Share PDF → JoyoArto**: an `application/pdf` share target on Android (SEND and SEND_MULTIPLE, `expo-share-intent`;
+  its iOS share extension is off for now, `docs/ios-release.md`) and a document picker. Each file goes to
+  `POST /api/imports/statement-file`
   (multipart `file`, `commit=false` preview, then `commit=true`), with the same result as `/api/imports/statement`.
   Settings → Development → "Mock statement uploads" answers locally until that endpoint is deployed.
 
@@ -237,6 +238,11 @@ scenario (`packages/api/src/services/demo.ts`, ids and restrictions in `lib/demo
 - **Restricted:** no invites, joining/leaving/deleting households, account deletion, tokens longer than a day,
   email-in or OAuth AI connections (FORBIDDEN with `data.demo`). Always Pro. Everything else, writes included, works.
 - Reviewer instructions for the store consoles: docs/HANDOFF.md.
+### Build and upload (iOS)
+
+`.github/workflows/release-ios.yml` (manual, environment `release`) builds the App Store IPA on a GitHub macOS runner and
+can upload it to TestFlight, the same pipeline as JoyoRogo: `gh workflow run release-ios.yml -R dzulfikar08/joyoarto -f
+upload_testflight=true`. Secrets, signing, the privacy manifest and the App Store notes: `docs/ios-release.md`.
 
 ## Public pages and waitlist
 
