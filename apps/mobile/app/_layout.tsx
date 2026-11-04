@@ -23,6 +23,9 @@ import { syncCaptures } from "@/src/capture/sync";
 import { loadCaptures } from "@/src/capture/store";
 import { loadAppearance } from "@/src/lib/appearance";
 import { loadSession, useSession } from "@/src/lib/auth";
+// Side effects only: both clear their on-device data (own API key, plan draft) at sign-out, even if never opened.
+import "@/src/lib/joyo-byok";
+import "@/src/lib/plan-draft";
 import { bindQueryLifecycle, persistOptions, queryClient } from "@/src/lib/query";
 import { loadSettings, syncNativeConfig } from "@/src/lib/settings";
 
