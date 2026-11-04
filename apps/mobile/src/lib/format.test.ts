@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { addDays, amountInputText, compactMoney, currentMonthWib, dayLabel, daySectionTitle, formatMoney, isDay, monthEnd, monthLabel, niceTicks, pctText, shiftMonth, todayWib } from "./format";
+import { addDays, amountInputText, compactMoney, currentMonthWib, dayLabel, daySectionTitle, formatMoney, isDay, monthEnd, monthLabel, niceTicks, pctText, rupiahInputToMinor, shiftMonth, shortDate, shortDateTime, todayWib } from "./format";
 
 describe("money", () => {
   test("formatMoney matches the API's display notation", () => {
@@ -55,4 +55,24 @@ describe("dates", () => {
     expect(isDay("2026-11-04")).toBe(true);
     expect(isDay("2026-11-4")).toBe(false);
   });
+});
+
+test("rupiah typed in Indonesian notation", () => {
+  expect(rupiahInputToMinor("")).toBe(0);
+  expect(rupiahInputToMinor("1.250.000")).toBe(125_000_000);
+  expect(rupiahInputToMinor("25000")).toBe(2_500_000);
+  expect(rupiahInputToMinor("-500.000")).toBe(-50_000_000);
+  expect(rupiahInputToMinor("Rp 1.250,5")).toBe(125_050);
+  expect(rupiahInputToMinor("Rp -10.000")).toBe(-1_000_000);
+  expect(rupiahInputToMinor("-0")).toBe(0);
+  expect(rupiahInputToMinor("12,345")).toBeNull();
+  expect(rupiahInputToMinor("1.25.000")).toBeNull();
+  expect(rupiahInputToMinor("abc")).toBeNull();
+});
+
+test("short dates in WIB", () => {
+  expect(shortDate("2026-11-03T18:30:00Z")).toBe("4 Nov 2026");
+  expect(shortDateTime("2026-11-03T07:05:00Z")).toBe("3 Nov 2026, 14:05");
+  expect(shortDate(null)).toBe("–");
+  expect(shortDate("nope")).toBe("–");
 });

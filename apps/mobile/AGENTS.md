@@ -22,7 +22,11 @@ iOS compiles and ships through TestFlight. Read the repo's README.md "Mobile app
 | `app/(tabs)/` | The floating tab bar: `index` (Home), `transactions`, `add` (centre button, never a screen), `joyo`, `more`. |
 | `app/transaction/[id].tsx` | Transaction detail and edit (opened from a list row, handed over through `src/lib/tx-cache.ts`). |
 | `app/import.tsx`, `captured.tsx`, `capture/[id].tsx`, `capture-setup.tsx` | Statement PDFs and Android notification capture. |
-| `app/accounts.tsx`, `plan.tsx`, `household.tsx` | Placeholders (`components/coming-soon.tsx`) for the follow-up screens. |
+| `app/import.tsx` + `components/import/` | Statement PDF batch (preview, GoPay-first save, combined result), CSV with column mapping, email-in card, import log with Undo. |
+| `app/accounts.tsx`, `account/[id].tsx` + `components/accounts/` | Accounts (archived collapsed), detail, add/edit sheet, archive. |
+| `app/household.tsx`, `settings.tsx`, `data-privacy.tsx` + `components/settings/` | Members, invites (share sheet), switch; billing (`src/lib/billing.ts`), Claude, API tokens, theme; export and deletion. |
+| `components/session-only.tsx` | `useHasSession()` / `SessionOnlyNote`: tokens, invites, email-in, export and deletion need a Google/Apple sign-in. |
+| `app/plan.tsx` | Placeholder (`components/coming-soon.tsx`) for the follow-up screen. |
 | `components/ui/` | The UI kit. Import from `@/components/ui`. |
 | `components/nav/floating-tab-bar.tsx` | The tab bar (port of JoyoRogo's). |
 | `components/charts/` | react-native-svg charts (donut, cash flow, pace). |
@@ -83,16 +87,12 @@ tested) holds `{ server, token, kind, me }`.
 
 Each replaces a placeholder or a "coming" note; the web page is the spec.
 
-- **Import** (polish): `app/import.tsx` works (PDF share and picker → `imports/statement-file`); add the import log
-  (`imports.list`, undo with `imports.undo`), CSV mappings, email-in address (`imports.email.*`).
-- **Accounts** (`app/accounts.tsx`): `accounts.list/create/update`, roles, archive; web `routes/accounts.tsx`.
+- Done: **Import**, **Accounts**, **Household / Settings / Billing / Data & privacy**, **Budgets editing** (Nov 2026).
 - **Plan & simulate** (`app/plan.tsx`): `plan.baseline/simulate/compare/templates/scenarios.*`; web `routes/plan.tsx`.
 - **Joyo AI chat** (`app/(tabs)/joyo.tsx`): `joyo.*` (streamed events, proposals with Confirm/Dismiss), JoyoRogo's chat
   UI for reference; web `routes/joyo.tsx`.
-- **Household / Settings / Billing** (`app/household.tsx`, `app/settings.tsx`): `household.*` (members, invites,
-  switch active), `tokens.*`, `account.*` (connections, delete account), `billing.*` (no purchase UI on iOS).
 - **Voice quick add**: `src/lib/voice.ts` is the hook the add sheet already calls (expo-audio, multipart to
   `/api/capture/transcribe`, then `capture.parse`). Adds the microphone permission: update `app.json`, the iOS IPA check
   in `scripts/ios/build-ios.sh` (it refuses any `NS*UsageDescription`) and docs/ios-release.md's App Privacy answers.
-- **Budgets editing** on Home (read-only now; `budgets.set`), and **OTA updates** (expo-updates + EAS Update like
+- **OTA updates** (expo-updates + EAS Update like
   JoyoRogo's docs/ota.md; needs an EAS project id from the owner).

@@ -86,9 +86,11 @@ function Root() {
         <Stack.Screen name="capture-setup" options={{ title: "Notification capture" }} />
         <Stack.Screen name="import" options={{ title: "Import statements" }} />
         <Stack.Screen name="accounts" options={{ title: "Accounts" }} />
+        <Stack.Screen name="account/[id]" options={{ title: "Account" }} />
         <Stack.Screen name="plan" options={{ title: "Plan & simulate" }} />
         <Stack.Screen name="household" options={{ title: "Household" }} />
         <Stack.Screen name="settings" options={{ title: "Settings" }} />
+        <Stack.Screen name="data-privacy" options={{ title: "Data & privacy" }} />
       </Stack>
       {session ? <AddSheet /> : null}
       <ToastHost />

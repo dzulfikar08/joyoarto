@@ -64,7 +64,7 @@ export default function More() {
 
         <ListSection title="Household & app">
           <ListRow icon="people-outline" title="Household" subtitle="Members and invites" onPress={() => go("/household")} />
-          <ListRow icon="settings-outline" title="Settings" subtitle={Platform.OS === "android" ? "Notification capture, server" : "Server"} onPress={() => go("/settings")} />
+          <ListRow icon="settings-outline" title="Settings" subtitle={Platform.OS === "android" ? "Tokens, Claude, data, capture" : "Tokens, Claude, data & privacy"} onPress={() => go("/settings")} />
         </ListSection>
 
         <Card>
