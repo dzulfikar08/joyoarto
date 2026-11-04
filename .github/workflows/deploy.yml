@@ -1,0 +1,59 @@
+# Deploys the Worker (web app + API + MCP + email) to Cloudflare after CI passes on main:
+# remote D1 migrations first, then `wrangler deploy`. Same steps as `bun run db:migrate:remote && bun run deploy`
+# on a laptop, which is no longer how production is updated.
+#
+# Secrets (environment `production`): CLOUDFLARE_API_TOKEN with Workers Scripts:Edit, D1:Edit,
+# Workers Routes:Edit and Zone DNS:Edit on joyorogo.com/dzulfikar.com (custom domains). Account id is in wrangler.jsonc.
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - run: bun install --frozen-lockfile
+      - name: Build web app
+        working-directory: apps/web
+        run: bunx vite build
+      - name: Apply D1 migrations
+        working-directory: apps/server
+        run: bunx wrangler d1 migrations apply DB --remote
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Deploy Worker
+        working-directory: apps/server
+        # ALLOWED_EMAILS / ADMIN_EMAILS are variables of the `production` environment (Settings → Environments), not
+        # in wrangler.jsonc. Refuse to deploy without them: an empty allowlist would lock everyone but invitees out.
+        run: |
+          [ -n "$ALLOWED_EMAILS" ] && [ -n "$ADMIN_EMAILS" ] || { echo "::error::Set ALLOWED_EMAILS and ADMIN_EMAILS in the production environment's variables"; exit 1; }
+          bunx wrangler deploy --var "ALLOWED_EMAILS:$ALLOWED_EMAILS" --var "ADMIN_EMAILS:$ADMIN_EMAILS"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ALLOWED_EMAILS: ${{ vars.ALLOWED_EMAILS }}
+          ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
+      - name: Smoke test
+        run: |
+          for u in https://app.arto.joyorogo.com/login https://app.arto.joyorogo.com/api/docs https://arto.joyorogo.com/; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -A "joyoarto-deploy/1.0" "$u"); echo "$u $code"; [ "$code" = "200" ]
+          done

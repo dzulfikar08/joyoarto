@@ -1,0 +1,56 @@
+{
+  "name": "baroka",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*"
+    ],
+    "catalog": {
+      "zod": "^4.5.4",
+      "@types/node": "^26.4.1",
+      "@cloudflare/workers-types": "^5.20260906.1",
+      "@orpc/server": "^1.15.0",
+      "@orpc/openapi": "^1.15.0",
+      "@orpc/zod": "^1.15.0",
+      "@orpc/client": "^1.15.0",
+      "@orpc/tanstack-query": "^1.15.0",
+      "@tanstack/react-query": "^5.102.8",
+      "better-auth": "1.7.3",
+      "@better-auth/mcp": "1.7.3",
+      "@better-auth/oauth-provider": "1.7.3",
+      "@modelcontextprotocol/sdk": "1.32.1",
+      "drizzle-orm": "^0.45.2",
+      "hono": "^4.13.7",
+      "typescript": "^6.0.3",
+      "@orpc/json-schema": "^1.15.0"
+    }
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:server": "turbo run dev -F server",
+    "dev:web": "turbo run dev -F web",
+    "dev:mobile": "bun run --cwd apps/mobile dev",
+    "android": "bun run --cwd apps/mobile android",
+    "build": "turbo run build",
+    "check-types": "turbo run check-types",
+    "test": "turbo run test",
+    "check": "oxlint && oxfmt --write",
+    "db:generate": "bun run --cwd packages/db db:generate",
+    "db:migrate:local": "bun run --cwd apps/server db:migrate:local",
+    "db:migrate:remote": "bun run --cwd apps/server db:migrate:remote",
+    "deploy": "bun run --cwd apps/web build && bun run --cwd apps/server deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@types/bun": "^1.4.2",
+    "@types/node": "catalog:",
+    "oxfmt": "^0.66.0",
+    "oxlint": "^1.81.0",
+    "turbo": "^2.10.12",
+    "typescript": "catalog:"
+  },
+  "packageManager": "bun@1.4.4"
+}

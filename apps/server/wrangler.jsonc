@@ -1,0 +1,66 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // One worker serves the web app (static assets) and the API on the same origin, so auth cookies are first-party.
+  "name": "baroka",
+  "account_id": "b7e6f8457bd39fa37a7eea5249799754",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "routes": [
+    // One Worker, three hosts (apps/web/src/lib/hosts.ts decides which pages each host shows):
+    // arto.joyorogo.com = landing, privacy, terms, demo; app.arto.joyorogo.com = the app, API, MCP and auth;
+    // baroka.by.dzulfikar.com = old address: pages redirect to the app host, the API keeps answering for old clients.
+    { "pattern": "arto.joyorogo.com", "custom_domain": true },
+    { "pattern": "app.arto.joyorogo.com", "custom_domain": true },
+    { "pattern": "baroka.by.dzulfikar.com", "custom_domain": true }
+  ],
+  "assets": {
+    "directory": "../web/dist",
+    "not_found_handling": "single-page-application",
+    // /share-target: the PWA share target. The service worker answers it; this is the fallback when it is not installed.
+    // Static files (manifest.webmanifest, sw.js, icons) are served from assets.
+    "run_worker_first": ["/api/*", "/rpc/*", "/mcp", "/.well-known/*", "/share-target"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "baroka",
+      "database_id": "2ac432a8-5043-4cf3-bd8d-442fafcb09ce",
+      "migrations_dir": "../../packages/db/src/migrations"
+    }
+  ],
+  // Workers AI: Whisper turns voice notes into text (the add sheet); also Joyo AI's chat model when ANTHROPIC_API_KEY is unset.
+  // Local `wrangler dev` reaches it remotely (needs `wrangler login`); without it, DEV_LOGIN answers with a fixed transcript.
+  "ai": { "binding": "AI" },
+  "ratelimits": [
+    { "name": "MCP_LIMITER", "namespace_id": "2001", "simple": { "limit": 120, "period": 60 } },
+    { "name": "OAUTH_REGISTER_LIMITER", "namespace_id": "2002", "simple": { "limit": 30, "period": 60 } },
+    // Public waitlist sign-ups, per client IP.
+    { "name": "WAITLIST_LIMITER", "namespace_id": "2003", "simple": { "limit": 5, "period": 60 } }
+  ],
+  // Local dev overrides these in .dev.vars (localhost origins).
+  "vars": {
+    "BETTER_AUTH_URL": "https://app.arto.joyorogo.com",
+    "APP_URL": "https://app.arto.joyorogo.com",
+    "CORS_ORIGIN": "https://app.arto.joyorogo.com,https://arto.joyorogo.com,https://baroka.by.dzulfikar.com",
+    // ALLOWED_EMAILS (who may sign up, comma-separated; invitees always may) and ADMIN_EMAILS (who can read
+    // /admin/waitlist) are not kept here: deploy.yml passes them from the GitHub environment's variables
+    // (`--var`), and local dev sets them in .dev.vars. Self-hosting: set your own.
+    // Statements by email: households get import+<token>@<this domain>. Cloudflare Email Routing on this (sub)domain
+    // sends import@ (subaddressing on) or a catch-all to this Worker's email() handler (src/email.ts). Replies use
+    // message.reply(), which needs no send_email binding and no verified destination. Remove to turn email import off.
+    "IMPORT_EMAIL_DOMAIN": "arto.joyorogo.com",
+    // Joyo AI (in-app chat) and the add sheet's parser. Models are Anthropic model ids; effort: low | medium | high.
+    "JOYO_AI_MODEL": "claude-opus-5-5",
+    "JOYO_PARSE_MODEL": "claude-haiku-5-5",
+    "JOYO_AI_EFFORT": "medium",
+    // Hosted questions per member per WIB day ("0" = hosted chat off; own keys still work). Voice notes + parses per day.
+    "JOYO_AI_DAILY_CAP": "30",
+    // No ANTHROPIC_API_KEY set: Joyo AI chat and capture parsing run on this Workers AI model (voice uses Whisper).
+    "JOYO_WORKERS_AI_MODEL": "@cf/google/gemma-4-26b-a4b-it",
+    "JOYO_CAPTURE_DAILY_CAP": "60"
+    // Optional: "ANTHROPIC_BASE_URL": "https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/anthropic"
+  }
+  // Secrets (wrangler secret put): BETTER_AUTH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, ANTHROPIC_API_KEY.
+}

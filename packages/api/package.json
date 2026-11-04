@@ -1,0 +1,30 @@
+{
+  "name": "@baroka/api",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "bun test src"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.4.0",
+    "@baroka/db": "workspace:*",
+    "@orpc/client": "catalog:",
+    "@orpc/server": "catalog:",
+    "drizzle-orm": "catalog:",
+    "postal-mime": "^4.2.0",
+    "unpdf": "2.1.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@baroka/config": "workspace:*",
+    "@orpc/json-schema": "catalog:",
+    "@orpc/openapi": "catalog:",
+    "@orpc/zod": "catalog:",
+    "typescript": "catalog:"
+  }
+}

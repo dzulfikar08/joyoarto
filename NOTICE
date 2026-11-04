@@ -1,0 +1,32 @@
+JoyoArto (codebase: baroka)
+Copyright (C) 2026 Dzulfikar Ats Tsauri (JoyoDigitama)
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
+Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any
+later version. See LICENSE for the full text.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for details.
+
+If you run a modified version of this program as a network service, section 13 of the AGPL requires you to offer the
+users of that service the corresponding source code of your version.
+
+Hosted service
+--------------
+The hosted JoyoArto service (https://arto.joyorogo.com, including any paid "Pro" plan) is a service operated by
+JoyoDigitama. Its subscription pays for hosting, support and operation; it is not a licence to the code, which is
+available under the AGPL to everyone. Data stored in the hosted service is covered by its own privacy policy and terms,
+not by this licence.
+
+Trademarks
+----------
+"JoyoArto", "Joyo AI", the JoyoArto logo and app icon, and the Joyo family names (JoyoRogo, JoyoFit) are trademarks of
+JoyoDigitama. The AGPL does not grant any right to use them. You may say that your work is based on JoyoArto, but a
+fork or a service you run must use its own name and logo, and must not suggest that it is JoyoArto or endorsed by
+JoyoDigitama.
+
+Third parties
+-------------
+Bank Jago, GoPay, Gojek, BCA and other banks, e-wallets and merchants named in the code are trademarks of their owners.
+JoyoArto is not affiliated with any of them. Third-party packages keep their own licences (see each package in
+node_modules and bun.lock).

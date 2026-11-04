@@ -1,0 +1,107 @@
+import "@/unistyles";
+import {
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+  useFonts,
+} from "@expo-google-fonts/plus-jakarta-sans";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Redirect, Stack, usePathname, useRouter } from "expo-router";
+import { ShareIntentProvider, useShareIntentContext } from "expo-share-intent";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useState } from "react";
+import { AppState } from "react-native";
+import { useUnistyles } from "react-native-unistyles";
+import { addNetworkStateListener } from "expo-network";
+
+import { NotificationCapture } from "@/modules/notification-capture";
+import { syncCaptures } from "@/src/capture/sync";
+import { loadCaptures } from "@/src/capture/store";
+import { loadSession, useSession } from "@/src/lib/auth";
+import { loadSettings, syncNativeConfig } from "@/src/lib/settings";
+
+void SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
+
+/** Keeps the capture queue moving while the app is open: on start, on foreground, on reconnect, every minute. */
+function CaptureSync() {
+  useEffect(() => {
+    void syncCaptures();
+    const sub = NotificationCapture.addCaptureListener(() => void syncCaptures());
+    const app = AppState.addEventListener("change", (s) => s === "active" && void syncCaptures());
+    const net = addNetworkStateListener((s) => s.isInternetReachable && void syncCaptures());
+    const timer = setInterval(() => void syncCaptures(), 60_000);
+    return () => {
+      sub?.remove();
+      app.remove();
+      net.remove();
+      clearInterval(timer);
+    };
+  }, []);
+  return null;
+}
+
+/** A PDF shared to the app opens the import screen. */
+function ShareRouter() {
+  const { hasShareIntent } = useShareIntentContext();
+  const router = useRouter();
+  const path = usePathname();
+  useEffect(() => {
+    if (hasShareIntent && path !== "/import") router.push("/import");
+  }, [hasShareIntent, path, router]);
+  return null;
+}
+
+function Root() {
+  const { theme, rt } = useUnistyles();
+  const session = useSession();
+  const path = usePathname();
+  const header = {
+    headerStyle: { backgroundColor: theme.colors.background },
+    headerTintColor: theme.colors.foreground,
+    headerTitleStyle: { fontFamily: theme.fonts.bold },
+    headerShadowVisible: false,
+    contentStyle: { backgroundColor: theme.colors.background },
+  };
+  if (session === undefined) return null;
+  if (!session && path !== "/login") return <Redirect href="/login" />;
+  return (
+    <>
+      <StatusBar style={rt.themeName === "dark" ? "light" : "dark"} />
+      {session ? <CaptureSync /> : null}
+      {session ? <ShareRouter /> : null}
+      <Stack screenOptions={header}>
+        <Stack.Screen name="index" options={{ title: "JoyoArto" }} />
+        <Stack.Screen name="login" options={{ title: "Sign in", headerShown: false }} />
+        <Stack.Screen name="quick-add" options={{ title: "Quick add", presentation: "modal" }} />
+        <Stack.Screen name="captured" options={{ title: "Captured" }} />
+        <Stack.Screen name="capture/[id]" options={{ title: "Capture" }} />
+        <Stack.Screen name="capture-setup" options={{ title: "Notification capture" }} />
+        <Stack.Screen name="import" options={{ title: "Import statements" }} />
+        <Stack.Screen name="settings" options={{ title: "Settings" }} />
+      </Stack>
+    </>
+  );
+}
+
+export default function RootLayout() {
+  const [fonts] = useFonts({ PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold });
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    void Promise.all([loadSession(), loadSettings().then(syncNativeConfig), loadCaptures()]).finally(() => setReady(true));
+  }, []);
+  useEffect(() => {
+    if (fonts && ready) void SplashScreen.hideAsync().catch(() => undefined);
+  }, [fonts, ready]);
+  if (!fonts || !ready) return null;
+  return (
+    <ShareIntentProvider>
+      <QueryClientProvider client={queryClient}>
+        <Root />
+      </QueryClientProvider>
+    </ShareIntentProvider>
+  );
+}

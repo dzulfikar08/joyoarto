@@ -1,0 +1,173 @@
+# Android APK for the JoyoArto app (apps/mobile). Builds on GitHub's runners, never on the laptop.
+#
+# Runs on pushes that touch apps/mobile, and by hand:
+#   gh workflow run android.yml -R dzulfikar08/joyoarto --ref <branch> [-f variant=debug]
+#   gh run download <run-id> -R dzulfikar08/joyoarto -n joyoarto-android-apk
+#   adb install -r joyoarto-release.apk
+#
+# The release variant bundles the JS (no Metro needed). It is signed with the release key when the optional secrets
+# ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD exist (same names as
+# JoyoRogo), otherwise with the throwaway debug key, which is fine for sideloading tests.
+name: Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: "release = JS bundled, runs standalone; debug = dev client, needs Metro"
+        type: choice
+        options: [release, debug]
+        default: release
+      archs:
+        description: "ABIs (comma-separated)"
+        type: string
+        default: arm64-v8a
+  push:
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/android.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      VARIANT: ${{ inputs.variant || 'release' }}
+      ARCHS: ${{ inputs.archs || 'arm64-v8a' }}
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/node_modules/.cache "$AGENT_TOOLSDIRECTORY/CodeQL"
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      # CVE-2026-91403 (as in JoyoRogo): Gradle fetches over TLS with a JDK that may still trust the compromised
+      # eMudhra intermediates, so the JVMs use a copy of cacerts without them. Drop once the pinned JDK is fixed.
+      - name: Distrust eMudhra in the JDK (CVE-2026-91403)
+        run: |
+          store="$RUNNER_TEMP/cacerts"
+          cp -L "$JAVA_HOME/lib/security/cacerts" "$store" && chmod 600 "$store"
+          for alias in $("$JAVA_HOME/bin/keytool" -list -keystore "$store" -storepass changeit | grep -i emsign | cut -d, -f1); do
+            "$JAVA_HOME/bin/keytool" -delete -keystore "$store" -storepass changeit -alias "$alias"
+          done
+          if "$JAVA_HOME/bin/keytool" -list -keystore "$store" -storepass changeit | grep -qi emsign; then echo "emSign still trusted" >&2; exit 1; fi
+          echo "JAVA_TOOL_OPTIONS=-Djavax.net.ssl.trustStore=$store -Djavax.net.ssl.trustStorePassword=changeit" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Cache bun packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-read-only: false
+
+      - name: Gradle JVM settings
+        run: |
+          mkdir -p ~/.gradle
+          cat >> ~/.gradle/gradle.properties <<'EOF2'
+          org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC
+          org.gradle.parallel=true
+          org.gradle.caching=true
+          EOF2
+
+      # ubuntu-latest ships the Android SDK (ANDROID_HOME is set); Gradle fetches missing platforms/build-tools.
+      - name: Android SDK
+        run: test -d "$ANDROID_HOME" && echo "ANDROID_HOME=$ANDROID_HOME" && ls "$ANDROID_HOME/build-tools"
+
+      # Most of a cold build is C++ from native libraries (unistyles, reanimated, worklets…), which Gradle's build
+      # cache does not cover. ccache keeps the compiled objects between runs; CMake picks it up from the
+      # CMAKE_*_COMPILER_LAUNCHER environment variables, which the NDK's CMake inherits from Gradle.
+      - name: Install ccache
+        run: sudo apt-get install -y -qq ccache >/dev/null && ccache --version | head -1
+      - name: Cache ccache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ccache
+          key: ccache-android-${{ env.ARCHS }}-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: |
+            ccache-android-${{ env.ARCHS }}-${{ hashFiles('bun.lock') }}-
+            ccache-android-${{ env.ARCHS }}-
+      - name: Use ccache for native code
+        run: |
+          {
+            echo "CCACHE_DIR=$HOME/.cache/ccache"
+            echo "CCACHE_MAXSIZE=2G"
+            echo "CCACHE_COMPILERCHECK=content"
+            # Paths differ per checkout; let ccache match on relative paths.
+            echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE"
+            echo "CCACHE_NOHASHDIR=true"
+            echo "CMAKE_C_COMPILER_LAUNCHER=ccache"
+            echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache"
+          } >> "$GITHUB_ENV"
+          ccache --zero-stats
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck and unit tests
+        working-directory: apps/mobile
+        run: |
+          bunx tsc --noEmit
+          bun test ./src/
+
+      - name: Restore release keystore (optional)
+        if: env.HAS_KEYSTORE == 'true' && env.VARIANT == 'release'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          umask 077
+          mkdir -p "$RUNNER_TEMP/keystore"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/keystore/joyoarto-release.jks"
+          {
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/keystore/joyoarto-release.jks"
+            echo "ANDROID_KEYSTORE_PASSWORD=$STORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Build APK
+        run: apps/mobile/scripts/build-android-ci.sh
+
+      - name: ccache stats
+        if: always()
+        run: ccache --show-stats | tee -a "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Checksum
+        run: sha256sum dist/joyoarto-*.apk | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: joyoarto-android-apk
+          path: dist/joyoarto-*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove signing material
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keystore"

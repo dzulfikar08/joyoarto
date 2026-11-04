@@ -1,0 +1,169 @@
+import { beforeEach, describe, expect, test } from "bun:test";
+
+import { schema } from "@baroka/db";
+import type { Database } from "@baroka/db";
+import { call } from "@orpc/server";
+import { eq } from "drizzle-orm";
+
+import type { AiConfig, Context, Principal } from "../context";
+import { runChat } from "../lib/joyo-ai/chat";
+import type { Engine } from "../lib/joyo-ai/chat";
+import { reserveSlot, wibDayStart } from "../lib/joyo-ai/limits";
+import { chatToolSpecs } from "../lib/joyo-ai/tools";
+import type { Adapter, ModelReply, ModelRequest } from "../lib/joyo-ai/types";
+import { appRouter } from "../routers/index";
+import { testAccount, testDb, testPrincipal } from "../test/d1";
+import { toolCatalog } from "../tools";
+
+let db: Database;
+let dewi: Principal;
+let stranger: Principal;
+
+beforeEach(async () => {
+  ({ db } = await testDb());
+  dewi = await testPrincipal(db, "Dewi");
+  stranger = await testPrincipal(db, "Stranger");
+  await testAccount(db, dewi, "GoPay");
+});
+
+const reply = (r: Partial<ModelReply>): ModelReply => ({ text: "", thinking: "", toolCalls: [], usage: { inputTokens: 10, outputTokens: 5 }, stop: "end", finish: "end_turn", ...r });
+
+/** A model that answers with the scripted replies in order, and remembers what it was sent. */
+function scripted(replies: ModelReply[]) {
+  const seen: ModelRequest[] = [];
+  const adapter: Adapter = {
+    async complete(_conn, request, options) {
+      seen.push({ ...request, messages: [...request.messages] });
+      const next = replies.shift();
+      if (!next) throw new Error("no more replies");
+      if (next.text) options?.onDelta?.({ text: next.text });
+      return next;
+    },
+    async listModels() {
+      return [];
+    },
+  };
+  const engine: Engine = { kind: "hosted", provider: "claude", adapter, conn: { baseUrl: "x", apiKey: "k", model: "claude-opus-5-5" } };
+  return { engine, seen };
+}
+
+function aiConfig(adapterEngine?: Engine): AiConfig {
+  void adapterEngine;
+  return {
+    anthropicKey: null,
+    anthropicBaseUrl: "https://api.anthropic.com",
+    chatModel: "claude-opus-5-5",
+    parseModel: "claude-opus-5-5",
+    effort: "medium",
+    workersAi: null,
+    workersAiModel: "m",
+    dailyCap: 2,
+    captureCap: 5,
+    fakeTranscript: true,
+  };
+}
+
+const person = { name: "Dewi", household: "Rumah", today: "2026-11-04" };
+
+describe("tool catalog", () => {
+  test("chat tools read or propose, and never import, delete or create accounts", () => {
+    const chat = toolCatalog().filter((t) => t.chat);
+    expect(chat.map((t) => t.name)).not.toContain("undo_import");
+    expect(chat.map((t) => t.name)).not.toContain("delete_scenario");
+    expect(chat.map((t) => t.name)).not.toContain("create_account");
+    for (const t of chat) expect(t.chat === "read" ? t.scope : "finance:read").toBe("finance:read");
+    expect(chat.find((t) => t.name === "quick_add")?.chat).toBe("propose");
+  });
+  test("every chat tool has an object schema", () => {
+    for (const spec of chatToolSpecs()) expect(spec.parameters.type).toBe("object");
+    expect(Object.keys(chatToolSpecs().find((s) => s.name === "search_transactions")?.parameters.properties ?? {}).length).toBeGreaterThan(3);
+  });
+});
+
+describe("runChat", () => {
+  test("reads through the member's own household and proposes writes without running them", async () => {
+    const { engine, seen } = scripted([
+      reply({ toolCalls: [{ id: "t1", name: "list_accounts", args: {} }, { id: "t2", name: "quick_add", args: { amountText: "25rb", description: "kopi kenangan" } }], stop: "tools" }),
+      reply({ text: "Saldo GoPay ada. Konfirmasi kartu di bawah untuk menyimpan kopi." }),
+    ]);
+    const context: Context = { db, principal: dewi };
+    const answer = await runChat({ engine, context, person, turns: [{ role: "user", content: "catat kopi 25rb" }] });
+    expect(answer.reply).toContain("Konfirmasi");
+    expect(answer.steps.map((s) => [s.tool, s.ok])).toEqual([
+      ["list_accounts", true],
+      ["quick_add", true],
+    ]);
+    expect(answer.proposals).toHaveLength(1);
+    expect(answer.proposals[0]).toMatchObject({ tool: "quick_add", status: "pending" });
+    // Nothing was saved.
+    expect(await db.select().from(schema.transaction)).toHaveLength(0);
+    // The second call saw both tool results; the accounts are Dewi's only.
+    const toolMessages = seen[1]!.messages.filter((m) => m.role === "tool");
+    expect(toolMessages).toHaveLength(2);
+    expect(toolMessages[0]!.role === "tool" && toolMessages[0]!.content).toContain("GoPay");
+    expect(seen[0]!.system).toContain("Today is 2026-11-04");
+  });
+
+  test("invalid arguments go back to the model as an error", async () => {
+    const { engine, seen } = scripted([reply({ toolCalls: [{ id: "t1", name: "set_budget", args: { amount: "lots" } }], stop: "tools" }), reply({ text: "ok" })]);
+    const answer = await runChat({ engine, context: { db, principal: dewi }, person, turns: [{ role: "user", content: "budget" }] });
+    expect(answer.proposals).toHaveLength(0);
+    const tool = seen[1]!.messages.find((m) => m.role === "tool");
+    expect(tool?.role === "tool" && tool.content).toContain("Invalid arguments");
+  });
+});
+
+describe("daily cap", () => {
+  test("a slot is refused once the day is full, and the next WIB day starts again", async () => {
+    const now = Date.UTC(2026, 10, 4, 10);
+    const slot = { userId: dewi.userId, householdId: dewi.householdId, kind: "chat" as const, engine: "hosted" as const, model: "m", cap: 2 };
+    expect(await reserveSlot(db, slot, now)).not.toBeNull();
+    expect(await reserveSlot(db, slot, now)).not.toBeNull();
+    expect(await reserveSlot(db, slot, now)).toBeNull();
+    // Own-key calls have their own count.
+    expect(await reserveSlot(db, { ...slot, engine: "byok" }, now)).not.toBeNull();
+    expect(await reserveSlot(db, slot, wibDayStart(now) + 86_400_000)).not.toBeNull();
+  });
+});
+
+describe("joyo router", () => {
+  test("off without an engine; proposals are confirmed from the stored message only, by the owner", async () => {
+    const ctx = (principal: Principal, ai?: AiConfig): Context => ({ db, principal, ...(ai ? { ai } : {}) });
+    const drain = async () => {
+      for await (const event of await call(appRouter.joyo.chat, { message: "halo" }, { context: ctx(dewi, aiConfig()) })) void event;
+    };
+    await expect(drain()).rejects.toThrow(/off/i);
+
+    // A stored answer with a pending quick add.
+    const { engine } = scripted([reply({ toolCalls: [{ id: "t1", name: "quick_add", args: { amountText: "25rb", description: "kopi" } }], stop: "tools" }), reply({ text: "Konfirmasi ya." })]);
+    const answer = await runChat({ engine, context: ctx(dewi), person, turns: [{ role: "user", content: "kopi 25rb" }] });
+    const conv = crypto.randomUUID();
+    await db.insert(schema.joyoConversation).values({ id: conv, householdId: dewi.householdId, userId: dewi.userId, title: "kopi" });
+    const messageId = crypto.randomUUID();
+    await db.insert(schema.joyoMessage).values({ id: messageId, conversationId: conv, role: "assistant", content: answer.reply, proposals: answer.proposals });
+    const proposalId = answer.proposals[0]!.id;
+
+    await expect(call(appRouter.joyo.proposal, { messageId, proposalId, action: "confirm" }, { context: ctx(stranger) })).rejects.toThrow();
+    const first = await call(appRouter.joyo.proposal, { messageId, proposalId, action: "confirm" }, { context: ctx(dewi) });
+    expect(first.proposal.status).toBe("done");
+    const second = await call(appRouter.joyo.proposal, { messageId, proposalId, action: "confirm" }, { context: ctx(dewi) });
+    expect(second.proposal.status).toBe("done");
+    const rows = await db.select().from(schema.transaction).where(eq(schema.transaction.householdId, dewi.householdId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ amount: -2_500_000, capturedVia: "joyo" });
+
+    // Conversations are private: the stranger sees none of Dewi's.
+    expect((await call(appRouter.joyo.conversations.list, undefined, { context: ctx(stranger) })).conversations).toHaveLength(0);
+    expect((await call(appRouter.joyo.conversations.list, undefined, { context: ctx(dewi) })).conversations).toHaveLength(1);
+  });
+});
+
+describe("capture", () => {
+  test("parse falls back to rules without a key; transcribe answers the dev transcript without a binding", async () => {
+    const context: Context = { db, principal: dewi, ai: aiConfig() };
+    const parsed = await call(appRouter.capture.parse, { text: "kopi 25rb gopay" }, { context });
+    expect(parsed.draft).toMatchObject({ amount: 2_500_000, direction: "out", source: "rules" });
+    const heard = await call(appRouter.capture.transcribe, { audio: new File([new Uint8Array(2000)], "v.webm", { type: "audio/webm" }) }, { context });
+    expect(heard.text).toContain("kopi");
+  });
+});

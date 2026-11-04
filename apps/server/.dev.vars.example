@@ -1,0 +1,12 @@
+BETTER_AUTH_SECRET=change-me-to-32-random-bytes
+BETTER_AUTH_URL=http://localhost:3000
+APP_URL=http://localhost:3001
+CORS_ORIGIN=http://localhost:3001
+DEV_LOGIN=1
+# Who may sign up with Google (comma-separated; people with a pending invite always may) and who can read /admin/waitlist.
+ALLOWED_EMAILS=
+ADMIN_EMAILS=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+# Joyo AI and the add sheet's parser (optional). Without it the chat uses Workers AI, or is off, and parsing uses rules.
+ANTHROPIC_API_KEY=

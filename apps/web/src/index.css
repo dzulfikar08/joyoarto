@@ -1,0 +1,32 @@
+@import "@baroka/ui/globals.css";
+
+/*
+ * Transition aliases: the old .card/.label classes draw with the JoyoArto tokens (same look as Card and Label).
+ * New code should use the @baroka/ui components instead.
+ * In the components layer so utilities on an element (p-0, space-y-3) can override them.
+ */
+@layer components {
+  .card {
+    @apply rounded-3xl bg-card p-4 text-card-foreground sm:p-5;
+  }
+  .label {
+    @apply text-xs font-semibold tracking-wide text-muted-foreground uppercase;
+  }
+}
+
+/* File pickers look like the secondary button instead of the browser default. */
+input[type="file"] {
+  @apply max-w-full text-sm text-muted-foreground;
+}
+input[type="file"]::file-selector-button {
+  @apply mr-3 h-10 cursor-pointer rounded-full border-0 bg-muted px-4 text-sm font-semibold text-foreground hover:bg-accent;
+}
+input[type="file"]:disabled::file-selector-button {
+  @apply cursor-not-allowed opacity-50;
+}
+
+/* Native checkboxes and radios in the brand colour. */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--primary);
+}

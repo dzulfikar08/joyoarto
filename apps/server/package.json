@@ -1,0 +1,32 @@
+{
+  "name": "server",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev --port 3000",
+    "deploy": "wrangler deploy",
+    "check-types": "tsc --noEmit",
+    "test": "bun test src",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote"
+  },
+  "dependencies": {
+    "@baroka/api": "workspace:*",
+    "@baroka/auth": "workspace:*",
+    "@baroka/db": "workspace:*",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@orpc/json-schema": "catalog:",
+    "@orpc/openapi": "catalog:",
+    "@orpc/server": "catalog:",
+    "@orpc/zod": "catalog:",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@baroka/config": "workspace:*",
+    "typescript": "catalog:",
+    "wrangler": "^4.40.0"
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "JoyoArto",
+    "slug": "joyoarto",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "joyoarto",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.joyodigitama.joyoarto",
+      "config": { "usesNonExemptEncryption": false }
+    },
+    "android": {
+      "package": "com.joyodigitama.joyoarto",
+      "adaptiveIcon": {
+        "backgroundColor": "#3752ae",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": { "favicon": "./assets/images/favicon.png" },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 120,
+          "resizeMode": "contain",
+          "backgroundColor": "#f9f6f1",
+          "dark": { "image": "./assets/images/splash-icon.png", "backgroundColor": "#110f0b" }
+        }
+      ],
+      ["expo-build-properties", { "android": { "minSdkVersion": 26 } }],
+      "react-native-edge-to-edge",
+      [
+        "expo-share-intent",
+        {
+          "androidIntentFilters": ["application/pdf"],
+          "androidMultiIntentFilters": ["application/pdf"],
+          "iosActivationRules": { "NSExtensionActivationSupportsFileWithMaxCount": 10 }
+        }
+      ]
+    ],
+    "experiments": { "typedRoutes": true }
+  }
+}

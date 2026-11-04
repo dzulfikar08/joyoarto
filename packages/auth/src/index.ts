@@ -1,0 +1,199 @@
+import { mcp } from "@better-auth/mcp";
+import type { Database } from "@baroka/db";
+import * as authSchema from "@baroka/db/schema/auth";
+import * as oauthSchema from "@baroka/db/schema/oauth";
+import type { BetterAuthPlugin } from "better-auth";
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { APIError, createAuthEndpoint, createAuthMiddleware } from "better-auth/api";
+import { setSessionCookie } from "better-auth/cookies";
+import { jwt } from "better-auth/plugins";
+
+import { MCP_OFFLINE_SCOPE, MCP_PATH, MCP_SCOPES } from "./mcp-scopes";
+
+export type AuthConfig = {
+  BETTER_AUTH_URL: string;
+  BETTER_AUTH_SECRET: string;
+  /** Comma-separated origins of the web app. */
+  CORS_ORIGIN: string;
+  /** Web app origin: the login and consent pages of the MCP connector live there. Empty = BETTER_AUTH_URL. */
+  APP_URL?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  /** Non-empty enables the credentialless dev sign-in. Never set it in production. */
+  DEV_LOGIN?: string;
+  /** Comma-separated emails allowed to sign up. Empty = anyone with a Google account. */
+  ALLOWED_EMAILS?: string;
+};
+
+export type AuthHooks = {
+  /** Runs once after a user row is created (gives them a household). */
+  onUserCreated?: (user: { id: string; name: string }) => Promise<void>;
+  /** Lets an email that is not on ALLOWED_EMAILS sign up (a pending household invite). */
+  canSignUp?: (email: string) => Promise<boolean>;
+};
+
+export type BarokaAuth = ReturnType<typeof createAuth>;
+export type AuthSession = Awaited<ReturnType<BarokaAuth["api"]["getSession"]>>;
+
+const DEV_USER = { email: "dev@baroka.local", name: "Dev User" };
+
+/** Credentialless sign-in for local development; the endpoint exists only when DEV_LOGIN is set. */
+function devLogin(enabled: boolean): BetterAuthPlugin {
+  return {
+    id: "dev-login",
+    endpoints: enabled
+      ? {
+          signInDevUser: createAuthEndpoint("/sign-in/dev-user", { method: "POST" }, async (ctx) => {
+            const adapter = ctx.context.internalAdapter;
+            const found = await adapter.findUserByEmail(DEV_USER.email);
+            const user =
+              found?.user ??
+              (await adapter.createUser(
+                { ...DEV_USER, emailVerified: true, createdAt: new Date(), updatedAt: new Date() },
+                { method: "dev-login" },
+              ));
+            const session = await adapter.createSession(user.id);
+            if (!session) throw new APIError("INTERNAL_SERVER_ERROR", { message: "Could not create a dev session" });
+            await setSessionCookie(ctx, { session, user });
+            return ctx.json({ user });
+          }),
+        }
+      : {},
+  };
+}
+
+/** Where the connector's access tokens are accepted: the MCP endpoint, which is the `aud` of every token. */
+export function mcpResourceUrl(authUrl: string): string {
+  return `${authUrl.replace(/\/$/, "")}${MCP_PATH}`;
+}
+
+/**
+ * OAuth 2.1 authorization server for the MCP connector (claude.ai, Claude Desktop, Claude Code, other MCP clients):
+ * authorization code + PKCE, dynamic client registration, resource-bound JWT access tokens (RFC 8707) and rotating
+ * refresh tokens. Login and consent are one page of the web app (/connect).
+ *
+ * `offline_access` is added to every authorization request that names scopes: without it no refresh token is issued
+ * and the connector would sign out every hour. A missing `resource` is filled in so the token is a JWT for /mcp.
+ */
+export function mcpPlugins(env: Pick<AuthConfig, "BETTER_AUTH_URL" | "APP_URL">): BetterAuthPlugin[] {
+  const appUrl = (env.APP_URL || env.BETTER_AUTH_URL).replace(/\/$/, "");
+  const page = `${appUrl}/connect`;
+  const provider = mcp({
+    loginPage: page,
+    consentPage: page,
+    resource: mcpResourceUrl(env.BETTER_AUTH_URL),
+    scopes: [...MCP_SCOPES],
+    grantTypes: ["authorization_code", "refresh_token"],
+    allowPublicClientPrelogin: true,
+    allowDynamicClientRegistration: true,
+    allowUnauthenticatedClientRegistration: true,
+    accessTokenExpiresIn: 60 * 60,
+    refreshTokenExpiresIn: 30 * 24 * 60 * 60,
+    rateLimit: {
+      token: { window: 60, max: 120 },
+      authorize: { window: 60, max: 120 },
+      register: { window: 60, max: 60 },
+      revoke: { window: 60, max: 60 },
+    },
+  });
+  return [
+    jwt({ disableSettingJwtHeader: true }),
+    {
+      ...provider,
+      hooks: {
+        ...provider.hooks,
+        before: [
+          ...(provider.hooks?.before ?? []),
+          {
+            matcher: (ctx) => ctx.path === "/oauth2/authorize",
+            handler: createAuthMiddleware(async (ctx) => {
+              const query = (ctx.query ?? {}) as { scope?: unknown; resource?: unknown };
+              const scope = typeof query.scope === "string" ? query.scope : undefined;
+              const needsScope = scope !== undefined && !scope.split(" ").includes(MCP_OFFLINE_SCOPE);
+              const needsResource = query.resource === undefined;
+              if (!needsScope && !needsResource) return;
+              return {
+                context: {
+                  query: {
+                    ...query,
+                    ...(needsScope ? { scope: `${scope} ${MCP_OFFLINE_SCOPE}` } : {}),
+                    ...(needsResource ? { resource: mcpResourceUrl(env.BETTER_AUTH_URL) } : {}),
+                  },
+                },
+              };
+            }),
+          },
+          {
+            // Better Auth 1.7.3 cannot infer the application type: desktop clients (Claude Code) register loopback or
+            // custom-scheme callbacks and must be "native".
+            matcher: (ctx) => ctx.path === "/oauth2/register",
+            handler: createAuthMiddleware(async (ctx) => {
+              const body = ctx.body as { application_type?: unknown; redirect_uris?: unknown } | undefined;
+              if (!body || body.application_type !== undefined || !nativeRegistration(body.redirect_uris)) return;
+              return { context: { body: { ...body, application_type: "native" } } };
+            }),
+          },
+        ],
+      },
+    },
+  ];
+}
+
+function nativeRegistration(redirectUris: unknown): boolean {
+  if (!Array.isArray(redirectUris)) return false;
+  return redirectUris.some((uri) => {
+    try {
+      const url = new URL(String(uri));
+      if (url.protocol === "https:") return false;
+      if (url.protocol !== "http:") return true;
+      return ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    } catch {
+      return false;
+    }
+  });
+}
+
+export function parseEmails(raw: string | undefined): string[] {
+  return (raw ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function createAuth(env: AuthConfig, database: Database, hooks: AuthHooks = {}) {
+  const allowed = parseEmails(env.ALLOWED_EMAILS);
+  return betterAuth({
+    database: drizzleAdapter(database, { provider: "sqlite", schema: { ...authSchema, ...oauthSchema } }),
+    secret: env.BETTER_AUTH_SECRET,
+    baseURL: env.BETTER_AUTH_URL,
+    trustedOrigins: env.CORS_ORIGIN.split(",")
+      .map((o) => o.trim())
+      .filter(Boolean),
+    socialProviders:
+      env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+        ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET, overrideUserInfoOnSignIn: true } }
+        : {},
+    databaseHooks: {
+      user: {
+        create: {
+          // Invite-only: the allowlist and people with a pending household invite may create accounts.
+          before: async (user) => {
+            const email = user.email.toLowerCase();
+            if (!allowed.length || allowed.includes(email) || email === DEV_USER.email) return;
+            if (!(await hooks.canSignUp?.(email))) return false;
+          },
+          after: async (user) => {
+            await hooks.onUserCreated?.({ id: user.id, name: user.name });
+          },
+        },
+      },
+    },
+    session: { cookieCache: { enabled: true, maxAge: 5 * 60 } },
+    advanced: {
+      defaultCookieAttributes: { sameSite: "none", secure: true, httpOnly: true },
+    },
+    disabledPaths: ["/token"],
+    plugins: [devLogin(Boolean(env.DEV_LOGIN)), ...mcpPlugins(env)],
+  });
+}

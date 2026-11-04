@@ -1,0 +1,36 @@
+{
+  "name": "web",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3001",
+    "build": "vite build",
+    "check-types": "vite build && tsc --noEmit"
+  },
+  "dependencies": {
+    "@baroka/ui": "workspace:*",
+    "@orpc/client": "catalog:",
+    "@orpc/tanstack-query": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-router": "^1.170.32",
+    "better-auth": "catalog:",
+    "lucide-react": "^1.41.0",
+    "pdfjs-dist": "6.4.299",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "sonner": "^2.0.8"
+  },
+  "devDependencies": {
+    "@baroka/api": "workspace:*",
+    "@baroka/config": "workspace:*",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/router-plugin": "^1.168.35",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "catalog:",
+    "vite": "^8.2.2"
+  }
+}
