@@ -10,9 +10,6 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 # Joyo AI and the add sheet's parser (optional). Without it the chat uses Workers AI, or is off, and parsing uses rules.
 ANTHROPIC_API_KEY=
-# JoyoArto Pro billing (optional). With PAYWALL=1 in wrangler.jsonc, the Free limits apply once a gateway is set here.
-# DOKU sandbox keys: dashboard-sandbox.doku.com → Integration → API Keys. Polar sandbox: sandbox.polar.sh.
-DOKU_CLIENT_ID=
-DOKU_SECRET_KEY=
-POLAR_ACCESS_TOKEN=
-POLAR_WEBHOOK_SECRET=
+# Joyo Pro (optional). Unset = billing off, everyone is Pro. Set it (the same value as JoyoRogo's server, or a local
+# JoyoRogo's) and the Free limits apply with PAYWALL=1; Pro status is then asked from JOYOROGO_API_URL.
+JOYO_INTERNAL_KEY=

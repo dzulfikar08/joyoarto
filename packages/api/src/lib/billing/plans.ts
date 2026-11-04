@@ -1,14 +1,15 @@
-// What Free and Pro include. The one place to change a limit: the server enforces these (services/billing.ts), the web
-// app shows them from billing.status, and the pricing page lists them. Prices live in wrangler vars (config.ts).
+// What Free and Pro include in JoyoArto. The one place to change a limit: the server enforces these
+// (services/billing.ts), the web app shows them from billing.status, and the pricing page lists them.
 //
-// A self-hosted server without billing configured (no PAYWALL=1 or no payment gateway) gives every household Pro:
+// Limits follow the ACTING user's plan (Joyo Pro is per account, bought in JoyoRogo). Prices are JoyoRogo's, read from
+// its /api/config at runtime. A server without billing (no PAYWALL=1 or no JOYO_INTERNAL_KEY) gives everyone Pro:
 // JoyoArto is AGPL and free to run yourself; the limits only exist on the hosted service.
 
 export const PLANS = ["free", "pro"] as const;
 export type Plan = (typeof PLANS)[number];
 
 export type PlanLimits = {
-  /** Bank statement imports (Jago/GoPay PDF or text, app, share-to-app, API upload) per household per WIB month; null = unlimited. */
+  /** Bank statement imports (Jago/GoPay PDF or text, app, share-to-app, API upload) per user per WIB month; null = unlimited. */
   statementImportsPerMonth: number | null;
   /** Several statements in one go on the import page. */
   bulkStatementImport: boolean;
@@ -16,7 +17,7 @@ export type PlanLimits = {
   emailImport: boolean;
   /** Hosted Joyo AI questions per member per WIB day; null = the server's JOYO_AI_DAILY_CAP. Own keys are not limited by plan. */
   aiDailyCap: number | null;
-  /** Household members, pending invites included. */
+  /** Household members, pending invites included; the inviter's plan decides. */
   members: number;
   /** Saved Plan & simulate scenarios (0 = drafts only; existing ones stay readable). */
   savedScenarios: number;
@@ -49,5 +50,5 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
 export const UPGRADE_FEATURES = ["statementImports", "bulkImport", "emailImport", "joyoAi", "members", "savedScenarios", "mcpConnector"] as const;
 export type UpgradeFeature = (typeof UPGRADE_FEATURES)[number];
 
-/** Usage counter metric for statement imports (usage_counter.metric). */
+/** Usage counter metric for statement imports (usage_counter.metric, per user). */
 export const STATEMENT_IMPORT_METRIC = "statement_import";

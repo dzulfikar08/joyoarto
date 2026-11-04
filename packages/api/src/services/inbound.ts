@@ -16,7 +16,7 @@ import type { BillingConfig } from "../lib/billing/config";
 import { mailbox, senderAuth } from "../lib/mime";
 import type { SenderAuth } from "../lib/mime";
 import { MAX_PDF_BYTES, pdfText } from "../lib/pdf/extract";
-import { householdPlan, requireFeature } from "./billing";
+import { requireFeature, userPlan } from "./billing";
 import { importStatement } from "./statements";
 
 const addr = schema.emailImportAddress;
@@ -72,7 +72,7 @@ export async function emailImportStatus(db: Database, p: Principal, domain: stri
 /** Turns email import on, or gives the household a new address (the old one stops working at once). */
 export async function regenerateEmailImport(db: Database, p: Principal, domain: string | null, billing?: BillingConfig) {
   if (!domain) notConfigured();
-  await requireFeature(db, p.householdId, billing, "emailImport");
+  await requireFeature(db, p.userId, billing, "emailImport");
   const token = newImportToken();
   await db
     .insert(addr)
@@ -256,12 +256,12 @@ export async function receiveEmail(
   const reply = (status: InboundStatus, text: string): InboundOutcome =>
     automatic ? { action: "drop", status } : { action: "reply", status, subject: reSubject, text };
 
-  // Email import is a Pro feature: a household that went back to Free gets told instead of a silent bounce.
-  const { limits } = await householdPlan(db, householdId, config.billing);
+  // Email import is a Pro feature of the sender's account: someone back on Free gets told instead of a silent bounce.
+  const { limits } = await userPlan(db, member.userId, config.billing);
   if (!limits.emailImport) {
-    await logInbound(db, householdId, { fromAddress: from, userId: member.userId, subject, status: "failed", detail: { reason: "Email import needs JoyoArto Pro.", auth } });
+    await logInbound(db, householdId, { fromAddress: from, userId: member.userId, subject, status: "failed", detail: { reason: "Email import needs Joyo Pro.", auth } });
     const url = config.appUrl ? ` ${config.appUrl.replace(/\/$/, "")}/pricing` : "";
-    return reply("failed", `Nothing was imported: importing statements by email is part of JoyoArto Pro.\n\nUpgrade in Settings → Billing${url ? ` (${url.trim()})` : ""}, or upload the PDF in the app.`);
+    return reply("failed", `Nothing was imported: importing statements by email is part of Joyo Pro.\n\nSee Settings → Billing${url ? ` (${url.trim()})` : ""}, or upload the PDF in the app.`);
   }
 
   if (!pdfs.length) {
