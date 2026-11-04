@@ -10,7 +10,8 @@ import type {
   TransactionPatch,
 } from "./types";
 
-export const DEFAULT_SERVER = "https://baroka.by.dzulfikar.com";
+/** The hosted service (app host: app, REST API, MCP). The old baroka.by.dzulfikar.com only redirects. */
+export const DEFAULT_SERVER = "https://app.arto.joyorogo.com";
 
 export class ApiError extends Error {
   constructor(
