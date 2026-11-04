@@ -9,6 +9,7 @@ import { Platform, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+import { BudgetSheet, type BudgetTarget } from "@/components/budgets/budget-sheet";
 import { CashflowChart } from "@/components/charts/cashflow";
 import { DonutChart, LegendRow, Swatch } from "@/components/charts/donut";
 import { PaceChart } from "@/components/charts/pace";
@@ -341,15 +342,27 @@ const BUDGET_STATUS = {
 
 function Budgets({ d }: { d: Dashboard }) {
   const { theme } = useUnistyles();
+  const [target, setTarget] = useState<BudgetTarget | null>(null);
   const items = d.budgets.items;
-  if (!items.length) return null;
   return (
-    <Card title="Budgets" subtitle={`${d.budgets.total.spent} of ${d.budgets.total.budget}`}>
+    <Card
+      title="Budgets"
+      subtitle={items.length ? `${d.budgets.total.spent} of ${d.budgets.total.budget}` : undefined}
+      action={<Button title={items.length ? "Add" : "Set budgets"} icon="add" variant="ghost" small onPress={() => setTarget("new")} />}
+    >
+      {!items.length ? <Text tone="muted">No budgets yet. Set a monthly limit per category to track your pace.</Text> : null}
       {items.map((b) => {
         const s = BUDGET_STATUS[b.status as keyof typeof BUDGET_STATUS] ?? BUDGET_STATUS.on_track;
         const fill = b.status === "over" ? theme.viz.critical : b.status === "ahead_of_pace" ? theme.viz.warning : theme.viz.series[0];
         return (
-          <View key={b.category} style={{ gap: 4 }} accessible accessibilityLabel={`${b.name}: ${b.spent.display} of ${b.budget.display}, ${b.usedPct}% used, ${s.label}`}>
+          <Pressable
+            key={b.category}
+            onPress={() => setTarget({ category: b.category, name: b.name, amount: b.budget.amount })}
+            accessibilityRole="button"
+            accessibilityHint="Change or remove this budget"
+            accessibilityLabel={`${b.name}: ${b.spent.display} of ${b.budget.display}, ${b.usedPct}% used, ${s.label}`}
+            style={({ pressed }) => [{ gap: 4 }, pressed && { opacity: 0.7 }]}
+          >
             <Row style={{ justifyContent: "space-between" }}>
               <Text numberOfLines={1} style={{ flex: 1 }}>{b.name}</Text>
               <Text variant="caption" tone="muted">
@@ -363,9 +376,11 @@ function Budgets({ d }: { d: Dashboard }) {
             <Text variant="caption" tone="muted">
               {s.icon} {s.label} · {b.usedPct}% used · {b.status === "over" ? `${b.remaining.display.replace("-", "")} over` : `${b.remaining.display} left`}
             </Text>
-          </View>
+          </Pressable>
         );
       })}
+      {items.length ? <Text variant="caption" tone="muted">Tap a budget to change or remove it.{d.isCurrentMonth ? " The tick marks an even pace for today." : ""}</Text> : null}
+      <BudgetSheet target={target} budgeted={items.map((b) => b.category)} onClose={() => setTarget(null)} />
     </Card>
   );
 }
