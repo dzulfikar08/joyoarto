@@ -82,10 +82,9 @@ const sections: Section[] = [
               <b>Waitlist</b> (kalau kamu daftar): email, nama panggilan, bank yang kamu centang, sumber dan bahasa, serta hash alamat IP (bukan IP-nya).
             </li>
             <li>
-              <b>Langganan Pro</b> (per rumah tangga): paket, status dan tanggal berakhirnya; untuk tiap pembayaran: nomor order, jumlah, mata uang, cara bayar
-              (DOKU atau Polar), status, tanggal, dan siapa anggota yang memulainya; ID pelanggan dan langganan dari Polar; serta hitungan import statement per
-              bulan untuk batas paket Free. <b>Kami tidak pernah menerima atau menyimpan nomor kartu, data rekening atau PIN e-wallet-mu</b>: itu diisi di halaman
-              DOKU atau Polar.
+              <b>Joyo Pro</b> (per akun): jawaban terakhir JoyoRogo soal Joyo Pro-mu (Pro atau tidak, sampai kapan, jenis paket, dari mana dibeli) dan kapan
+              diperiksa; serta hitungan import statement-mu per bulan untuk batas paket Free. {N} tidak menerima pembayaran, jadi <b>tidak pernah menerima atau
+              menyimpan nomor kartu, data rekening, PIN e-wallet atau riwayat pembayaranmu</b>; itu ada di JoyoRogo dan penyedia pembayarannya.
             </li>
           </UL>
           <P>
@@ -131,9 +130,9 @@ const sections: Section[] = [
               <b>Waitlist</b> (if you join it): email, nickname, the banks you ticked, source and language, and a hash of your IP address (never the IP itself).
             </li>
             <li>
-              <b>Pro subscription</b> (per household): the plan, its status and end date; for each payment: the order number, amount, currency, how it was paid (DOKU
-              or Polar), status, dates and which member started it; Polar's customer and subscription ids; and a monthly count of statement imports for the Free
-              plan's limit. <b>We never receive or store your card number, bank account details or e-wallet PIN</b>: you enter those on DOKU's or Polar's page.
+              <b>Joyo Pro</b> (per account): JoyoRogo's last answer about your Joyo Pro (Pro or not, until when, the kind of plan, where it was bought) and when it
+              was checked; and a monthly count of your statement imports for the Free plan's limit. {N} takes no payments, so <b>we never receive or store your card
+              number, bank account details, e-wallet PIN or payment history</b>; those stay with JoyoRogo and its payment providers.
             </li>
           </UL>
           <P>
@@ -176,8 +175,7 @@ const sections: Section[] = [
               <b>Waitlist:</b> mengabari kamu sekali saat {N} Pro dibuka. Dasarnya: persetujuanmu.
             </li>
             <li>
-              <b>Pembayaran Pro:</b> memproses pembayaran, memberi Pro ke rumah tangga yang membayar, dan menyimpan catatan transaksi. Dasarnya: pemenuhan
-              perjanjian, dan kewajiban hukum untuk menyimpan catatan pembukuan.
+              <b>Joyo Pro:</b> memeriksa ke JoyoRogo apakah akunmu punya Joyo Pro, supaya fitur dan batas yang benar berlaku. Dasarnya: pemenuhan perjanjian.
             </li>
           </UL>
           <P>
@@ -208,8 +206,7 @@ const sections: Section[] = [
               <b>Waitlist:</b> telling you once when {N} Pro opens. Basis: your consent.
             </li>
             <li>
-              <b>Pro payments:</b> processing payments, giving Pro to the household that paid, and keeping transaction records. Basis: performing our agreement, and
-              the legal obligation to keep bookkeeping records.
+              <b>Joyo Pro:</b> checking with JoyoRogo whether your account has Joyo Pro, so the right features and limits apply. Basis: performing our agreement.
             </li>
           </UL>
           <P>
@@ -287,17 +284,13 @@ const sections: Section[] = [
             kamu dan Anthropic. Hal yang sama berlaku untuk aplikasi AI lain yang kamu sambungkan.
           </li>
           <li>
-            <b>DOKU (PT Nusa Satu Inti Artha)</b>, <b>hanya kalau kamu membayar Pro dalam rupiah</b>: memproses pembayaran QRIS, e-wallet dan virtual account.
-            Yang kami kirim: nomor order, jumlah, nama paket, serta nama dan email pembeli. Data pembayaranmu diisi langsung di halaman DOKU dan diproses menurut
-            kebijakan privasi DOKU.
+            <b>JoyoRogo</b> (juga dijalankan Joyo Digitama), yang menjual dan memproses pembayaran <b>Joyo Pro</b>: untuk memeriksa apakah kamu punya Joyo Pro, {N}
+            mengirim ID akun Google-mu dan alamat email yang sudah terverifikasi, paling sering sekali tiap beberapa menit selama kamu memakai {N}. JoyoRogo
+            menjawab hanya status Pro, tanggal berakhir, jenis paket dan dari mana dibeli. Data keuanganmu tidak pernah dikirim ke JoyoRogo. Kalau kamu membeli Joyo
+            Pro, pembayarannya diproses JoyoRogo dan penyedia pembayarannya menurut kebijakan privasi JoyoRogo.
           </li>
           <li>
-            <b>Polar Software, Inc.</b> (Amerika Serikat), <b>hanya kalau kamu membayar Pro dengan kartu dalam dolar AS</b>: merchant of record yang menagih kartumu,
-            menghitung pajak dan mengirim invoice. Yang kami kirim: ID rumah tangga (sebagai ID pelanggan), nama dan email pembeli, dan paket yang dipilih.
-          </li>
-          <li>
-            <b>Anggota rumah tangga</b> yang kamu undang bisa melihat dan mengubah data keuangan rumah tangga itu, serta melihat status langganan dan riwayat
-            pembayaran rumah tangga.
+            <b>Anggota rumah tangga</b> yang kamu undang bisa melihat dan mengubah data keuangan rumah tangga itu. Status Joyo Pro-mu hanya terlihat olehmu.
           </li>
         </UL>
       ),
@@ -331,15 +324,13 @@ const sections: Section[] = [
             other AI app you connect.
           </li>
           <li>
-            <b>DOKU (PT Nusa Satu Inti Artha)</b>, <b>only if you pay for Pro in rupiah</b>: processes QRIS, e-wallet and virtual account payments. What we send: the
-            order number, amount, plan name, and the buyer's name and email. You enter your payment details on DOKU's own page, under DOKU's privacy policy.
+            <b>JoyoRogo</b> (also run by Joyo Digitama), which sells and processes payments for <b>Joyo Pro</b>: to check whether you have Joyo Pro, {N} sends your
+            Google account id and your verified email address, at most once every few minutes while you use {N}. JoyoRogo answers only the Pro status, end date,
+            kind of plan and where it was bought. Your finance data is never sent to JoyoRogo. If you buy Joyo Pro, the payment is processed by JoyoRogo and its
+            payment providers under JoyoRogo's privacy policy.
           </li>
           <li>
-            <b>Polar Software, Inc.</b> (United States), <b>only if you pay for Pro by card in US dollars</b>: the merchant of record that charges your card, handles
-            tax and sends invoices. What we send: the household id (as the customer id), the buyer's name and email, and the chosen plan.
-          </li>
-          <li>
-            <b>Household members</b> you invite can see and change that household's finance data, and see its subscription status and payment history.
+            <b>Household members</b> you invite can see and change that household's finance data. Your Joyo Pro status is visible only to you.
           </li>
         </UL>
       ),
@@ -358,8 +349,7 @@ const sections: Section[] = [
           <li>Catatan pemakaian AI: selama akunmu aktif.</li>
           <li>Sesi masuk: sampai kedaluwarsa atau kamu keluar.</li>
           <li>
-            Catatan pembayaran (nomor order, jumlah, tanggal, status): 10 tahun, sesuai kewajiban penyimpanan dokumen pajak, juga setelah rumah tangga atau akun
-            dihapus (tanpa tautan ke rumah tangga atau akunmu lagi). Status langganan dan hitungan import ikut terhapus bersama rumah tangga.
+            Jawaban JoyoRogo soal Joyo Pro dan hitungan import-mu: sampai akunmu dihapus. {N} tidak menyimpan catatan pembayaran; JoyoRogo yang menyimpannya.
           </li>
           <li>Token API yang sudah dicabut: datanya (bukan token-nya) tetap tercatat sampai akunmu dihapus, supaya kamu bisa melihat riwayatnya.</li>
           <li>Waitlist: sampai kami mengabari peluncuran, atau lebih cepat kalau kamu minta dihapus (atau saat akunmu dengan email yang sama dihapus).</li>
@@ -374,8 +364,7 @@ const sections: Section[] = [
           <li>AI usage records: while your account is active.</li>
           <li>Sign-in sessions: until they expire or you sign out.</li>
           <li>
-            Payment records (order number, amount, dates, status): 10 years, as tax law requires, also after the household or account is deleted (no longer linked
-            to the household or your account). The subscription status and import counts go with the household.
+            JoyoRogo's Joyo Pro answer and your import counts: until your account is deleted. {N} keeps no payment records; JoyoRogo does.
           </li>
           <li>Revoked API tokens: their details (never the token) stay until your account is deleted, so you can see the history.</li>
           <li>Waitlist: until we announce the launch, or sooner if you ask (or when your account with the same email is deleted).</li>

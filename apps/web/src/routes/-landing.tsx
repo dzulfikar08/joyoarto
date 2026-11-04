@@ -236,8 +236,8 @@ function Features({ t }: { t: T }) {
       icon: <Icon d="M16 18l6-6-6-6M8 6l-6 6 6 6" />,
       title: t("Open source (AGPL)", "Open source (AGPL)"),
       body: t(
-        "Kodenya terbuka (AGPL). Mau host sendiri boleh; mau praktis, pakai JoyoArto Pro yang kami jalankan.",
-        "The code is open (AGPL). Host it yourself, or use JoyoArto Pro, which we run for you.",
+        "Kodenya terbuka (AGPL). Mau host sendiri boleh; mau praktis, pakai versi yang kami jalankan, dengan Joyo Pro untuk batas yang lebih longgar.",
+        "The code is open (AGPL). Host it yourself, or use the version we run for you, with Joyo Pro for higher limits.",
       ),
     },
     {
@@ -345,19 +345,14 @@ function Pricing({ t }: { t: T }) {
     <Section id="harga">
       <Heading
         eyebrow={t("Harga", "Pricing")}
-        title={t("Gratis untuk mulai. Pro untuk seluruh keluarga.", "Free to start. Pro for the whole family.")}
+        title={t("Gratis untuk mulai. Joyo Pro kalau perlu lebih.", "Free to start. Joyo Pro when you need more.")}
         sub={t(
-          "Satu langganan per rumah tangga, jadi kamu dan pasangan sama-sama Pro. Bayar pakai QRIS, e-wallet atau virtual account.",
-          "One plan per household, so you and your partner both get Pro. Pay with QRIS, e-wallets or a virtual account.",
+          "Joyo Pro itu satu langganan per akun yang membuka Pro di JoyoArto, JoyoRogo dan JoyoFit. Dibeli di JoyoRogo dengan akun Google yang sama.",
+          "Joyo Pro is one subscription per account that unlocks Pro in JoyoArto, JoyoRogo and JoyoFit. You buy it in JoyoRogo with the same Google account.",
         )}
       />
       <PricingPlans
         t={tt}
-        action={() => (
-          <Link to="/pricing" className={buttonVariants({ className: "w-full" })}>
-            {t("Pilih Pro", "Choose Pro")} <ArrowRight aria-hidden />
-          </Link>
-        )}
         freeAction={
           <Link to="/login" className={buttonVariants({ variant: "secondary", className: "w-full" })}>
             {t("Mulai gratis", "Start free")}
@@ -374,11 +369,11 @@ function Waitlist({ t }: { t: T }) {
       <div className="mx-auto grid max-w-4xl gap-8 rounded-[2rem] bg-primary-soft p-6 sm:p-10 lg:grid-cols-2">
         <div>
           <p className="text-sm font-bold text-primary-ink">Waitlist</p>
-          <h2 className="mt-1.5 text-[1.75rem] leading-tight font-extrabold tracking-tight text-balance sm:text-3xl">{t("Jadi yang pertama pakai JoyoArto Pro.", "Be first in line for JoyoArto Pro.")}</h2>
+          <h2 className="mt-1.5 text-[1.75rem] leading-tight font-extrabold tracking-tight text-balance sm:text-3xl">{t("Jadi yang pertama pakai JoyoArto.", "Be first in line for JoyoArto.")}</h2>
           <p className="mt-3 text-muted-foreground">
             {t(
-              "Versi hosted, tinggal pakai. Harganya nanti murah, dalam rupiah, dan yang gabung sekarang dapat harga founder.",
-              "The hosted version, ready to use. It will be cheap, priced in rupiah, and people who join now get a founder price.",
+              "Versi hosted, tinggal pakai. Gratis untuk mulai; Joyo Pro (dibeli di JoyoRogo) membuka batas yang lebih longgar.",
+              "The hosted version, ready to use. Free to start; Joyo Pro (bought in JoyoRogo) raises the limits.",
             )}
           </p>
           <p className="mt-3 text-sm text-muted-foreground">
@@ -403,8 +398,8 @@ function Faq({ t }: { t: T }) {
     [
       t("Berapa harganya?", "How much does it cost?"),
       t(
-        "Ada paket Free (catat manual, CSV, 2 import statement sebulan) dan Pro untuk seluruh rumah tangga, dalam rupiah, bayar per bulan atau per tahun. Rumah tangga yang beli lebih awal dapat harga founder. Kalau mau gratis sepenuhnya, kodenya open source: silakan host sendiri.",
-        "There is a Free plan (manual entries, CSV, 2 statement imports a month) and Pro for the whole household, in rupiah, paid monthly or yearly. Early households get a founder price. If you'd rather not pay at all, the code is open source: host it yourself.",
+        "Ada paket Free (catat manual, CSV, 2 import statement sebulan) dan Joyo Pro: satu langganan per akun yang juga membuka Pro di JoyoRogo dan JoyoFit, dibeli di JoyoRogo per bulan atau per tahun. Harga terbarunya ada di halaman Harga. Kalau mau gratis sepenuhnya, kodenya open source: silakan host sendiri.",
+        "There is a Free plan (manual entries, CSV, 2 statement imports a month) and Joyo Pro: one subscription per account that also unlocks Pro in JoyoRogo and JoyoFit, bought in JoyoRogo monthly or yearly. Current prices are on the Pricing page. If you'd rather not pay at all, the code is open source: host it yourself.",
       ),
     ],
     [

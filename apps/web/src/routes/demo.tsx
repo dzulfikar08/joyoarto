@@ -121,8 +121,8 @@ function Demo() {
             <h2 className="text-2xl leading-tight font-extrabold tracking-tight text-balance">{t("Mau ini tiap bulan, otomatis rapi?", "Want this every month, kept tidy for you?")}</h2>
             <p className="mt-2 text-muted-foreground">
               {t(
-                "Di JoyoArto Pro semua statement tersimpan jadi satu buku keluarga: kategori yang kamu atur sekali, tanya Claude, dan simulasi rencana besar. Gabung waitlist buat harga founder.",
-                "With JoyoArto Pro every statement adds up to one family ledger: categories you set once, Claude to ask, and simulations for big plans. Join the waitlist for the founder price.",
+                "Di JoyoArto semua statement tersimpan jadi satu buku keluarga: kategori yang kamu atur sekali, tanya Claude, dan simulasi rencana besar. Gabung waitlist biar dikabari saat dibuka.",
+                "In JoyoArto every statement adds up to one family ledger: categories you set once, Claude to ask, and simulations for big plans. Join the waitlist to hear when it opens.",
               )}
             </p>
             <Link to="/" hash="fitur" className="mt-3 inline-block text-sm font-semibold text-primary-ink underline underline-offset-4">

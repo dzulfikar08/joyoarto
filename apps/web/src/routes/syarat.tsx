@@ -61,58 +61,60 @@ const sections: Section[] = [
   },
   {
     id: "pro",
-    title: { id: "Paket Pro, pembayaran dan pengembalian dana", en: "Pro, payments and refunds" },
+    title: { id: "Joyo Pro, pembayaran dan pengembalian dana", en: "Joyo Pro, payments and refunds" },
     body: {
       id: (
         <UL>
           <li>
-            Pro dibeli untuk satu rumah tangga: semua anggotanya ikut Pro selama masa aktifnya. Isi dan batas tiap paket ada di halaman harga dan bisa berubah;
-            perubahan yang merugikan berlaku mulai periode berikutnya, tidak di tengah periode yang sudah dibayar.
+            Ada paket Free dan <b>Joyo Pro</b>. Joyo Pro adalah satu langganan per akun yang membuka Pro di JoyoArto, JoyoRogo dan JoyoFit. Pro berlaku untuk
+            akunmu, bukan untuk seluruh rumah tangga: tiap anggota punya paketnya sendiri, dan batas anggota mengikuti paket orang yang mengundang. Isi dan batas
+            tiap paket ada di halaman harga dan bisa berubah; perubahan yang merugikan berlaku mulai periode berikutnya, tidak di tengah periode yang sudah dibayar.
           </li>
           <li>
-            <b>Rupiah (DOKU: QRIS, e-wallet, virtual account):</b> prabayar per bulan atau per tahun dan tidak diperpanjang otomatis. Bulan yang dibayar ditambahkan
-            setelah masa Pro yang masih ada (termasuk masa coba).
+            <b>{N} tidak menjual apa pun dan tidak menerima pembayaran.</b> Joyo Pro dibeli, diperpanjang dan dibatalkan di JoyoRogo (juga dijalankan Joyo
+            Digitama), dengan akun Google yang sama. Harga, cara bayar, perpanjangan otomatis atau tidak, dan pengembalian dana mengikuti syarat dan kebijakan
+            pengembalian dana JoyoRogo yang tampil saat kamu membeli. Pembelian lewat Google Play atau App Store mengikuti syarat toko tersebut.
           </li>
           <li>
-            <b>Kartu dalam dolar AS (Polar):</b> langganan yang diperpanjang otomatis tiap periode sampai kamu batalkan di portal langganan (Pengaturan → Langganan).
-            Setelah dibatalkan, Pro tetap aktif sampai akhir periode yang sudah dibayar. Polar adalah merchant of record untuk pembayaran ini.
+            {N} memeriksa status Joyo Pro-mu ke JoyoRogo dan menyimpan jawabannya sebentar. Kalau JoyoRogo sedang tidak bisa dihubungi, Pro yang sudah aktif tetap
+            berlaku paling lama 24 jam setelah tanggal berakhir terakhir yang kami ketahui.
           </li>
           <li>
-            <b>Pengembalian dana:</b> kalau kamu nggak puas, minta lewat {mail} dalam 7 hari setelah pembayaran pertama sebuah paket dan kami kembalikan penuh.
-            Setelah itu, pembayaran yang sudah berjalan tidak dikembalikan, kecuali layanan tidak bisa dipakai karena kesalahan kami atau diwajibkan hukum. Dana
-            kembali lewat cara bayar yang sama; masa Pro dari pembayaran itu ikut berakhir.
+            Akun baru dapat masa coba Pro di {N}, dan akun yang dibuat sebelum Pro diluncurkan dapat Pro gratis sampai tanggal yang tampil di Pengaturan →
+            Langganan. Keduanya gratis dan berakhir sendiri.
           </li>
           <li>
-            Kalau Pro berakhir, rumah tangga kembali ke Free. Tidak ada data yang dihapus: semua transaksi dan skenario tersimpan tetap bisa dilihat, hanya fitur Pro
-            dan batas Free yang berlaku lagi.
+            Kalau Pro berakhir, akunmu kembali ke Free. Tidak ada data yang dihapus: semua transaksi dan skenario tersimpan tetap bisa dilihat, hanya fitur Pro
+            berhenti dan batas Free berlaku lagi.
           </li>
-          <li>Harga sudah termasuk pajak yang berlaku, kecuali disebutkan lain di halaman pembayaran.</li>
+          <li>Pertanyaan soal tagihan: hubungi JoyoRogo lewat kontak di halaman Pro-nya, atau {mail}.</li>
         </UL>
       ),
       en: (
         <UL>
           <li>
-            Pro is bought for one household: all its members get Pro while it lasts. What each plan includes and its limits are on the pricing page and may change;
-            changes for the worse apply from the next period, never in the middle of one you paid for.
+            There is a Free plan and <b>Joyo Pro</b>. Joyo Pro is one subscription per account that unlocks Pro in JoyoArto, JoyoRogo and JoyoFit. Pro belongs to your
+            account, not to the whole household: each member has their own plan, and the member limit follows the plan of whoever invites. What each plan includes
+            and its limits are on the pricing page and may change; changes for the worse apply from the next period, never in the middle of one you paid for.
           </li>
           <li>
-            <b>Rupiah (DOKU: QRIS, e-wallets, virtual accounts):</b> prepaid per month or per year and never renewed automatically. Paid months are added after any Pro
-            time you still have (including a trial).
+            <b>{N} sells nothing and takes no payments.</b> Joyo Pro is bought, renewed and cancelled in JoyoRogo (also run by Joyo Digitama) with the same Google
+            account. Prices, payment methods, whether it renews automatically, and refunds follow JoyoRogo's terms and refund policy shown when you buy. Purchases
+            through Google Play or the App Store follow that store's terms.
           </li>
           <li>
-            <b>Card in US dollars (Polar):</b> a subscription that renews each period until you cancel it in the subscription portal (Settings → Billing). After you
-            cancel, Pro stays on until the end of the period you paid for. Polar is the merchant of record for these payments.
+            {N} checks your Joyo Pro status with JoyoRogo and keeps the answer for a short while. If JoyoRogo cannot be reached, Pro that was active stays on for at
+            most 24 hours past the last end date we know.
           </li>
           <li>
-            <b>Refunds:</b> if you are not happy, ask at {mail} within 7 days of a plan's first payment and we refund it in full. After that, payments are not
-            refunded, unless the service could not be used through our fault or the law requires it. Money goes back the way it was paid, and the Pro time it bought
-            ends.
+            New accounts get a Pro trial in {N}, and accounts created before Pro launched get free Pro until the date shown in Settings → Billing. Both are free and
+            end by themselves.
           </li>
           <li>
-            When Pro ends, the household goes back to Free. Nothing is deleted: every transaction and saved scenario stays readable; only the Pro features stop and
+            When Pro ends, your account goes back to Free. Nothing is deleted: every transaction and saved scenario stays readable; only the Pro features stop and
             the Free limits apply again.
           </li>
-          <li>Prices include applicable taxes unless the payment page says otherwise.</li>
+          <li>Billing questions: contact JoyoRogo through its Pro page, or {mail}.</li>
         </UL>
       ),
     },
