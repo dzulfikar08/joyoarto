@@ -1,4 +1,4 @@
-// JoyoArto Pro in the web app: recognising the server's upgrade errors, the shared upgrade prompt, prices and copy.
+// Joyo Pro in the web app: recognising the server's upgrade errors, the shared upgrade prompt, prices and copy.
 // The server is the judge (packages/api/src/services/billing.ts); this only explains and offers the way up.
 
 import { ORPCError } from "@orpc/client";
@@ -65,15 +65,18 @@ export function upgradeCopy(feature: UpgradeFeature, t: T): { title: string; bod
       };
     case "members":
       return {
-        title: t("Rumah tangga Free maksimal 2 orang", "Free households have up to 2 people"),
-        body: t("Pro bisa sampai 6 anggota, misalnya orang tua atau pengasuh. Undangan yang belum diterima ikut dihitung.", "Pro allows up to 6 members, say parents or a nanny. Pending invites count too."),
+        title: t("Dengan Free, rumah tangga maksimal 2 orang", "On Free a household has up to 2 people"),
+        body: t(
+          "Dengan Joyo Pro, yang mengundang bisa menambah sampai 6 anggota, misalnya orang tua atau pengasuh. Undangan yang belum diterima ikut dihitung.",
+          "With Joyo Pro the person inviting can bring up to 6 members, say parents or a nanny. Pending invites count too.",
+        ),
       };
     case "savedScenarios":
       return {
         title: t("Simpan skenario itu fitur Pro", "Saving scenarios is Pro"),
         body: t(
-          "Simulasi tetap jalan dan draft-mu tersimpan di perangkat ini. Dengan Pro, skenario disimpan untuk seluruh rumah tangga.",
-          "Simulations still work and your draft stays on this device. With Pro, scenarios are saved for the whole household.",
+          "Simulasi tetap jalan dan draft-mu tersimpan di perangkat ini. Dengan Joyo Pro, kamu bisa menyimpan skenario untuk seluruh rumah tangga.",
+          "Simulations still work and your draft stays on this device. With Joyo Pro you can save scenarios for the whole household.",
         ),
       };
     case "mcpConnector":
@@ -89,7 +92,7 @@ export function rupiah(whole: number): string {
   return `Rp ${whole.toLocaleString("id-ID")}`;
 }
 
-/** "$2.99" from cents. */
+/** "$9.99" from cents. */
 export function usd(cents: number): string {
   return `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
 }

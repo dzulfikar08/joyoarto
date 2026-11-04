@@ -19,12 +19,12 @@ export function UpgradeSheet() {
       <div className="space-y-3">
         <p className="text-sm text-muted-foreground">
           {t(
-            "JoyoArto Pro dibeli untuk rumah tangga: semua anggota ikut Pro. Bayar pakai QRIS, e-wallet atau virtual account.",
-            "JoyoArto Pro is bought for the household: every member gets it. Pay with QRIS, e-wallets or a virtual account.",
+            "Joyo Pro itu satu langganan per akun, berlaku di JoyoArto, JoyoRogo dan JoyoFit. Dibeli di JoyoRogo dengan akun Google yang sama.",
+            "Joyo Pro is one subscription per account, valid in JoyoArto, JoyoRogo and JoyoFit. You buy it in JoyoRogo with the same Google account.",
           )}
         </p>
         <Link to="/pricing" onClick={() => closeUpgrade()} className={buttonVariants({ className: "w-full" })}>
-          <Sparkles aria-hidden /> {t("Lihat paket Pro", "See Pro plans")}
+          <Sparkles aria-hidden /> {t("Lihat Joyo Pro", "See Joyo Pro")}
         </Link>
       </div>
     </Sheet>

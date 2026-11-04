@@ -177,8 +177,8 @@ export function WaitlistForm({ source, initialBanks = [], children }: { source: 
         <p className="font-semibold">{en ? "You're on the list. Thank you!" : "Kamu sudah masuk waitlist. Makasih!"}</p>
         <p className="mt-1 text-sm">
           {en
-            ? "We'll email you once when JoyoArto Pro opens, with the founder price. No spam."
-            : "Kami kabari sekali lewat email saat JoyoArto Pro dibuka, lengkap dengan harga founder. Nggak ada spam."}
+            ? "We'll email you once when JoyoArto opens. No spam."
+            : "Kami kabari sekali lewat email saat JoyoArto dibuka. Nggak ada spam."}
         </p>
         </div>
       </div>
@@ -254,8 +254,8 @@ export function WaitlistForm({ source, initialBanks = [], children }: { source: 
       )}
       <p className="text-xs text-muted-foreground">
         {en
-          ? "We store only your email, name and the banks you ticked, to tell you when Pro opens. Nothing else."
-          : "Kami cuma simpan email, nama dan bank yang kamu centang, buat ngabarin saat Pro dibuka. Itu aja."}
+          ? "We store only your email, name and the banks you ticked, to tell you when JoyoArto opens. Nothing else."
+          : "Kami cuma simpan email, nama dan bank yang kamu centang, buat ngabarin saat JoyoArto dibuka. Itu aja."}
       </p>
     </form>
   );

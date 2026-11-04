@@ -64,6 +64,20 @@
       "when": 1793801143942,
       "tag": "0008_billing",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793802863994,
+      "tag": "0009_drop_household_billing",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1793802876657,
+      "tag": "0010_joyo_pro_per_user",
+      "breakpoints": true
     }
   ]
 }

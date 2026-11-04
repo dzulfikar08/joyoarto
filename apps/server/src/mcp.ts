@@ -2,7 +2,7 @@ import type { Context as ApiContext, Principal, Scope } from "@baroka/api/contex
 import { SCOPES } from "@baroka/api/context";
 import { ensureHousehold } from "@baroka/api/lib/household";
 import { pruneMcpAudit } from "@baroka/api/services/account";
-import { householdPlan } from "@baroka/api/services/billing";
+import { userPlan } from "@baroka/api/services/billing";
 import { principalFromToken } from "@baroka/api/services/tokens";
 import { MCP_INSTRUCTIONS, toolCatalog, toolInput } from "@baroka/api/tools";
 import { MCP_DATA_SCOPES, MCP_PATH } from "@baroka/auth/mcp-scopes";
@@ -215,7 +215,7 @@ export function registerMcpRoutes(app: Hono) {
     } catch {
       return c.json({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error." }, id: null }, 400);
     }
-    const { limits } = await householdPlan(getDb(), auth.principal.householdId, billing);
+    const { limits } = await userPlan(getDb(), auth.principal.userId, billing);
     const server = createMcpServer(auth.principal, auth.clientId, waitUntilOf(c), limits.mcpConnector);
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     await server.connect(transport);

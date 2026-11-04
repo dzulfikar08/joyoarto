@@ -80,15 +80,15 @@ export async function importStatement(db: Database, p: Principal, input: Input, 
     return badRequest("Not a statement JoyoArto can read yet (Bank Jago monthly statement, GoPay e-statement). Use CSV import, or ask Claude to read it.");
   }
   // Free plan: a few statements a month (previews too, so the prompt comes before the work). Counted when rows are saved.
-  await assertStatementImport(db, p.householdId, options.billing);
+  await assertStatementImport(db, p.userId, options.billing);
   const source = options.source ?? "pdf";
   if (jago) {
     const res = await importJago(db, p, input, source);
-    if (input.commit && res.totals.inserted > 0) await countStatementImport(db, p.householdId);
+    if (input.commit && res.totals.inserted > 0) await countStatementImport(db, p.userId);
     return res;
   }
   const res = await importGopay(db, p, input, source);
-  if (input.commit && (res.wallet.inserted > 0 || res.bankPaymentsNamed > 0)) await countStatementImport(db, p.householdId);
+  if (input.commit && (res.wallet.inserted > 0 || res.bankPaymentsNamed > 0)) await countStatementImport(db, p.userId);
   return res;
 }
 

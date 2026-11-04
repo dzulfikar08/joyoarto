@@ -12,7 +12,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 
-import { billing, registerBillingWebhooks } from "./billing";
+import { billing } from "./billing";
 import { handleEmail } from "./email";
 import { env } from "./env";
 import { registerMcpPublicCors, registerMcpRoutes } from "./mcp";
@@ -36,7 +36,6 @@ app.use(
 );
 
 registerMcpRoutes(app);
-registerBillingWebhooks(app);
 
 app.on(["POST", "GET"], "/api/auth/*", (c) => getAuth().handler(c.req.raw));
 

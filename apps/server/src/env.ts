@@ -3,7 +3,7 @@ import { env as workerEnv } from "cloudflare:workers";
 
 export type RateLimit = { limit(options: { key: string }): Promise<{ success: boolean }> };
 
-/** JoyoArto Pro billing vars and secrets are listed in BillingEnv (packages/api/src/lib/billing/config.ts). */
+/** Joyo Pro vars and the JOYO_INTERNAL_KEY secret are listed in BillingEnv (packages/api/src/lib/billing/config.ts). */
 export type Env = BillingEnv & {
   DB: D1Database;
   BETTER_AUTH_URL: string;

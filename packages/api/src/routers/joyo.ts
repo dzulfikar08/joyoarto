@@ -74,7 +74,7 @@ export const joyoRouter = {
   status: readProcedure.route({ method: "GET", path: "/joyo/status", tags: ["joyo"], summary: "Whether Joyo AI is on, its model and today's usage" }).handler(async ({ context }) => {
     const engine = hostedEngine(context.ai);
     const serverCap = context.ai?.dailyCap ?? 0;
-    const { cap, plan } = await chatCap(context.db, context.principal.householdId, context.billing, serverCap);
+    const { cap, plan } = await chatCap(context.db, context.principal.userId, context.billing, serverCap);
     return {
       hosted: engine && serverCap > 0 ? { provider: engine.provider, model: engine.conn.model } : null,
       usedToday: await usedToday(context.db, context.principal.userId, ["chat"], "hosted"),
@@ -128,7 +128,7 @@ export const joyoRouter = {
       const userMessage = lastTurn?.role === "user" && lastTurn.content === input.message ? lastTurn : await joyo.appendMessage(db, conversationId, { role: "user", content: input.message });
       if (userMessage !== lastTurn) history.push(userMessage);
 
-      const { cap, plan } = engine.kind === "hosted" ? await chatCap(db, principal.householdId, context.billing, serverCap) : { cap: serverCap, plan: "pro" as const };
+      const { cap, plan } = engine.kind === "hosted" ? await chatCap(db, principal.userId, context.billing, serverCap) : { cap: serverCap, plan: "pro" as const };
       const slot = await reserveSlot(db, {
         userId: principal.userId,
         householdId: principal.householdId,

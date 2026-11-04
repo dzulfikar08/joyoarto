@@ -1,27 +1,22 @@
-// JoyoArto Pro, per household: which plan a household is on, the Free limits, checkout (DOKU in rupiah, Polar in US
-// dollars), orders and their status. Every query is scoped by the principal's householdId. Webhooks: billing-webhooks.ts.
+// JoyoArto's side of Joyo Pro: which plan the acting user is on, the Free limits, and what Settings → Billing and the
+// pricing page show. Joyo Pro is one subscription per ACCOUNT, sold and managed by JoyoRogo (the only billing
+// authority); JoyoArto asks it (lib/billing/joyo-pro.ts), caches the answer per user, and sells nothing itself.
 
 import { schema } from "@baroka/db";
 import type { Database } from "@baroka/db";
-import { BILLING_INTERVALS } from "@baroka/db/schema/billing";
-import type { BillingInterval } from "@baroka/db/schema/billing";
 import { ORPCError } from "@orpc/server";
-import { and, count, desc, eq, gt, gte, inArray, isNull, sql } from "drizzle-orm";
-import { z } from "zod";
+import { and, count, eq, gt, isNull, sql } from "drizzle-orm";
 
 import type { Principal } from "../context";
-import type { BillingConfig, PriceIdr } from "../lib/billing/config";
-import { WEBHOOK_TARGET, buildOrderId, checkStatus, createCheckout, isPaid } from "../lib/billing/doku";
-import { freeTimeEnd, nextPeriodEnd, resolveEntitlement, wibMonth } from "../lib/billing/entitlement";
+import type { BillingConfig } from "../lib/billing/config";
+import { localEntitlement, resolveEntitlement, wibMonth } from "../lib/billing/entitlement";
 import type { Entitlement } from "../lib/billing/entitlement";
+import { JoyoProUnauthorized, answerIsPro, cacheRow, failOpen, fetchJoyoPricing, fetchJoyoPro } from "../lib/billing/joyo-pro";
+import type { CachedJoyoPro, JoyoPricing } from "../lib/billing/joyo-pro";
 import { PLAN_LIMITS, STATEMENT_IMPORT_METRIC } from "../lib/billing/plans";
 import type { PlanLimits, UpgradeFeature } from "../lib/billing/plans";
-import { createPolarCheckout, createPolarPortal } from "../lib/billing/polar";
-import { formatMoney } from "../lib/money";
-import { notFound } from "./common";
 
-const e = schema.householdEntitlement;
-const o = schema.billingOrder;
+const jp = schema.joyoProStatus;
 const hm = schema.householdMember;
 
 /**
@@ -29,74 +24,166 @@ const hm = schema.householdMember;
  * and MCP/REST callers get a readable message.
  */
 export function upgradeRequired(feature: UpgradeFeature, message: string, extra: Record<string, unknown> = {}): never {
-  throw new ORPCError("FORBIDDEN", { message: `${message} Upgrade to JoyoArto Pro in Settings → Billing.`, data: { upgrade: true, feature, ...extra } });
+  throw new ORPCError("FORBIDDEN", {
+    message: `${message} Joyo Pro (bought in JoyoRogo with the same Google account) unlocks it; see Settings → Billing.`,
+    data: { upgrade: true, feature, ...extra },
+  });
 }
 
-export type HouseholdPlan = { entitlement: Entitlement; limits: PlanLimits };
+// ------------------------------------------------------------------------------------------------ Joyo Pro status
 
-const SELF_HOST: HouseholdPlan = {
-  entitlement: { plan: "pro", source: "selfhost", status: "active", provider: null, interval: null, periodEnd: null, cancelAtPeriodEnd: false },
-  limits: PLAN_LIMITS.pro,
+/** JoyoRogo's view of a user, as JoyoArto last knew it. */
+export type JoyoStatus = {
+  pro: boolean;
+  until: Date | null;
+  plan: string | null;
+  source: string | null;
+  /** Last successful answer; null = never answered. */
+  checkedAt: Date | null;
+  /** JoyoRogo could not be asked just now: `pro` comes from the fail-open rule. */
+  stale: boolean;
 };
 
-/** The household's plan now. Without billing config (self-host, tests) every household is Pro and nothing is read. */
-export async function householdPlan(db: Database, householdId: string, config: BillingConfig | undefined, now = new Date()): Promise<HouseholdPlan> {
-  if (!config?.enforced) return SELF_HOST;
-  const [rows, [household], memberEmails] = await db.batch([
+/** Users whose last call failed, and until when not to try again (per isolate): an outage must not add 3 s to every request. */
+const backoff = new Map<string, number>();
+const BACKOFF_MS = 60_000;
+
+/** Tests only. */
+export function resetJoyoProCaches() {
+  backoff.clear();
+  pricingCache = null;
+}
+
+async function identity(db: Database, userId: string): Promise<{ email: string; emailVerified: boolean; googleSub: string | null; createdAt: Date } | null> {
+  const [[u], [google]] = await db.batch([
+    db.select({ email: schema.user.email, emailVerified: schema.user.emailVerified, createdAt: schema.user.createdAt }).from(schema.user).where(eq(schema.user.id, userId)),
     db
-      .select({ provider: e.provider, status: e.status, interval: e.interval, periodEnd: e.periodEnd, cancelAtPeriodEnd: e.cancelAtPeriodEnd })
-      .from(e)
-      .where(eq(e.householdId, householdId)),
-    db.select({ createdAt: schema.household.createdAt }).from(schema.household).where(eq(schema.household.id, householdId)),
-    db.select({ email: schema.user.email }).from(hm).innerJoin(schema.user, eq(schema.user.id, hm.userId)).where(eq(hm.householdId, householdId)),
+      .select({ accountId: schema.account.accountId })
+      .from(schema.account)
+      .where(and(eq(schema.account.userId, userId), eq(schema.account.providerId, "google")))
+      .limit(1),
   ]);
-  const granted = memberEmails.some((m) => config.proEmails.includes(m.email.toLowerCase()));
-  const entitlement = resolveEntitlement({ config, rows, householdCreatedAt: household?.createdAt ?? now, granted, now });
-  return { entitlement, limits: PLAN_LIMITS[entitlement.plan] };
+  return u ? { ...u, googleSub: google?.accountId ?? null } : null;
+}
+
+function fromRow(row: CachedJoyoPro, now: Date): JoyoStatus {
+  return { pro: answerIsPro(row, now), until: row.until, plan: row.plan, source: row.source, checkedAt: row.checkedAt, stale: false };
+}
+
+/**
+ * Joyo Pro for a user: the cached answer while it is fresh (10 min for Pro, 2 min for not-Pro), else JoyoRogo's.
+ * Unreachable JoyoRogo (or a refused key) never locks out someone it confirmed, for at most 24 h past the last end it
+ * confirmed; someone it never confirmed stays not-Pro.
+ */
+export async function joyoStatus(db: Database, userId: string, config: BillingConfig, now = new Date()): Promise<JoyoStatus | null> {
+  const joyo = config.joyo;
+  if (!joyo) return null;
+  const [cached] = await db.select().from(jp).where(eq(jp.userId, userId));
+  if (cached && cached.expiresAt.getTime() > now.getTime()) return fromRow(cached, now);
+
+  const stale = (): JoyoStatus => ({ ...failOpen(cached, now), plan: cached?.plan ?? null, source: cached?.source ?? null, checkedAt: cached?.checkedAt ?? null, stale: true });
+  if ((backoff.get(userId) ?? 0) > now.getTime()) return stale();
+
+  const who = await identity(db, userId);
+  if (!who) return null;
+  // Only a verified email may stand in for the Google account id (sign-in is Google, so this is the normal case).
+  if (!who.googleSub && !who.emailVerified) return { pro: false, until: null, plan: null, source: null, checkedAt: null, stale: false };
+  try {
+    const answer = await fetchJoyoPro(joyo, { googleSub: who.googleSub, email: who.emailVerified ? who.email : "" });
+    const row = cacheRow(answer, cached, now);
+    await db
+      .insert(jp)
+      .values({ userId, ...row })
+      .onConflictDoUpdate({ target: jp.userId, set: row });
+    backoff.delete(userId);
+    return fromRow(row, now);
+  } catch (error) {
+    if (error instanceof JoyoProUnauthorized) console.error(error.message);
+    else console.error(`joyo-pro status for ${userId}:`, error instanceof Error ? error.message : error);
+    backoff.set(userId, now.getTime() + BACKOFF_MS);
+    return stale();
+  }
+}
+
+// ------------------------------------------------------------------------------------------------ plan
+
+export type UserPlan = { entitlement: Entitlement; limits: PlanLimits; joyo: JoyoStatus | null };
+
+const SELF_HOST: UserPlan = { entitlement: { plan: "pro", source: "selfhost", until: null }, limits: PLAN_LIMITS.pro, joyo: null };
+
+/**
+ * The user's plan now. Without billing (self-host, tests) everyone is Pro and nothing is read. `askJoyo: "always"`
+ * fetches Joyo Pro even when a trial or grandfathering already grants Pro (Settings shows both); limit checks skip the
+ * call then.
+ */
+export async function userPlan(
+  db: Database,
+  userId: string,
+  config: BillingConfig | undefined,
+  opts: { now?: Date; askJoyo?: "ifNeeded" | "always" } = {},
+): Promise<UserPlan> {
+  if (!config?.enforced) return SELF_HOST;
+  const now = opts.now ?? new Date();
+  const [u] = await db.select({ email: schema.user.email, createdAt: schema.user.createdAt }).from(schema.user).where(eq(schema.user.id, userId));
+  const local = u ? localEntitlement({ config, email: u.email, userCreatedAt: u.createdAt, now }) : null;
+  const decided = local && (opts.askJoyo !== "always" || local.source === "grant");
+  const joyo = decided ? null : await joyoStatus(db, userId, config, now);
+  const entitlement = resolveEntitlement(local, joyo);
+  return { entitlement, limits: PLAN_LIMITS[entitlement.plan], joyo };
 }
 
 // ------------------------------------------------------------------------------------------------ limits
 
-/** Pro-only features (email import, the Claude connector). */
-export async function requireFeature(db: Database, householdId: string, config: BillingConfig | undefined, feature: "emailImport" | "mcpConnector") {
-  const { limits } = await householdPlan(db, householdId, config);
+/** Pro-only features (email import, the Claude connector), for the acting user. */
+export async function requireFeature(db: Database, userId: string, config: BillingConfig | undefined, feature: "emailImport" | "mcpConnector") {
+  const { limits } = await userPlan(db, userId, config);
   if (limits[feature]) return;
-  if (feature === "emailImport") upgradeRequired(feature, "Importing statements by email is part of JoyoArto Pro.");
-  upgradeRequired(feature, "The Claude connector (MCP) is part of JoyoArto Pro.");
+  if (feature === "emailImport") upgradeRequired(feature, "Importing statements by email is part of Joyo Pro.");
+  upgradeRequired(feature, "The Claude connector (MCP) is part of Joyo Pro.");
 }
 
-async function usage(db: Database, householdId: string, metric: string, period: string): Promise<number> {
+async function usage(db: Database, userId: string, metric: string, period: string): Promise<number> {
   const uc = schema.usageCounter;
   const [row] = await db
     .select({ count: uc.count })
     .from(uc)
-    .where(and(eq(uc.householdId, householdId), eq(uc.metric, metric), eq(uc.period, period)));
+    .where(and(eq(uc.userId, userId), eq(uc.metric, metric), eq(uc.period, period)));
   return row?.count ?? 0;
 }
 
-/** Before reading a statement: a Free household that used this month's imports gets the upgrade prompt (preview included). */
-export async function assertStatementImport(db: Database, householdId: string, config: BillingConfig | undefined, now = new Date()) {
-  const { limits } = await householdPlan(db, householdId, config, now);
+/** Before reading a statement: a Free user who used this month's imports gets the upgrade prompt (preview included). */
+export async function assertStatementImport(db: Database, userId: string, config: BillingConfig | undefined, now = new Date()) {
+  const { limits } = await userPlan(db, userId, config, { now });
   const limit = limits.statementImportsPerMonth;
   if (limit === null) return;
-  const used = await usage(db, householdId, STATEMENT_IMPORT_METRIC, wibMonth(now));
+  const used = await usage(db, userId, STATEMENT_IMPORT_METRIC, wibMonth(now));
   if (used >= limit) {
     upgradeRequired("statementImports", `Free includes ${limit} statement imports a month and this month's are used.`, { limit, used });
   }
 }
 
-/** After a committed statement import that added rows. Counted for every plan, so a downgrade starts from the truth. */
-export async function countStatementImport(db: Database, householdId: string, now = new Date()) {
+/** After a committed statement import that added rows. Counted on every plan, so a downgrade starts from the truth. */
+export async function countStatementImport(db: Database, userId: string, now = new Date()) {
   const uc = schema.usageCounter;
   await db
     .insert(uc)
-    .values({ householdId, metric: STATEMENT_IMPORT_METRIC, period: wibMonth(now), count: 1, updatedAt: now })
-    .onConflictDoUpdate({ target: [uc.householdId, uc.metric, uc.period], set: { count: sql`${uc.count} + 1`, updatedAt: now } });
+    .values({ userId, metric: STATEMENT_IMPORT_METRIC, period: wibMonth(now), count: 1, updatedAt: now })
+    .onConflictDoUpdate({ target: [uc.userId, uc.metric, uc.period], set: { count: sql`${uc.count} + 1`, updatedAt: now } });
 }
 
-/** Members plus pending invites must stay within the plan (`adding` = the person about to be invited or to join). */
-export async function assertMemberSeat(db: Database, householdId: string, config: BillingConfig | undefined, opts: { countPending: boolean }) {
-  const { limits, entitlement } = await householdPlan(db, householdId, config);
+/**
+ * Members plus pending invites must stay within the INVITER's plan (`inviterId`: who sends the invite, or who sent the
+ * invite being accepted). Without a known inviter the Free limit applies.
+ */
+export async function assertMemberSeat(
+  db: Database,
+  householdId: string,
+  inviterId: string | null,
+  config: BillingConfig | undefined,
+  opts: { countPending: boolean },
+) {
+  const { limits, entitlement } =
+    inviterId || !config?.enforced ? await userPlan(db, inviterId ?? "", config) : { limits: PLAN_LIMITS.free, entitlement: { plan: "free" as const } };
   const inv = schema.householdInvite;
   const [[members], [pending]] = await db.batch([
     db.select({ n: count() }).from(hm).where(eq(hm.householdId, householdId)),
@@ -108,59 +195,57 @@ export async function assertMemberSeat(db: Database, householdId: string, config
   const used = (members?.n ?? 0) + (opts.countPending ? (pending?.n ?? 0) : 0);
   if (used < limits.members) return;
   if (entitlement.plan === "pro") throw new ORPCError("BAD_REQUEST", { message: `A household can have at most ${limits.members} members.` });
-  upgradeRequired("members", `Free households have up to ${limits.members} members (pending invites count).`, { limit: limits.members, used });
+  upgradeRequired("members", `On Free a household has up to ${limits.members} people (pending invites count); the inviter's plan decides.`, {
+    limit: limits.members,
+    used,
+  });
 }
 
 /** Saving a new scenario (updating an existing one stays allowed, so nothing saved is lost after a downgrade). */
-export async function assertScenarioSlot(db: Database, householdId: string, config: BillingConfig | undefined, existing: number) {
-  const { limits, entitlement } = await householdPlan(db, householdId, config);
+export async function assertScenarioSlot(db: Database, userId: string, config: BillingConfig | undefined, existing: number) {
+  const { limits, entitlement } = await userPlan(db, userId, config);
   if (existing < limits.savedScenarios) return;
-  if (entitlement.plan === "pro") throw new ORPCError("BAD_REQUEST", { message: `A household can keep at most ${limits.savedScenarios} saved scenarios; delete some first.` });
-  upgradeRequired("savedScenarios", "Saving scenarios is part of JoyoArto Pro. Your draft stays on this device.", { limit: limits.savedScenarios });
+  if (entitlement.plan === "pro") {
+    throw new ORPCError("BAD_REQUEST", { message: `A household can keep at most ${limits.savedScenarios} saved scenarios; delete some first.` });
+  }
+  upgradeRequired("savedScenarios", "Saving scenarios is part of Joyo Pro. Your draft stays on this device.", { limit: limits.savedScenarios });
 }
 
-/** Hosted Joyo AI questions per member today: the plan's cap, never above the server's. */
-export async function chatCap(db: Database, householdId: string, config: BillingConfig | undefined, serverCap: number): Promise<{ cap: number; plan: "free" | "pro" }> {
-  const { limits, entitlement } = await householdPlan(db, householdId, config);
+/** Hosted Joyo AI questions for this user today: the plan's cap, never above the server's. */
+export async function chatCap(db: Database, userId: string, config: BillingConfig | undefined, serverCap: number): Promise<{ cap: number; plan: "free" | "pro" }> {
+  const { limits, entitlement } = await userPlan(db, userId, config);
   return { cap: limits.aiDailyCap === null ? serverCap : Math.min(limits.aiDailyCap, serverCap), plan: entitlement.plan };
 }
 
 // ------------------------------------------------------------------------------------------------ prices
 
-type Price = { priceIdr: PriceIdr; tier: "standard" | "founder"; founderSlotsLeft: number | null };
+const PRICING_CACHE_MS = 10 * 60_000;
+let pricingCache: { at: number; value: JoyoPricing | null } | null = null;
 
-/** Founder price while seats are left, and for good for a household that already bought at it. */
-export async function priceFor(db: Database, householdId: string | null, config: BillingConfig): Promise<Price> {
-  if (!config.founder) return { priceIdr: config.priceIdr, tier: "standard", founderSlotsLeft: null };
-  const founderPaid = and(eq(o.status, "paid"), eq(o.priceTier, "founder"), gt(o.amount, 0));
-  const [[taken], mine] = await db.batch([
-    db.select({ n: sql<number>`count(distinct ${o.householdId})` }).from(o).where(founderPaid),
-    db
-      .select({ id: o.id })
-      .from(o)
-      .where(and(founderPaid, eq(o.householdId, householdId ?? "")))
-      .limit(1),
-  ]);
-  const left = Math.max(0, config.founder.slots - (taken?.n ?? 0));
-  if (mine.length || left > 0) return { priceIdr: config.founder.priceIdr, tier: "founder", founderSlotsLeft: left };
-  return { priceIdr: config.priceIdr, tier: "standard", founderSlotsLeft: 0 };
+/** JoyoRogo's current Joyo Pro prices (per isolate, 10 min); null when JoyoRogo does not answer. */
+async function joyoPricing(config: BillingConfig, now: number): Promise<JoyoPricing | null> {
+  if (!config.joyo) return null;
+  if (pricingCache && now - pricingCache.at < PRICING_CACHE_MS) return pricingCache.value;
+  let value: JoyoPricing | null = null;
+  try {
+    value = await fetchJoyoPricing(config.joyo.apiUrl);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+  }
+  // A failure is remembered for a minute only.
+  pricingCache = { at: value ? now : now - PRICING_CACHE_MS + 60_000, value };
+  return value;
 }
 
-export function planMonths(interval: BillingInterval): number {
-  return interval === "yearly" ? 12 : 1;
-}
-
-/** Public price list for the pricing page and landing (no session needed). */
-export async function publicPricing(db: Database, config: BillingConfig | undefined, serverAiCap: number) {
+/** Public: what Free and Pro include, JoyoRogo's prices and where to buy (no session needed). */
+export async function publicPricing(config: BillingConfig | undefined, serverAiCap: number, now = Date.now()) {
   const limits = { free: PLAN_LIMITS.free, pro: { ...PLAN_LIMITS.pro, aiDailyCap: serverAiCap } };
-  if (!config) return { available: false, enforced: false, priceIdr: null, founder: null, usdCents: null, trialDays: 0, limits };
-  const founder = config.founder ? await priceFor(db, null, config) : null;
+  if (!config?.joyo) return { available: false, enforced: false, proUrl: null, prices: null, trialDays: 0, limits };
   return {
-    available: config.doku !== null || config.polar !== null,
+    available: true,
     enforced: config.enforced,
-    priceIdr: config.priceIdr,
-    founder: config.founder && founder ? { priceIdr: config.founder.priceIdr, slotsLeft: founder.founderSlotsLeft ?? 0 } : null,
-    usdCents: config.polar?.priceUsdCents ?? null,
+    proUrl: config.proUrl,
+    prices: await joyoPricing(config, now),
     trialDays: config.trialDays,
     limits,
   };
@@ -168,258 +253,31 @@ export async function publicPricing(db: Database, config: BillingConfig | undefi
 
 // ------------------------------------------------------------------------------------------------ status
 
-function orderView(row: typeof o.$inferSelect) {
-  return {
-    id: row.id,
-    provider: row.provider,
-    interval: row.interval,
-    months: row.months,
-    amount: row.amount,
-    currency: row.currency,
-    display: formatMoney(row.amount, row.currency),
-    priceTier: row.priceTier,
-    status: row.status,
-    isTest: row.isTest,
-    periodEnd: row.periodEnd,
-    createdAt: row.createdAt,
-    paidAt: row.paidAt,
-  };
-}
-
-/** Settings → Billing: plan, renewal, usage against the limits, checkout options, recent orders. */
+/** Settings → Billing: the signed-in user's plan, Joyo Pro as JoyoRogo reports it, and usage against the limits. */
 export async function billingStatus(db: Database, p: Principal, config: BillingConfig | undefined, serverAiCap: number, now = new Date()) {
-  const plan = await householdPlan(db, p.householdId, config, now);
+  const plan = await userPlan(db, p.userId, config, { now, askJoyo: "always" });
   const inv = schema.householdInvite;
-  const [orders, [members], [pending], [household], polarRows] = await db.batch([
-    db.select().from(o).where(eq(o.householdId, p.householdId)).orderBy(desc(o.createdAt)).limit(20),
+  const [[members], [pending]] = await db.batch([
     db.select({ n: count() }).from(hm).where(eq(hm.householdId, p.householdId)),
     db
       .select({ n: count() })
       .from(inv)
       .where(and(eq(inv.householdId, p.householdId), isNull(inv.acceptedAt), gt(inv.expiresAt, now))),
-    db.select({ createdAt: schema.household.createdAt }).from(schema.household).where(eq(schema.household.id, p.householdId)),
-    db
-      .select({ status: e.status })
-      .from(e)
-      .where(and(eq(e.householdId, p.householdId), eq(e.provider, "polar"))),
   ]);
   const period = wibMonth(now);
-  const used = await usage(db, p.householdId, STATEMENT_IMPORT_METRIC, period);
-  const price = config && (config.doku || config.polar) ? await priceFor(db, p.householdId, config) : null;
-  const free = config && household ? freeTimeEnd(config, household.createdAt) : null;
+  const used = await usage(db, p.userId, STATEMENT_IMPORT_METRIC, period);
   const limits = { ...plan.limits, aiDailyCap: plan.limits.aiDailyCap === null ? serverAiCap : Math.min(plan.limits.aiDailyCap, serverAiCap) };
-  const recentPending = orders.find((r) => r.status === "pending" && r.provider === "doku" && now.getTime() - r.createdAt.getTime() < 2 * 86_400_000);
   return {
     enforced: config?.enforced ?? false,
     plan: plan.entitlement.plan,
     entitlement: plan.entitlement,
+    joyo: plan.joyo,
+    /** JoyoRogo's Pro page: buy, renew or manage Joyo Pro there. Null without billing. */
+    proUrl: config?.joyo ? config.proUrl : null,
     limits,
     usage: {
       statementImports: { used, limit: limits.statementImportsPerMonth, period },
       members: { used: (members?.n ?? 0) + (pending?.n ?? 0), limit: limits.members },
     },
-    checkout: { doku: !!config?.doku, polar: !!config?.polar },
-    price: price && config ? { idr: price.priceIdr, tier: price.tier, standardIdr: config.priceIdr, founderSlotsLeft: price.founderSlotsLeft, usdCents: config.polar?.priceUsdCents ?? null } : null,
-    /** Paid DOKU months start after this (trial or grandfathered Pro). */
-    freeTimeEnd: free && free.end.getTime() > now.getTime() ? free.end : null,
-    polarSubscription: polarRows[0]?.status ?? null,
-    pendingOrder: recentPending ? orderView(recentPending) : null,
-    orders: orders.map(orderView),
   };
-}
-
-// ------------------------------------------------------------------------------------------------ DOKU checkout
-
-export const checkoutInput = z.object({ interval: z.enum(BILLING_INTERVALS).default("monthly") });
-
-async function buyer(db: Database, userId: string) {
-  const [u] = await db.select({ name: schema.user.name, email: schema.user.email }).from(schema.user).where(eq(schema.user.id, userId));
-  return u ?? notFound("User");
-}
-
-async function liveRenewingPolar(db: Database, householdId: string): Promise<boolean> {
-  const [row] = await db
-    .select({ status: e.status })
-    .from(e)
-    .where(and(eq(e.householdId, householdId), eq(e.provider, "polar"), inArray(e.status, ["active", "past_due"])));
-  return !!row;
-}
-
-/** Creates the order, then DOKU's hosted page (QRIS, e-wallets, VA). The buyer comes back to /payment?order=<id>. */
-export async function startDokuCheckout(db: Database, p: Principal, config: BillingConfig | undefined, input: z.infer<typeof checkoutInput>) {
-  const doku = config?.doku;
-  if (!config || !doku) throw new ORPCError("NOT_FOUND", { message: "Paying in rupiah is not available on this server." });
-  if (await liveRenewingPolar(db, p.householdId)) {
-    throw new ORPCError("CONFLICT", { message: "This household already has a card subscription. Manage it in Settings → Billing." });
-  }
-  const me = await buyer(db, p.userId);
-  const price = await priceFor(db, p.householdId, config);
-  const amountIdr = price.priceIdr[input.interval];
-  const id = buildOrderId();
-  await db.insert(o).values({
-    id,
-    householdId: p.householdId,
-    userId: p.userId,
-    provider: "doku",
-    interval: input.interval,
-    months: planMonths(input.interval),
-    amount: amountIdr * 100,
-    currency: "IDR",
-    priceTier: price.tier,
-    isTest: doku.sandbox,
-  });
-  try {
-    const { paymentUrl } = await createCheckout(doku, {
-      orderId: id,
-      amountIdr,
-      itemName: input.interval === "yearly" ? "JoyoArto Pro 1 tahun" : "JoyoArto Pro 1 bulan",
-      customerEmail: me.email,
-      customerName: me.name,
-      notifyUrl: `${config.apiUrl}${WEBHOOK_TARGET}`,
-      returnUrl: `${config.appUrl}/payment?order=${encodeURIComponent(id)}`,
-    });
-    await db.update(o).set({ paymentUrl }).where(eq(o.id, id));
-    return { orderId: id, paymentUrl };
-  } catch (error) {
-    console.error(`doku checkout ${id} failed:`, error);
-    await db.update(o).set({ status: "failed" }).where(eq(o.id, id));
-    throw new ORPCError("BAD_GATEWAY", { message: "Couldn't open the payment page. Try again in a moment." });
-  }
-}
-
-/**
- * Pays a pending DOKU order: flips it to paid and stacks its months on the household's Pro time, in one D1 batch. The
- * flip lands only while the order is pending AND the DOKU entitlement still ends where we extended from, so a replayed
- * or concurrent notification extends exactly once.
- */
-export async function activateDokuOrder(
-  db: Database,
-  config: Pick<BillingConfig, "trialDays" | "grandfather">,
-  orderId: string,
-  now = new Date(),
-): Promise<"activated" | "already" | "failed" | "conflict" | "not_found"> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const [order] = await db.select().from(o).where(eq(o.id, orderId));
-    if (!order || !order.householdId) return "not_found";
-    if (order.status === "paid") return "already";
-    if (order.status !== "pending") return "failed";
-    const householdId = order.householdId;
-    await db.insert(e).values({ householdId, provider: "doku", status: "expired", periodEnd: null }).onConflictDoNothing();
-    const [[current], [household]] = await db.batch([
-      db
-        .select({ periodEnd: e.periodEnd })
-        .from(e)
-        .where(and(eq(e.householdId, householdId), eq(e.provider, "doku"))),
-      db.select({ createdAt: schema.household.createdAt }).from(schema.household).where(eq(schema.household.id, householdId)),
-    ]);
-    const previous = current?.periodEnd ?? null;
-    const free = household ? freeTimeEnd(config, household.createdAt) : null;
-    const base = [previous, free?.end ?? null].filter((d): d is Date => d !== null).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
-    const until = nextPeriodEnd(base, now, order.months);
-    const previousMs = previous?.getTime() ?? null;
-    const [flipped] = await db.batch([
-      db
-        .update(o)
-        .set({ status: "paid", paidAt: now, periodEnd: until })
-        .where(
-          and(
-            eq(o.id, orderId),
-            eq(o.status, "pending"),
-            sql`(select ${e.periodEnd} from ${e} where ${e.householdId} = ${householdId} and ${e.provider} = 'doku') is ${previousMs}`,
-          ),
-        )
-        .returning({ id: o.id }),
-      db
-        .update(e)
-        .set({ status: "active", periodEnd: until, interval: order.interval, cancelAtPeriodEnd: false, updatedAt: now })
-        .where(
-          and(
-            eq(e.householdId, householdId),
-            eq(e.provider, "doku"),
-            sql`exists (select 1 from ${o} where ${o.id} = ${orderId} and ${o.status} = 'paid' and ${o.paidAt} = ${now.getTime()})`,
-          ),
-        ),
-    ]);
-    if (flipped.length === 1) return "activated";
-  }
-  return "conflict";
-}
-
-export async function markOrderFailed(db: Database, orderId: string) {
-  await db
-    .update(o)
-    .set({ status: "failed" })
-    .where(and(eq(o.id, orderId), eq(o.status, "pending")));
-}
-
-export const orderIdInput = z.object({ id: z.string().min(1).max(80) });
-
-/** One of the household's orders (the payment page polls this until the webhook lands). */
-export async function getOrder(db: Database, p: Principal, id: string) {
-  const [row] = await db
-    .select()
-    .from(o)
-    .where(and(eq(o.id, id), eq(o.householdId, p.householdId)));
-  return orderView(row ?? notFound("Order"));
-}
-
-/** "Check payment": ask DOKU now instead of waiting for the webhook, and settle the order if it was paid. */
-export async function checkOrder(db: Database, p: Principal, config: BillingConfig | undefined, id: string, now = new Date()) {
-  const order = await getOrder(db, p, id);
-  if (order.status !== "pending" || order.provider !== "doku" || !config?.doku) return order;
-  try {
-    const n = await checkStatus(config.doku, id);
-    if (n.status === "EXPIRED") await markOrderFailed(db, id);
-    else if (isPaid(n) && Math.round(n.amount) * 100 === order.amount) await activateDokuOrder(db, config, id, now);
-  } catch (error) {
-    // DOKU answers Not Found until the buyer picks a payment channel.
-    console.error(`doku check ${id}:`, error instanceof Error ? error.message : error);
-  }
-  return getOrder(db, p, id);
-}
-
-// ------------------------------------------------------------------------------------------------ Polar
-
-/** USD card subscription (Polar). The household is Polar's customer, so any member can manage it later. */
-export async function startPolarCheckout(db: Database, p: Principal, config: BillingConfig | undefined, input: z.infer<typeof checkoutInput>, customerIp?: string | null) {
-  const polar = config?.polar;
-  if (!config || !polar) throw new ORPCError("NOT_FOUND", { message: "Paying in US dollars is not available on this server." });
-  const [live] = await db
-    .select({ status: e.status })
-    .from(e)
-    .where(and(eq(e.householdId, p.householdId), eq(e.provider, "polar"), inArray(e.status, ["active", "past_due", "canceled"]), gte(e.periodEnd, new Date())));
-  if (live) throw new ORPCError("CONFLICT", { message: "This household already has a card subscription. Manage it from Settings → Billing." });
-  const me = await buyer(db, p.userId);
-  try {
-    return await createPolarCheckout(polar, {
-      interval: input.interval,
-      householdId: p.householdId,
-      userId: p.userId,
-      email: me.email,
-      name: me.name,
-      successUrl: `${config.appUrl}/payment?polar=success`,
-      returnUrl: `${config.appUrl}/pricing`,
-      customerIp,
-    });
-  } catch (error) {
-    console.error(`polar checkout for ${p.householdId} failed:`, error);
-    throw new ORPCError("BAD_GATEWAY", { message: "Couldn't open the checkout. Try again in a moment." });
-  }
-}
-
-/** Polar's customer portal: cancel, change plan, card, invoices. */
-export async function polarPortal(db: Database, p: Principal, config: BillingConfig | undefined) {
-  const polar = config?.polar;
-  if (!config || !polar) throw new ORPCError("NOT_FOUND", { message: "Card subscriptions are not available on this server." });
-  const [row] = await db
-    .select({ status: e.status })
-    .from(e)
-    .where(and(eq(e.householdId, p.householdId), eq(e.provider, "polar")));
-  if (!row) notFound("Card subscription");
-  try {
-    return await createPolarPortal(polar, { householdId: p.householdId, returnUrl: `${config.appUrl}/settings` });
-  } catch (error) {
-    console.error(`polar portal for ${p.householdId} failed:`, error);
-    throw new ORPCError("BAD_GATEWAY", { message: "Couldn't open the subscription portal. Try again in a moment." });
-  }
 }

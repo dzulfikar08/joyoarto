@@ -137,7 +137,7 @@ export async function createInvite(db: Database, p: Principal, input: z.infer<ty
     .select({ id: inv.id })
     .from(inv)
     .where(and(eq(inv.householdId, p.householdId), eq(inv.email, email), isNull(inv.acceptedAt), gt(inv.expiresAt, new Date())));
-  if (!again) await assertMemberSeat(db, p.householdId, billing, { countPending: true });
+  if (!again) await assertMemberSeat(db, p.householdId, p.userId, billing, { countPending: true });
   const now = new Date();
   const [pending] = await db
     .select({ n: count() })
@@ -226,8 +226,8 @@ export async function acceptInvite(db: Database, p: Principal, input: z.infer<ty
     forbidden(`This invite is for ${invite.email}, but you are signed in as ${email || "another account"}. Sign in with ${invite.email} to accept it.`);
   }
 
-  // The invite held a seat, but the household may have gone back to Free since.
-  if (!(await roleOf(db, invite.householdId, p.userId))) await assertMemberSeat(db, invite.householdId, billing, { countPending: false });
+  // The invite held a seat under the inviter's plan, which may have gone back to Free since.
+  if (!(await roleOf(db, invite.householdId, p.userId))) await assertMemberSeat(db, invite.householdId, invite.invitedBy, billing, { countPending: false });
 
   // Claim it first, so a link opened twice cannot add a membership twice.
   const claimed = await db

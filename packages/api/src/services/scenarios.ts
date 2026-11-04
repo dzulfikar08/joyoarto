@@ -124,7 +124,7 @@ export async function saveScenario(db: Database, p: Principal, input: z.infer<ty
     return { created: false, scenario: await getScenario(db, p, id) };
   }
   const count = (await db.select({ id: ps.id }).from(ps).where(scope).limit(MAX_SCENARIOS)).length;
-  await assertScenarioSlot(db, p.householdId, billing, count);
+  await assertScenarioSlot(db, p.userId, billing, count);
   if (count >= MAX_SCENARIOS) badRequest(`A household can keep at most ${MAX_SCENARIOS} saved scenarios; delete some first.`);
   const newId = crypto.randomUUID();
   await db.insert(ps).values({ id: newId, householdId: p.householdId, createdBy: p.userId, ...values });
