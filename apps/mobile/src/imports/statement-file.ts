@@ -7,6 +7,12 @@ import type { StatementResult } from "../lib/types";
  */
 export async function uploadStatement(api: ApiClient | null, file: UploadFile, commit: boolean, mock: boolean): Promise<StatementResult> {
   if (mock || !api) return mockStatementResult(file.name, commit);
+  // Native uploader on phones (reads content:// PDFs reliably); fetch + FormData elsewhere (tests, web).
+  // React Native sets navigator.product; importing react-native here would break the plain bun tests.
+  if (typeof navigator !== "undefined" && navigator.product === "ReactNative") {
+    const { uploadStatementNative } = await import("./native-upload");
+    return uploadStatementNative(api.server, api.token, file, commit);
+  }
   return api.uploadStatementFile(file, commit);
 }
 

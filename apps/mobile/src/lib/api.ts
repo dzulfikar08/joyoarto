@@ -98,6 +98,7 @@ export function createApi(creds: Credentials, fetchImpl: FetchLike = fetch, opti
 
   return {
     server: base,
+    token: creds.token,
     me: () => request<Me>("GET", "/me"),
     accounts: () => request<{ accounts: Account[] }>("GET", "/accounts").then((r) => r.accounts),
     categories: () => request<{ categories: Category[] }>("GET", "/categories").then((r) => r.categories),
