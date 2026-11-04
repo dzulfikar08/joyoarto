@@ -71,10 +71,9 @@
     // "Upgrade" goes to JoyoRogo's Pro checkout (?from=joyoarto is added); prices are read from JoyoRogo's /api/config.
     "JOYO_PRO_URL": "https://app.joyorogo.com/pro",
     // New accounts: days of Pro to try JoyoArto.
-    "PRO_TRIAL_DAYS": "14",
-    // Accounts created before this day (WIB) keep Pro until PRO_GRANDFATHER_UNTIL.
-    "PRO_GRANDFATHER_CREATED_BEFORE": "2026-11-05",
-    "PRO_GRANDFATHER_UNTIL": "2027-02-01"
+    "PRO_TRIAL_DAYS": "14"
+    // No grandfathering: accounts without Joyo Pro get the trial only. (PRO_GRANDFATHER_CREATED_BEFORE /
+    // PRO_GRANDFATHER_UNTIL still work for self-hosters who want one.)
     // PRO_EMAILS (accounts that are always Pro; ADMIN_EMAILS count too) is passed by deploy.yml with --var from the
     // production environment's variables, like ALLOWED_EMAILS, so it is not in the public repo.
   }

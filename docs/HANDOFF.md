@@ -43,8 +43,8 @@ the Atur project **BRK** (workspace `joyodigitama`).
      wrangler.jsonc, so setting the key turns the Free limits on.
    - Both apps must keep signing in with the same Google OAuth client (they do today), or `googleSub` stops matching and
      only the verified email is left.
-   - Check the grandfather date: accounts created before `PRO_GRANDFATHER_CREATED_BEFORE` (2026-11-05, WIB) keep Pro until
-     2027-02-01. Move it to the launch day if launch is later.
+   - No grandfathering (owner's decision, 4 Nov 2026): accounts without Joyo Pro get the 14-day trial only; existing
+     Joyo Pro members (JoyoRogo/JoyoFit) are Pro in JoyoArto right away.
    - Migrations 0009/0010 drop the old household billing tables (never used in production: no gateway secrets were set)
      and add `joyo_pro_status` and a per-user `usage_counter`. `deploy.yml` applies them. Remove any old `DOKU_*` /
      `POLAR_*` secrets from the `baroka` Worker if they were ever set.
