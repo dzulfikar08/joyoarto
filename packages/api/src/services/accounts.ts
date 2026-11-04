@@ -43,6 +43,8 @@ export async function listAccounts(db: Database, p: Principal, input: { includeA
         archived: acc.archivedAt !== null,
         /** Opening balance plus every recorded transaction (pending ones too); only right once statements cover the whole history. */
         balance: money(acc.openingBalance + Number(s?.sum ?? 0), acc.currency),
+        /** What the account held before its first recorded transaction (the edit form starts from it). */
+        openingBalance: money(acc.openingBalance, acc.currency),
         transactions: Number(s?.count ?? 0),
         firstDate: s?.first ?? null,
         lastDate: s?.last ?? null,

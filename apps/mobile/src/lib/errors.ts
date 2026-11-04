@@ -28,6 +28,22 @@ export function isUpgradeError(e: unknown): boolean {
   return err.code === "FORBIDDEN" && data?.upgrade === true;
 }
 
+/** Something the store reviewers' demo account may not do (the server's FORBIDDEN with data.demo). */
+export function isDemoError(e: unknown): boolean {
+  const err = asErr(e);
+  const data = err.data as { demo?: unknown } | undefined;
+  return err.code === "FORBIDDEN" && data?.demo === true;
+}
+
+/** A procedure that needs a signed-in session (Google or Apple), not an access token (sessionProcedure). */
+export function isSessionOnlyError(e: unknown): boolean {
+  const err = asErr(e);
+  return err.code === "FORBIDDEN" && typeof err.message === "string" && /from the JoyoArto web app/i.test(err.message);
+}
+
+/** What a token or demo sign-in sees for tokens, invites, exports and account deletion. Never points to the web app. */
+export const SESSION_ONLY_MESSAGE = "Only available when you sign in with Google or Apple. Sign out from More, then sign in again.";
+
 /** No answer at all: offline, DNS, timeout (RN's fetch throws TypeError "Network request failed"). */
 export function isNetworkError(e: unknown): boolean {
   const err = asErr(e);
@@ -49,6 +65,7 @@ export function errorMessage(e: unknown, opts: { storeSafe?: boolean } = {}): st
   if (isNetworkError(e)) return "No connection to the server. Check your internet and try again.";
   if (isUnauthorized(e)) return "You were signed out. Sign in again.";
   if (opts.storeSafe && isUpgradeError(e)) return STORE_SAFE_LIMIT_MESSAGE;
+  if (isSessionOnlyError(e)) return SESSION_ONLY_MESSAGE;
   const err = asErr(e);
   if (typeof err.message === "string" && err.message) return err.message;
   return String(e);

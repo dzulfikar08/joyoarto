@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
 import { ApiError, STORE_SAFE_LIMIT_MESSAGE } from "./api";
-import { errorMessage, isNetworkError, isRetryable, isUnauthorized, isUpgradeError } from "./errors";
+import { errorMessage, isDemoError, isSessionOnlyError, isNetworkError, SESSION_ONLY_MESSAGE, isRetryable, isUnauthorized, isUpgradeError } from "./errors";
 import { procedureOfKey, shouldPersistQuery, shouldRetry } from "./query-policy";
 
 const orpcError = (code: string, status: number, message: string, data?: unknown) => Object.assign(new Error(message), { code, status, data });
@@ -35,4 +35,15 @@ test("query policy", () => {
   expect(shouldPersistQuery({ queryKey: [["reports", "dashboard"], {}], state: { status: "success" } })).toBe(true);
   expect(shouldPersistQuery({ queryKey: [["reports", "dashboard"], {}], state: { status: "error" } })).toBe(false);
   expect(shouldPersistQuery({ queryKey: [["transactions", "search"], {}], state: { status: "success" } })).toBe(false);
+});
+
+test("demo and session-only refusals", () => {
+  const demo = orpcError("FORBIDDEN", 403, "The demo account cannot invite people.", { demo: true, action: "invite" });
+  expect(isDemoError(demo)).toBe(true);
+  expect(errorMessage(demo)).toMatch(/demo account cannot invite/);
+  const web = orpcError("FORBIDDEN", 403, "Do this from the JoyoArto web app.");
+  expect(isSessionOnlyError(web)).toBe(true);
+  expect(isDemoError(web)).toBe(false);
+  expect(errorMessage(web, { storeSafe: true })).toBe(SESSION_ONLY_MESSAGE);
+  expect(SESSION_ONLY_MESSAGE).not.toMatch(/web/i);
 });

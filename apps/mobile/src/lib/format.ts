@@ -118,3 +118,36 @@ export function pctText(v: number): string {
 export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
+
+/**
+ * What a person typed as rupiah ("1.250.000", "-500.000", "25000", "Rp 1.250,50") to minor units; "" is 0, anything
+ * else that is not an amount is null. Indonesian notation: dots group thousands, a comma starts the cents.
+ */
+export function rupiahInputToMinor(text: string): number | null {
+  const s = text.replace(/\s+/g, "").replace(/^(-?)(?:Rp\.?|IDR)/i, "$1").replace(/^Rp\.?(-)/i, "$1");
+  if (!s || s === "-") return 0;
+  const m = /^(-?)(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?$/.exec(s);
+  if (!m) return null;
+  const whole = Number(m[2]!.replace(/\./g, ""));
+  const cents = m[3] ? Number(m[3].padEnd(2, "0")) : 0;
+  const v = whole * 100 + cents;
+  return m[1] && v ? -v : v;
+}
+
+/** An ISO time or Date as "3 Nov 2026" (UTC+7). */
+export function shortDate(when: string | number | Date | null | undefined): string {
+  if (when === null || when === undefined) return "–";
+  const d = new Date(when);
+  if (Number.isNaN(d.getTime())) return "–";
+  const w = new Date(d.getTime() + WIB_MS);
+  return `${w.getUTCDate()} ${MONTHS[w.getUTCMonth()]!.slice(0, 3)} ${w.getUTCFullYear()}`;
+}
+
+/** An ISO time as "3 Nov 2026, 14:05" (WIB). */
+export function shortDateTime(when: string | number | Date | null | undefined): string {
+  if (when === null || when === undefined) return "–";
+  const d = new Date(when);
+  if (Number.isNaN(d.getTime())) return "–";
+  const w = new Date(d.getTime() + WIB_MS);
+  return `${shortDate(d)}, ${String(w.getUTCHours()).padStart(2, "0")}:${String(w.getUTCMinutes()).padStart(2, "0")}`;
+}
