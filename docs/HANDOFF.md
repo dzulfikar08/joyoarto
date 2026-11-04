@@ -11,6 +11,7 @@ the Atur project **BRK** (workspace `joyodigitama`).
 | Code | github.com/dzulfikar08/joyoarto (renamed from `baroka`; packages and the Worker are still named `baroka`) |
 | Production | app: https://app.arto.joyorogo.com · landing: https://arto.joyorogo.com · old https://baroka.by.dzulfikar.com redirects |
 | Deploys | GitHub Actions: `ci.yml` → `deploy.yml` (D1 migrations + `wrangler deploy` + smoke test). Secret `CLOUDFLARE_API_TOKEN` in environment `production`. Don't deploy from a laptop. |
+| iOS | `release-ios.yml` (manual, environment `release`, macOS runner) builds the IPA and optionally uploads it to TestFlight; secrets and steps in `docs/ios-release.md`. Not run yet. |
 | Android | `android.yml` builds the APK artifact `joyoarto-android-apk` (`gh run download <id> -n joyoarto-android-apk`). Release signing secrets (`ANDROID_KEYSTORE_*`) not set yet: debug-signed. |
 | MCP | claude-hub has `joyoarto` (https://app.arto.joyorogo.com/mcp, its own `brk_` token) and `atur`. |
 | Task tracking | Atur project BRK (Backlog/Todo/In Progress/Done/Cancelled). |
@@ -57,3 +58,34 @@ the Atur project **BRK** (workspace `joyodigitama`).
    Play service account invited to the JoyoArto app, RTDN pointed at the same topic, and the App Store notification URL
    set to JoyoRogo's `/api/billing/apple/notifications` (JoyoRogo docs/play-billing.md section 4 and billing-status.md).
    The app must call JoyoRogo with a JoyoRogo session (same Google account), not JoyoArto's.
+8. **iOS app: TestFlight** (workflow, config and docs done; see `docs/ios-release.md`). Owner steps, in order:
+   1. **Secrets.** On the Linux box, set the five `release` environment secrets of `dzulfikar08/joyoarto` with the
+      commands in `docs/ios-release.md` "Secrets": `ASC_KEY_BASE64` (`~/Downloads/AuthKey_BUU2CPKLGM.p8`), `ASC_KEY_ID`
+      (`BUU2CPKLGM`), `ASC_ISSUER_ID` (`9e34111d-e39f-4122-9000-6eb4628fe9b9`), `IOS_DIST_CERT_P12_BASE64` and
+      `IOS_DIST_CERT_PASSWORD` (a new `.p12` from `~/.config/joyorogo-ios/distribution/{cert.der,key.pem}`).
+   2. **Bundle id** (developer.apple.com, Certificates, Identifiers & Profiles, Identifiers, +, App IDs, App): explicit
+      `com.joyodigitama.joyoarto`, description `JoyoArto`, **no capabilities** (no App Groups: the share extension is
+      not built; no push). Optional: the workflow's `asc-ci-profile.py` registers it by itself on the first run.
+   3. **App Store Connect app** (appstoreconnect.apple.com, Apps, +, New App): platform iOS, name
+      `JoyoArto: Keuangan Keluarga`, primary language **Indonesian**, bundle id `com.joyodigitama.joyoarto`, SKU
+      `joyoarto`, user access Full. Then App Information: category Finance; Pricing and Availability: Free.
+   4. **Dry run, then upload.** `gh workflow run release-ios.yml -R dzulfikar08/joyoarto -f upload_testflight=false`,
+      approve the `release` deployment, check it is green; then the same with `-f upload_testflight=true`. Wait for the
+      build to finish processing in TestFlight.
+   5. **Export compliance**: nothing to answer (`ITSAppUsesNonExemptEncryption` is false in the build). If a build
+      still shows "Missing Compliance": encryption yes, exempt (HTTPS only) yes.
+   6. **Internal group** (TestFlight, Internal Testing, +): `Internal`, tick "Enable automatic distribution", add
+      yourself (and household testers who are App Store Connect users).
+   7. **Beta App Review information** (TestFlight, Test Information): feedback email, privacy policy
+      `https://arto.joyorogo.com/privasi`, sign-in required, the demo login (`<REVIEW_DEMO_CODE>`, the review code the
+      other agent is adding; never commit it) and the notes text from `docs/ios-release.md`. Make the demo account Pro
+      (or give it a long trial) so the reviewer hits no Free limit.
+   8. **External group with a public link** (TestFlight, External Testing, +): `Publik`, add the build, submit it for
+      Beta App Review (first build only takes about a day), then **Enable Public Link** (tester limit as you like).
+   9. **App Privacy** (App Store Connect, App Privacy, Get Started): the answers table in `docs/ios-release.md`
+      (name, email, other financial info, user id; linked, app functionality, no tracking), privacy policy URL
+      `https://arto.joyorogo.com/privasi`. Publish.
+   - Follow-ups: the iOS share extension (`docs/ios-release.md` "Share extension"); App Store release needs a version
+     bump, 6.9" screenshots from a demo household, review notes, and a decision on In-App Purchase for Joyo Pro
+     (`docs/ios-release.md` "Joyo Pro and App Review": first review with no purchase UI or link out, then JoyoFit's
+     StoreKit flow through JoyoRogo if Apple asks).
