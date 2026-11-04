@@ -3,19 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- seo:head -->
+    <!-- Replaced per public page at build time (scripts/prerender.ts, copy in src/lib/seo.ts); this is what dev shows. -->
+    <title>JoyoArto</title>
+    <meta name="description" content="Aplikasi keuangan keluarga open source: e-statement Bank Jago & GoPay, setiap saldo dicek sampai cocok." />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <!-- /seo:head -->
     <meta name="theme-color" content="#f9f6f1" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#110f0b" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="apple-mobile-web-app-title" content="JoyoArto" />
     <meta name="application-name" content="JoyoArto" />
     <!-- Hosts: arto.joyorogo.com shows the public pages, app.arto.joyorogo.com the app; the old baroka.by.dzulfikar.com
-         sends everything to the app host. Same rules as src/lib/hosts.ts (this copy runs before the bundle loads). -->
+         sends everything to the app host. Same rules as src/lib/hosts.ts (this copy runs before the bundle loads).
+         Only the public site is indexed: every other host gets robots noindex here (and X-Robots-Tag from public/_headers).
+         The "js" class hides the prerendered #prerender body for people who run the app (see scripts/prerender.ts). -->
     <script>
       (function () {
-        var h = location.hostname, p = location.pathname, pub = ["/", "/demo", "/privasi", "/syarat"];
+        var d = document.documentElement, h = location.hostname, p = location.pathname, pub = ["/", "/demo", "/pricing", "/privasi", "/syarat"];
+        d.className += " js";
+        if (h !== "arto.joyorogo.com") document.querySelector('meta[name="robots"]').setAttribute("content", "noindex");
         if (h === "baroka.by.dzulfikar.com" || (h === "arto.joyorogo.com" && pub.indexOf(p.replace(/\/$/, "") || "/") < 0))
           location.replace("https://app.arto.joyorogo.com" + p + location.search + location.hash);
       })();
@@ -29,31 +39,17 @@
         document.documentElement.style.colorScheme = dark ? "dark" : "light";
       } catch (e) {}
     </script>
-    <title>JoyoArto · Keuangan keluarga rapi dari e-statement Jago & GoPay</title>
-    <meta
-      name="description"
-      content="Upload e-statement Bank Jago dan GoPay, JoyoArto cek setiap saldo sampai cocok, lalu tanya Claude soal uangmu atau simulasikan rencana besar. Untuk keluarga. Family finance ledger for Indonesia: verified Jago & GoPay statements, Claude connector, plans."
-    />
-    <!-- %VITE_PUBLIC_URL% is the public origin (apps/web/.env.production; defaults to the current deployment). -->
-    <link rel="canonical" href="%VITE_PUBLIC_URL%/" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="JoyoArto" />
-    <meta property="og:url" content="%VITE_PUBLIC_URL%/" />
-    <meta property="og:title" content="JoyoArto · Keuangan keluarga rapi, tanpa nyatet satu-satu" />
-    <meta
-      property="og:description"
-      content="Upload e-statement Jago & GoPay, setiap saldo dicek sampai cocok. Tanya Claude, ajak pasangan, simulasikan rencana. Coba demonya tanpa akun."
-    />
-    <meta property="og:image" content="%VITE_PUBLIC_URL%/og.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="JoyoArto: keuangan keluarga rapi dari e-statement Jago & GoPay" />
-    <meta property="og:locale" content="id_ID" />
-    <meta property="og:locale:alternate" content="en_US" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="JoyoArto · Keuangan keluarga rapi, tanpa nyatet satu-satu" />
-    <meta name="twitter:description" content="Upload e-statement Jago & GoPay, setiap saldo dicek sampai cocok. Tanya Claude soal uangmu." />
-    <meta name="twitter:image" content="%VITE_PUBLIC_URL%/og.png" />
+    <style>
+      .js #prerender { display: none; }
+      #prerender { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1rem; line-height: 1.6; }
+      #prerender h1 { font-size: 2rem; line-height: 1.15; font-weight: 800; margin: 1.5rem 0 0.75rem; }
+      #prerender h2 { font-size: 1.375rem; font-weight: 800; margin: 2rem 0 0.5rem; }
+      #prerender h3 { font-weight: 700; margin: 1rem 0 0.25rem; }
+      #prerender p, #prerender ol { margin: 0.5rem 0; }
+      #prerender ol { padding-left: 1.25rem; list-style: decimal; }
+      #prerender a { text-decoration: underline; }
+      #prerender footer { margin-top: 2.5rem; font-size: 0.875rem; }
+    </style>
   </head>
   <body>
     <div id="app"></div>

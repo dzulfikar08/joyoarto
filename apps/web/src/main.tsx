@@ -16,6 +16,9 @@ captureOAuthQuery(window.location);
 // Only for the share target (statement PDFs shared from the phone); it caches nothing else.
 registerServiceWorker();
 
+// The prerendered body is for crawlers without JavaScript (scripts/prerender.ts); the "js" class already hid it.
+document.getElementById("prerender")?.remove();
+
 // Toasts only follow a user action, so sonner loads right after first paint instead of in the entry bundle.
 const Toaster = lazy(() => import("@baroka/ui/components/sonner").then((m) => ({ default: m.Toaster })));
 

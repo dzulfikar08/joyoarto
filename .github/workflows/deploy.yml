@@ -58,3 +58,17 @@ jobs:
           for u in https://app.arto.joyorogo.com/login https://app.arto.joyorogo.com/api/docs https://arto.joyorogo.com/; do
             code=$(curl -s -o /dev/null -w "%{http_code}" -A "joyoarto-deploy/1.0" "$u"); echo "$u $code"; [ "$code" = "200" ]
           done
+      # Search and link previews (docs/SEO.md): only the public site is indexable, pages carry their own share tags.
+      - name: SEO smoke test
+        run: |
+          set -e
+          ua="joyoarto-deploy/1.0"
+          if curl -sI -A "$ua" https://arto.joyorogo.com/ | grep -qi '^x-robots-tag:.*noindex'; then echo "::error::the public site is noindex"; exit 1; fi
+          curl -sI -A "$ua" https://app.arto.joyorogo.com/login | grep -qi '^x-robots-tag:.*noindex'
+          curl -sI -A "$ua" https://app.arto.joyorogo.com/api/docs | grep -qi '^x-robots-tag:.*noindex'
+          curl -s -A "$ua" https://arto.joyorogo.com/demo | grep -q '<link rel="canonical" href="https://arto.joyorogo.com/demo"'
+          curl -s -A "$ua" https://arto.joyorogo.com/robots.txt | grep -q '^Sitemap: https://arto.joyorogo.com/sitemap.xml'
+          curl -s -A "$ua" https://arto.joyorogo.com/sitemap.xml | grep -q '<loc>https://arto.joyorogo.com/pricing</loc>'
+          curl -s -A "$ua" https://arto.joyorogo.com/.well-known/security.txt | grep -q '^Contact: mailto:'
+          curl -sI -A "$ua" https://arto.joyorogo.com/og/home.png | grep -qi '^content-type: image/png'
+          echo "SEO checks passed"
