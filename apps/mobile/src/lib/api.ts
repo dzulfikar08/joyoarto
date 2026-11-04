@@ -105,6 +105,30 @@ export function createApi(creds: Credentials, fetchImpl: FetchLike = fetch) {
   };
 }
 
+/**
+ * POST /api/demo/token: a demo code (for store reviewers; the server's DEMO_LOGIN_CODE) to a short-lived token for the
+ * demo account, whose made-up data resets every day. No token is needed to ask.
+ */
+export async function requestDemoToken(server: string, code: string, fetchImpl: FetchLike = fetch): Promise<{ token: string; expiresAt: string | null }> {
+  let res: Response;
+  try {
+    res = await fetchImpl(`${server.replace(/\/+$/, "")}/api/demo/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ code: code.trim() }),
+    });
+  } catch {
+    throw new ApiError("No connection to the server.", 0);
+  }
+  const json = (await res.json().catch(() => null)) as { token?: string; expiresAt?: string | null; message?: string; code?: string } | null;
+  if (!res.ok || !json?.token) {
+    const message =
+      res.status === 401 ? "That demo code is not right." : res.status === 404 ? "Demo login is not available on this server." : (json?.message ?? `Server error ${res.status}`);
+    throw new ApiError(message, res.status, json?.code);
+  }
+  return { token: json.token, expiresAt: json.expiresAt ?? null };
+}
+
 /** A token looks like brk_ followed by url-safe characters. */
 export function looksLikeToken(s: string) {
   return /^brk_[A-Za-z0-9_-]{16,}$/.test(s.trim());

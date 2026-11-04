@@ -27,7 +27,7 @@ export type RequestInfo = {
   /** Server secret mixed into the IP hash, so stored hashes cannot be reversed by trying every address. */
   ipSalt: string;
   /** Rate limit check: false means over the limit. Absent when the binding is not configured (local dev). */
-  allow?: (bucket: "waitlist", key: string) => Promise<boolean>;
+  allow?: (bucket: "waitlist" | "demo", key: string) => Promise<boolean>;
   /** Lowercased emails of the operators (env ADMIN_EMAILS). */
   adminEmails: string[];
 };
@@ -36,6 +36,8 @@ export type RequestInfo = {
 export type ServerConfig = {
   /** Domain of the household import addresses (import+<token>@<domain>); null = email import off. */
   importEmailDomain: string | null;
+  /** DEMO_LOGIN_CODE (secret): the code store reviewers type to reach the demo account. Unset = demo login off. */
+  demoCode?: string | null;
 };
 
 /** The Workers AI binding (`ai.run(model, input)`), as far as JoyoArto uses it. */

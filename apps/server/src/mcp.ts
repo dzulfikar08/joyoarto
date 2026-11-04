@@ -1,5 +1,6 @@
 import type { Context as ApiContext, Principal, Scope } from "@baroka/api/context";
 import { SCOPES } from "@baroka/api/context";
+import { isDemoUser } from "@baroka/api/lib/demo";
 import { ensureHousehold } from "@baroka/api/lib/household";
 import { pruneMcpAudit } from "@baroka/api/services/account";
 import { userPlan } from "@baroka/api/services/billing";
@@ -134,6 +135,8 @@ async function authenticate(request: Request): Promise<{ principal: Principal; c
   }
   try {
     const p = await verifyMcpAccessToken(getAuth(), request, env.BETTER_AUTH_URL);
+    // The demo account (store reviewers) cannot keep a connection alive past its daily reset.
+    if (isDemoUser(p.userId)) return challenge(401, "demo", "The demo account cannot connect AI apps.");
     // A JWT cannot be revoked, so the consent is checked on every request: removing a connection works at once.
     const [consent] = await db
       .select({ id: schema.oauthConsent.id })

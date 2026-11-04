@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import type { LinkProps } from "@tanstack/react-router";
-import { ChartNoAxesCombined, ChevronRight, FileDown, LogOut, Settings, ShieldCheck, Sparkles, WalletCards } from "lucide-react";
+import { ChartNoAxesCombined, ChevronRight, ExternalLink, FileDown, LogOut, Settings, ShieldCheck, Smartphone, Sparkles, WalletCards } from "lucide-react";
 import type { ComponentType } from "react";
 
 import { Avatar } from "@/components/avatar";
 import { PageHeader, ThemeSwitch } from "@/components/kit";
+import { ANDROID_SECTION_ID } from "@/lib/app-links";
 import { requireSession, signOut } from "@/lib/auth";
+import { SITE_URL } from "@/lib/brand";
 import { orpc } from "@/lib/orpc";
 
 export const Route = createFileRoute("/more")({ beforeLoad: requireSession, component: More });
@@ -23,6 +25,11 @@ const ITEMS: Item[] = [
   { to: "/privasi", label: "Privacy policy", hint: "What JoyoArto stores and shares", Icon: ShieldCheck },
 ];
 
+/** The two tester steps live on the public landing page (lib/app-links.ts). */
+const ANDROID_STEPS_URL = `${SITE_URL}/#${ANDROID_SECTION_ID}`;
+
+const ROW = "flex min-h-16 items-center gap-4 px-5 py-3 transition-colors hover:bg-muted/60 focus-visible:bg-muted focus-visible:outline-none";
+
 function More() {
   const me = useQuery(orpc.me.queryOptions());
   return (
@@ -38,9 +45,15 @@ function More() {
         </span>
         <ChevronRight aria-hidden className="size-5 shrink-0 text-muted-foreground/70" />
       </Link>
+      {me.data?.demo && (
+        <p className="rounded-2xl bg-warning-soft p-4 text-sm text-warning-ink">
+          This is the demo account: the data is made up and resets every day. Inviting people, deleting the account and
+          long-lived tokens are off.
+        </p>
+      )}
       <nav aria-label="More" className="card divide-y divide-border overflow-hidden p-0">
         {ITEMS.map(({ to, label, hint, Icon }) => (
-          <Link key={label} to={to} className="flex min-h-16 items-center gap-4 px-5 py-3 transition-colors hover:bg-muted/60 focus-visible:bg-muted focus-visible:outline-none">
+          <Link key={label} to={to} className={ROW}>
             <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-ink">
               <Icon className="size-5" aria-hidden />
             </span>
@@ -51,6 +64,16 @@ function More() {
             <ChevronRight aria-hidden className="size-5 shrink-0 text-muted-foreground/70" />
           </Link>
         ))}
+        <a href={ANDROID_STEPS_URL} target="_blank" rel="noopener" className={ROW}>
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-ink">
+            <Smartphone className="size-5" aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Pasang di Android</span>
+            <span className="block text-xs text-muted-foreground">Join the testers' group, then install from Google Play. iPhone: soon</span>
+          </span>
+          <ExternalLink aria-hidden className="size-5 shrink-0 text-muted-foreground/70" />
+        </a>
       </nav>
       <section className="card flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm font-semibold">Appearance</span>

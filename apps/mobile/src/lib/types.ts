@@ -8,6 +8,8 @@ export type Me = {
   household: { id: string; name: string | null; baseCurrency: string };
   scopes: string[];
   via: string;
+  /** The store reviewers' demo account (made-up data, reset daily). Older servers leave it out. */
+  demo?: boolean;
 };
 
 export type Account = {

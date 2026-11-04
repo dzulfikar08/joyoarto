@@ -1,4 +1,5 @@
 import { Button } from "@baroka/ui/components/button";
+import { Input } from "@baroka/ui/components/input";
 import { Link, createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 
@@ -38,6 +39,23 @@ function Login() {
     location.assign(done);
   };
 
+  /** Store reviewers: a demo code (DEMO_LOGIN_CODE on the server) opens the demo account, whose made-up data resets daily. */
+  const demo = async (code: string) => {
+    setError(null);
+    const res = await fetch(`${SERVER_URL}/api/auth/sign-in/demo`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { message?: string } | null;
+      return setError(res.status === 404 ? "Demo login is not available." : (body?.message ?? "Demo sign-in failed."));
+    }
+    await queryClient.invalidateQueries({ queryKey: ["session"] });
+    location.assign(done);
+  };
+
   return (
     <div className="grid min-h-dvh place-items-center px-4 py-10">
       <div className="w-full max-w-sm">
@@ -64,6 +82,25 @@ function Login() {
               </Button>
             )}
           </div>
+          <details className="group text-left text-sm">
+            <summary className="cursor-pointer list-none text-center text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
+              Demo account (reviewers)
+            </summary>
+            <form
+              className="mt-3 space-y-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const code = new FormData(e.currentTarget).get("code");
+                if (typeof code === "string" && code.trim()) void demo(code.trim());
+              }}
+            >
+              <Input name="code" aria-label="Demo code" placeholder="Demo code" autoComplete="off" autoCapitalize="none" spellCheck={false} />
+              <Button type="submit" variant="secondary" className="w-full">
+                Open the demo
+              </Button>
+              <p className="text-xs text-muted-foreground">Made-up data that resets every day. Nothing you do there reaches real people.</p>
+            </form>
+          </details>
           {error && (
             <p role="alert" className="rounded-2xl bg-destructive-soft p-3 text-sm text-destructive-ink">
               {error}

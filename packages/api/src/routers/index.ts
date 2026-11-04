@@ -1,12 +1,15 @@
 import { schema } from "@baroka/db";
+import { ORPCError } from "@orpc/server";
 import type { RouterClient } from "@orpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { authedProcedure, readProcedure, sessionProcedure, writeProcedure } from "../index";
+import { authedProcedure, publicProcedure, readProcedure, sessionProcedure, writeProcedure } from "../index";
+import { DEMO_TOKEN_DAYS, isDemoUser, refuseDemo } from "../lib/demo";
 import * as account from "../services/account";
 import * as accounts from "../services/accounts";
 import * as dashboard from "../services/dashboard";
+import * as demo from "../services/demo";
 import { billingRouter } from "./billing";
 import { householdRouter } from "./household";
 import { captureRouter, joyoRouter } from "./joyo";
@@ -20,7 +23,7 @@ import * as scenarios from "../services/scenarios";
 import * as statements from "../services/statements";
 import * as tokens from "../services/tokens";
 import * as tx from "../services/transactions";
-import { waitlistRouter } from "./waitlist";
+import { adminProcedure, waitlistRouter } from "./waitlist";
 
 const byId = z.object({ id: z.string() });
 
@@ -37,6 +40,8 @@ export const appRouter = {
       household: { id: p.householdId, name: household?.name ?? null, baseCurrency: household?.baseCurrency ?? "IDR" },
       scopes: p.scopes,
       via: p.via,
+      /** The store reviewers' demo account: made-up data that resets every day. */
+      demo: isDemoUser(p.userId),
     };
   }),
 
@@ -220,7 +225,10 @@ export const appRouter = {
         .handler(({ context }) => inbound.emailImportStatus(context.db, context.principal, context.config?.importEmailDomain ?? null)),
       regenerate: sessionOnly
         .route({ method: "POST", path: "/imports/email", tags: ["imports"], summary: "Turn on email import, or replace the address (the old one stops working)" })
-        .handler(({ context }) => inbound.regenerateEmailImport(context.db, context.principal, context.config?.importEmailDomain ?? null, context.billing)),
+        .handler(({ context }) => {
+          refuseDemo(context.principal.userId, "emailImport");
+          return inbound.regenerateEmailImport(context.db, context.principal, context.config?.importEmailDomain ?? null, context.billing);
+        }),
       disable: sessionOnly
         .route({ method: "DELETE", path: "/imports/email", tags: ["imports"], summary: "Turn off email import" })
         .handler(({ context }) => inbound.disableEmailImport(context.db, context.principal, context.config?.importEmailDomain ?? null)),
@@ -244,7 +252,10 @@ export const appRouter = {
     create: sessionOnly
       .route({ method: "POST", path: "/tokens", tags: ["tokens"] })
       .input(tokens.createTokenInput)
-      .handler(({ context, input }) => tokens.createToken(context.db, context.principal, input)),
+      .handler(({ context, input }) => {
+        if (!input.expiresInDays || input.expiresInDays > 1) refuseDemo(context.principal.userId, "longLivedToken");
+        return tokens.createToken(context.db, context.principal, input);
+      }),
     revoke: sessionOnly
       .route({ method: "DELETE", path: "/tokens/{id}", tags: ["tokens"] })
       .input(byId)
@@ -292,7 +303,10 @@ export const appRouter = {
         summary: "Delete your account (type your email to confirm); households where you are the only member go with it",
       })
       .input(account.deleteAccountInput)
-      .handler(({ context, input }) => account.deleteAccount(context.db, context.principal, input)),
+      .handler(({ context, input }) => {
+        refuseDemo(context.principal.userId, "deleteAccount");
+        return account.deleteAccount(context.db, context.principal, input);
+      }),
   },
 
   household: householdRouter,
@@ -307,6 +321,31 @@ export const appRouter = {
   capture: captureRouter,
 
   waitlist: waitlistRouter,
+
+  /**
+   * The demo account for store reviewers (Google Play, App Store) and screenshots. Off unless the server has the secret
+   * DEMO_LOGIN_CODE. The web app signs in with POST /api/auth/sign-in/demo (packages/auth); the phone app uses `token`.
+   */
+  demo: {
+    token: publicProcedure
+      .route({
+        method: "POST",
+        path: "/demo/token",
+        tags: ["demo"],
+        summary: `Demo code to a ${DEMO_TOKEN_DAYS}-day token for the demo account (resets its made-up data)`,
+      })
+      .input(z.object({ code: z.string().trim().min(1).max(200) }))
+      .handler(async ({ context, input }) => {
+        const req = context.request;
+        if (req?.allow && !(await req.allow("demo", req.ip ?? "unknown"))) {
+          throw new ORPCError("TOO_MANY_REQUESTS", { message: "Too many attempts. Try again in a minute." });
+        }
+        return demo.demoToken(context.db, input.code, context.config?.demoCode);
+      }),
+    reset: adminProcedure
+      .route({ method: "POST", path: "/admin/demo/reset", tags: ["demo"], summary: "Create or reset the demo account's data (operators)" })
+      .handler(({ context }) => demo.seedDemo(context.db)),
+  },
 };
 
 export type AppRouter = typeof appRouter;
