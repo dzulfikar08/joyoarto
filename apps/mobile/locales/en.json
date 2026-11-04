@@ -1,0 +1,5 @@
+{
+  "ios": {
+    "NSMicrophoneUsageDescription": "JoyoArto uses the microphone only while you record a voice note to add a transaction (up to 60 seconds). The recording is sent to JoyoArto's server to turn it into text and is then deleted, never stored."
+  }
+}

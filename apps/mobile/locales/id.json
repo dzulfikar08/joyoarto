@@ -1,0 +1,5 @@
+{
+  "ios": {
+    "NSMicrophoneUsageDescription": "JoyoArto memakai mikrofon hanya saat kamu merekam catatan suara untuk mencatat transaksi (maks. 60 detik). Rekaman dikirim ke server JoyoArto untuk diubah jadi teks lalu dihapus, tidak disimpan."
+  }
+}

@@ -189,10 +189,24 @@ INFO=$APPDIR/Info.plist
 sdk=$(plist "$INFO" DTSDKName)
 case $sdk in iphoneos2[6-9]* | iphoneos[3-9]*) ;; *) fail "built with $sdk, App Store Connect wants the iOS 26 SDK or later" ;; esac
 
-# Permission texts: the app asks for none (document picker and Keychain need none). A key here means a plugin added a
-# prompt the app never shows, which App Review questions; add it to app.json on purpose or remove the plugin.
-usage=$(plutil -convert xml1 -o - "$INFO" | grep -oE '<key>NS[A-Za-z]+UsageDescription</key>' | sed -E 's/<\/?key>//g' | tr '\n' ' ' || true)
-[ -z "$usage" ] || fail "unexpected permission texts in Info.plist: $usage"
+# Permission texts: the microphone (voice quick add, expo-audio's plugin in app.json) and nothing else (document
+# picker and Keychain need none). Any other key means a plugin added a prompt the app never shows, which App Review
+# questions; add it to app.json on purpose (and here, and docs/ios-release.md) or remove the plugin.
+EXPECTED_USAGE="NSMicrophoneUsageDescription"
+usage=$(plutil -convert xml1 -o - "$INFO" | grep -oE '<key>NS[A-Za-z]+UsageDescription</key>' | sed -E 's/<\/?key>//g' | sort -u | tr '\n' ' ' | sed 's/ $//' || true)
+[ "$usage" = "$EXPECTED_USAGE" ] || fail "permission texts in Info.plist are '$usage', expected exactly '$EXPECTED_USAGE'"
+mic=$(plist "$INFO" NSMicrophoneUsageDescription)
+[ ${#mic} -ge 40 ] || fail "NSMicrophoneUsageDescription is missing or too short to explain itself: '$mic'"
+grep -qi "mikrofon" <<< "$mic" || fail "NSMicrophoneUsageDescription has no Indonesian text: '$mic'"
+# Translations from app.json "locales" (locales/id.json, locales/en.json): the prompt in the phone's language.
+for lang in id en; do
+  strings_file=$APPDIR/$lang.lproj/InfoPlist.strings
+  [ -f "$strings_file" ] || fail "no $lang.lproj/InfoPlist.strings (app.json locales)"
+  plutil -convert xml1 -o - "$strings_file" | grep -q NSMicrophoneUsageDescription || fail "$lang.lproj/InfoPlist.strings lacks NSMicrophoneUsageDescription"
+done
+# Recording happens only with the sheet open: no background audio mode.
+! plutil -convert xml1 -o - "$INFO" | grep -q '<string>audio</string>' || fail "UIBackgroundModes includes audio (expo-audio enableBackgroundPlayback/Recording must be false)"
+echo "   permission texts: $usage (base, id, en)"
 
 # No extensions: the share extension is off on iOS, nothing else is embedded.
 [ ! -d "$APPDIR/PlugIns" ] || fail "the app embeds extensions ($(ls "$APPDIR/PlugIns" | tr '\n' ' ')) but signing covers one bundle id"

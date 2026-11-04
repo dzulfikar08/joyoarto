@@ -1,11 +1,13 @@
 // The add-transaction sheet behind the tab bar's centre button (the web's apps/web/src/components/add-sheet.tsx):
 // type it ("kopi 25rb gopay"), the server reads it (capture.parse: AI with a rules fallback), review the editable draft,
-// Save = transactions.quickAdd as a pending row. Nothing is saved before Save. Voice: src/lib/voice.ts (hook only).
+// Save = transactions.quickAdd as a pending row. Nothing is saved before Save. Voice ("Say it", when the server has
+// transcription on: joyo.status.voice): src/lib/voice.ts records up to 60 s, the server turns it into text, and the
+// text runs through the same parse → review → save.
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Linking, Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 import { invalidateLedger, useAccountGroups, useAccounts, useCategoryGroups } from "@/components/data";
@@ -13,12 +15,13 @@ import { Button, DateField, Field, FieldLabel, Icon, Input, Loading, Picker, Row
 import { closeAddSheet, useAddSheet } from "@/src/lib/add-sheet";
 import { errorMessage } from "@/src/lib/errors";
 import { formatMoney } from "@/src/lib/format";
-import { client } from "@/src/lib/orpc";
+import { client, orpc } from "@/src/lib/orpc";
 import { storeSafe } from "@/src/lib/platform";
 import { lastAccountId, loadPrefs, rememberAccount } from "@/src/lib/prefs";
 import { emptyReview, parseReviewAmount, quickAddPayload, reviewFromDraft, type Review } from "@/src/lib/quick-add";
 import { toast } from "@/src/lib/toast";
-import { transcribeVoiceNote, voiceCaptureAvailable } from "@/src/lib/voice";
+import { useVoiceCapture } from "@/src/lib/voice";
+import { clockLabel, MAX_RECORD_MS, VOICE_MESSAGES, voiceNotice } from "@/src/lib/voice-state";
 
 const EXAMPLES = ["kopi kenangan 25rb gopay", "gaji masuk 16 juta", "kemarin parkir 5rb cash"];
 
@@ -30,7 +33,7 @@ export function AddSheet() {
     void loadPrefs();
   }, []);
   return (
-    <Sheet open={open} onClose={closeAddSheet} title="Add transaction" subtitle="Type it. You check it before it's saved.">
+    <Sheet open={open} onClose={closeAddSheet} title="Add transaction" subtitle="Say it or type it. You check it before it's saved.">
       {open ? <AddFlow key={session} prefill={prefill} onDone={closeAddSheet} /> : null}
     </Sheet>
   );
@@ -61,6 +64,14 @@ function AddFlow({ prefill, onDone }: { prefill?: string; onDone: () => void }) 
     }
   };
 
+  const status = useQuery({ ...orpc.joyo.status.queryOptions(), staleTime: 5 * 60_000 });
+  const voiceOn = status.data?.voice === true;
+  const voice = useVoiceCapture((heard) => {
+    setText(heard);
+    void parse(heard, "voice", heard);
+  });
+  const vs = voice.state;
+
   const submitText = () => {
     const t = text.trim();
     if (t.length < 2) return;
@@ -68,6 +79,38 @@ function AddFlow({ prefill, onDone }: { prefill?: string; onDone: () => void }) 
   };
 
   if (phase === "review") return <ReviewForm review={review} setReview={setReview} onBack={() => setPhase("input")} onDone={onDone} />;
+
+  if (vs.phase === "recording" || vs.phase === "stopping") {
+    const elapsed = vs.elapsedMs;
+    return (
+      <View style={{ alignItems: "center", gap: 14 }} accessibilityLiveRegion="polite">
+        <View style={styles.recIcon}>
+          <Icon name="mic" color="#fff" size={34} />
+        </View>
+        <Text variant="heading">Listening…</Text>
+        <Text tone="muted" accessibilityLabel={`${Math.floor(elapsed / 1000)} of 60 seconds`}>
+          {clockLabel(elapsed)} / {clockLabel(MAX_RECORD_MS)}
+        </Text>
+        <Text variant="caption" tone="muted" style={{ textAlign: "center" }}>
+          Say what it was, how much and how you paid. “Bayar parkir lima ribu cash”
+        </Text>
+        <Row>
+          <Button title="Cancel" variant="secondary" flex onPress={voice.cancel} />
+          <Button title="Done" icon="stop" flex loading={vs.phase === "stopping"} onPress={voice.stop} />
+        </Row>
+      </View>
+    );
+  }
+
+  if (vs.phase === "sending" || vs.phase === "asking") {
+    return (
+      <View style={{ alignItems: "center", gap: 8 }}>
+        <Loading label={vs.phase === "asking" ? "Waiting for microphone access…" : "Turning your voice note into text…"} />
+        {vs.phase === "asking" ? <Text variant="caption" tone="muted" style={{ textAlign: "center" }}>{VOICE_MESSAGES.why}</Text> : null}
+        <Button title="Cancel" variant="ghost" small onPress={voice.cancel} />
+      </View>
+    );
+  }
 
   if (phase === "reading") {
     return (
@@ -89,17 +132,14 @@ function AddFlow({ prefill, onDone }: { prefill?: string; onDone: () => void }) 
 
   return (
     <>
-      {voiceCaptureAvailable() ? (
+      {voiceOn ? (
         <Pressable
           accessibilityRole="button"
-          onPress={() =>
-            void transcribeVoiceNote()
-              .then((heard) => {
-                setText(heard);
-                return parse(heard, "voice", heard);
-              })
-              .catch((e) => setError(errorMessage(e)))
-          }
+          accessibilityLabel="Say it: record a voice note, up to 60 seconds"
+          onPress={() => {
+            setError(null);
+            voice.start();
+          }}
           style={styles.voice}
         >
           <View style={styles.voiceIcon}>
@@ -111,14 +151,25 @@ function AddFlow({ prefill, onDone }: { prefill?: string; onDone: () => void }) 
           </View>
         </Pressable>
       ) : null}
-      <FieldLabel label="Type it" error={error}>
+      {voiceOn && voiceNotice(vs) ? (
+        <View style={styles.note} accessibilityRole="alert">
+          <Text variant="caption" tone={vs.phase === "denied" ? "warning" : "destructive"}>{voiceNotice(vs)}</Text>
+          {vs.phase === "denied" ? (
+            <Row style={{ marginTop: 6 }}>
+              {vs.canAskAgain ? <Button title="Allow microphone" small variant="secondary" icon="mic-outline" onPress={voice.start} /> : <Button title="Open Settings" small variant="secondary" icon="settings-outline" onPress={() => void Linking.openSettings()} />}
+              <Button title="Type instead" small variant="ghost" onPress={voice.reset} />
+            </Row>
+          ) : null}
+        </View>
+      ) : null}
+      <FieldLabel label={voiceOn ? "Or type it" : "Type it"} error={error}>
         <Input
           value={text}
           onChangeText={setText}
           placeholder="kopi 25rb gopay"
           maxLength={500}
           multiline
-          autoFocus={!prefill}
+          autoFocus={!prefill && !voiceOn}
           blurOnSubmit
           returnKeyType="go"
           onSubmitEditing={submitText}
@@ -214,6 +265,7 @@ function ReviewForm({ review, setReview, onBack, onDone }: { review: Review; set
 
 const styles = StyleSheet.create((theme) => ({
   voice: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: theme.colors.primarySoft, borderRadius: 24, padding: 14 },
+  recIcon: { width: 84, height: 84, borderRadius: 42, backgroundColor: theme.colors.destructive, alignItems: "center", justifyContent: "center" },
   voiceIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: theme.colors.primary, alignItems: "center", justifyContent: "center" },
   example: { backgroundColor: theme.colors.muted, borderRadius: theme.radius.pill, paddingHorizontal: 12, paddingVertical: 8 },
   note: { backgroundColor: theme.colors.muted, borderRadius: theme.radius.tile, padding: 12 },

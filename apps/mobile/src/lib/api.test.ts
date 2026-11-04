@@ -64,3 +64,26 @@ describe("Free-plan limits", () => {
     expect(err.message).toBe("Missing scope finance:write");
   });
 });
+
+describe("POST /api/capture/transcribe", () => {
+  test("sends the voice note as multipart `audio` with the bearer token", async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const api = createApi({ server: "https://app.example", token: "brk_x" }, async (url, init) => {
+      calls.push({ url, init: init! });
+      return new Response(JSON.stringify({ text: "kopi 25rb gopay" }), { status: 200 });
+    });
+    const out = await api.transcribe({ uri: "file:///rec.m4a", name: "voice.m4a", type: "audio/mp4" });
+    expect(out).toEqual({ text: "kopi 25rb gopay" });
+    expect(calls[0]!.url).toBe("https://app.example/api/capture/transcribe");
+    expect(calls[0]!.init.method).toBe("POST");
+    expect(calls[0]!.init.body).toBeInstanceOf(FormData);
+    expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBe("Bearer brk_x");
+  });
+
+  test("the daily voice cap comes back as the server's message", async () => {
+    const api = createApi({ server: "https://x", token: "brk_x" }, async () =>
+      new Response(JSON.stringify({ code: "TOO_MANY_REQUESTS", message: "That's all the voice notes for today. Type it instead." }), { status: 429 }),
+    );
+    await expect(api.transcribe({ uri: "file:///a.m4a", name: "voice.m4a", type: "audio/mp4" })).rejects.toThrow("voice notes for today");
+  });
+});

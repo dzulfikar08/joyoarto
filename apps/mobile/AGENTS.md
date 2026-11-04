@@ -91,8 +91,5 @@ Each replaces a placeholder or a "coming" note; the web page is the spec.
 - **Plan & simulate** (`app/plan.tsx`): `plan.baseline/simulate/compare/templates/scenarios.*`; web `routes/plan.tsx`.
 - **Joyo AI chat** (`app/(tabs)/joyo.tsx`): `joyo.*` (streamed events, proposals with Confirm/Dismiss), JoyoRogo's chat
   UI for reference; web `routes/joyo.tsx`.
-- **Voice quick add**: `src/lib/voice.ts` is the hook the add sheet already calls (expo-audio, multipart to
-  `/api/capture/transcribe`, then `capture.parse`). Adds the microphone permission: update `app.json`, the iOS IPA check
-  in `scripts/ios/build-ios.sh` (it refuses any `NS*UsageDescription`) and docs/ios-release.md's App Privacy answers.
 - **OTA updates** (expo-updates + EAS Update like
   JoyoRogo's docs/ota.md; needs an EAS project id from the owner).

@@ -92,8 +92,10 @@ Keychain, key and profile are removed in the last `always()` step. The `.p12` is
 ## IPA checks (the job fails on any)
 
 Bundle id; `CFBundleVersion` equals the build number; display name `JoyoArto`; `ITSAppUsesNonExemptEncryption` false;
-ATS without arbitrary loads; iOS 26 SDK or later; **no `NS*UsageDescription` key at all** (the app asks for no
-permission); no embedded extensions; `PrivacyInfo.xcprivacy` present, `NSPrivacyTracking` false, and entries for
+ATS without arbitrary loads; iOS 26 SDK or later; **exactly one permission text, `NSMicrophoneUsageDescription`**
+(voice quick add; at least 40 characters, Indonesian in the base Info.plist, and translated in `id.lproj` and
+`en.lproj/InfoPlist.strings` from app.json `locales`), no other `NS*UsageDescription` key and no `audio` background mode;
+no embedded extensions; `PrivacyInfo.xcprivacy` present, `NSPrivacyTracking` false, and entries for
 UserDefaults, FileTimestamp, SystemBootTime and DiskSpace; App Store profile without devices; `get-task-allow` false;
 signature verifies with an Apple Distribution identity; no `NotificationCaptureModule` in the executable; embedded
 `app.config` matches `expo config`; `main.jsbundle` has app code and the API URL `https://app.arto.joyorogo.com`.
@@ -109,8 +111,16 @@ signature verifies with an Apple Distribution identity; no `NotificationCaptureM
 - **Notification capture is Android only.** `modules/notification-capture/expo-module.config.json` lists only
   `android`, so iOS autolinking never adds it; the JS reads it with `requireOptionalNativeModule` (null on iOS) and
   hides the screens (`Platform.OS === "android"`). The IPA check above proves it stays out.
-- **No permission prompts.** No microphone (the phone app has no voice quick add; that is the web's add sheet), no
-  camera, photos, location or contacts. `expo-secure-store`'s default Face ID text is removed (`faceIDPermission:
+- **One permission prompt: the microphone**, for voice quick add ("Say it" in the add sheet, `src/lib/voice.ts`). It is
+  asked the first time the member taps the mic, never at launch. Text (app.json `expo-audio` plugin, base Info.plist,
+  bilingual) and translations (`apps/mobile/locales/id.json`, `en.json`, shown in the phone's language):
+  - id: "JoyoArto memakai mikrofon hanya saat kamu merekam catatan suara untuk mencatat transaksi (maks. 60 detik).
+    Rekaman dikirim ke server JoyoArto untuk diubah jadi teks lalu dihapus, tidak disimpan."
+  - en: "JoyoArto uses the microphone only while you record a voice note to add a transaction (up to 60 seconds). The
+    recording is sent to JoyoArto's server to turn it into text and is then deleted, never stored."
+
+  No background audio (`enableBackgroundPlayback` / `enableBackgroundRecording` false: recording stops when the sheet
+  closes). No camera, photos, location or contacts. `expo-secure-store`'s default Face ID text is removed (`faceIDPermission:
   false`); the token is in the Keychain without biometrics. expo-dev-client's Bonjour and local-network keys are
   deleted from the release Info.plist by the build script (the dev launcher only runs in Debug).
 - **Export compliance**: `ios.config.usesNonExemptEncryption: false` writes `ITSAppUsesNonExemptEncryption = NO`. The
@@ -185,14 +195,24 @@ to upload, and no French declaration.
 | Contact Info: Name, Email Address | Collected, linked to the user, App Functionality only, not used for tracking |
 | Financial Info: Other Financial Info (accounts, transactions, balances, statements' parsed rows) | Collected, linked, App Functionality only, not tracking |
 | Identifiers: User ID | Collected, linked, App Functionality only, not tracking |
-| User Content, Usage Data, Diagnostics, Location, Contacts, Health, Browsing, Search, Purchases, Sensitive Info | Not collected (no analytics, no crash reporting, no ads; payments are not taken in JoyoArto) |
+| User Content: Audio Data (voice quick add) | **Not collected** in Apple's sense: the voice note is sent to JoyoArto's server only to turn it into text for that one request (Cloudflare Workers AI Whisper, `packages/api/src/services/capture.ts`), then dropped; neither the audio nor the transcript is stored or logged, and the phone deletes its copy after sending. Apple counts data as collected only when it is kept longer than needed to answer the request in real time. If transcripts or audio are ever stored, change this row to Collected, linked, App Functionality. |
+| User Content (other), Usage Data, Diagnostics, Location, Contacts, Health, Browsing, Search, Purchases, Sensitive Info | Not collected (no analytics, no crash reporting, no ads; payments are not taken in JoyoArto) |
 | Tracking (App Tracking Transparency) | No: no data is used for tracking, no data brokers, no ads |
 
 Notes: "Financial Info" in Apple's list also has payment info / credit info; neither applies (only the last four digits of
 an account, which is account metadata, are kept). Payment info is not collected because JoyoArto never takes payments.
 Privacy policy URL `https://arto.joyorogo.com/privasi`; it already covers the phone app's data (finance records,
-tokens, the Keychain-stored token is on the device only). If the iOS app ever adds Joyo AI, voice or analytics, update
-this table, the privacy manifest and the policy together.
+tokens, the Keychain-stored token is on the device only). It already covers voice notes (sent to Cloudflare Workers AI
+for transcription, processed and discarded; recordings and transcripts not stored) and Joyo AI, so it needs no change
+for voice quick add. Joyo AI chat in the app sends questions and the ledger data it reads to the AI provider, the same as the web
+(questions and answers are stored per member as conversations: already "Other Financial Info"/linked; review this when
+the chat ships to TestFlight). If analytics are ever added, update this table, the privacy manifest and the policy
+together.
+
+**Google Play Data safety** (same change): Audio, "Voice or sound recordings": collected, **processed ephemerally**,
+not shared (Cloudflare processes it for us as a service provider), optional (the member can type instead), purpose App
+functionality. Android shows no usage text of its own, so the add sheet explains the microphone in the app (English and
+Indonesian) before and after the system prompt.
 
 ## From TestFlight to the App Store
 
