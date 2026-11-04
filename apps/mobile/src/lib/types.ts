@@ -1,16 +1,9 @@
-// Response shapes of the JoyoArto REST API (/api/docs), written out by hand from packages/api/src/services so the
-// app does not depend on the server packages. Only the fields the app reads are listed.
+// Response shapes of the REST API (/api/docs) used by the REST client (src/lib/api.ts: capture sync, statement PDFs,
+// headless JS), written out by hand. Screens use the oRPC client (src/lib/orpc.ts), typed from the server's router.
 
 export type Money = { amount: number; display: string };
 
-export type Me = {
-  user: { id: string; name: string | null; email: string | null };
-  household: { id: string; name: string | null; baseCurrency: string };
-  scopes: string[];
-  via: string;
-  /** The store reviewers' demo account (made-up data, reset daily). Older servers leave it out. */
-  demo?: boolean;
-};
+export type { Me } from "./session-store";
 
 export type Account = {
   id: string;

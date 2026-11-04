@@ -16,5 +16,12 @@ export function jsonFile<T>(name: string) {
       if (!file.exists) file.create({ intermediates: true });
       file.write(JSON.stringify(value));
     },
+    remove() {
+      try {
+        if (file.exists) file.delete();
+      } catch {
+        // already gone
+      }
+    },
   };
 }
