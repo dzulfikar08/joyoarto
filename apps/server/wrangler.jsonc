@@ -59,7 +59,7 @@
     "APPLE_BUNDLE_IDS": "com.joyodigitama.joyoarto",
     // Native Google Sign-In on iOS gets ID tokens for the iOS OAuth client: add its id here once it exists
     // (Android's tokens are for GOOGLE_CLIENT_ID, the web client, already). Client ids are public.
-    // "GOOGLE_NATIVE_CLIENT_IDS": "<ios client id>.apps.googleusercontent.com",
+    "GOOGLE_NATIVE_CLIENT_IDS": "915036968874-v9nu6n98eb34vqmnva034tu6donspavn.apps.googleusercontent.com",
     // Joyo AI (in-app chat) and the add sheet's parser. Models are Anthropic model ids; effort: low | medium | high.
     "JOYO_AI_MODEL": "claude-opus-5-5",
     "JOYO_PARSE_MODEL": "claude-haiku-5-5",

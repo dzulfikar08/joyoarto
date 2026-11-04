@@ -102,3 +102,13 @@ third-party one such as Google is offered).
 - iPhone Google sign-in (iOS client, URL scheme) and Sign in with Apple (entitlement, profile, Apple's sheet).
 - That `set-auth-token` reaches the app through `fetch` on both platforms (the server test proves the header is sent).
 - Sign-out revocation and the 401 → signed-out path against production.
+
+## Created (4 Nov 2026)
+
+| Client | Type | Fingerprint / bundle |
+| --- | --- | --- |
+| `915036968874-chs9i9f8mikaa3hvgbk4fsegd6pjfav5` "JoyoArto Android (Play signing)" | Android | SHA-1 `B3:54:79:8B:32:64:96:92:C7:32:27:6C:E1:2C:2C:F9:FC:EA:A2:E3` (Play app signing key) |
+| `915036968874-lggi9ttf81jgue6d3iamdtlvoh2bvc4a` "JoyoArto Android (upload key)" | Android | SHA-1 `CE:32:1F:CA:D5:65:AD:2F:03:1D:30:75:90:36:DD:1C:CE:99:6B:BB` (release/upload keystore) |
+| `915036968874-v9nu6n98eb34vqmnva034tu6donspavn` "JoyoArto iOS" | iOS | `com.joyodigitama.joyoarto`, team `F6Q6UFUK69` |
+
+Android clients need no config (Google matches package + SHA-1); the iOS id is in `app.json` and `GOOGLE_NATIVE_CLIENT_IDS`.
