@@ -1,8 +1,10 @@
 import type { AppRouterClient } from "@baroka/api/routers/index";
-import { ORPCError, createORPCClient } from "@orpc/client";
+import { ORPCError, createORPCClient, onError } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
+
+import { isUpgradeError, openUpgrade } from "./billing";
 
 /** Production serves the API from the same origin as the app; dev points at wrangler dev (.env.development). */
 export const SERVER_URL = (import.meta.env.VITE_SERVER_URL as string | undefined) || window.location.origin;
@@ -21,6 +23,12 @@ export const queryClient = new QueryClient({
 const link = new RPCLink({
   url: `${SERVER_URL}/rpc`,
   fetch: (request, init) => fetch(request, { ...init, credentials: "include" }),
+  // A Free limit anywhere (import, invite, saving a scenario, Joyo AI) opens the one upgrade prompt (components/upgrade.tsx).
+  interceptors: [
+    onError((error) => {
+      if (isUpgradeError(error)) openUpgrade(error.data.feature);
+    }),
+  ],
 });
 
 export const client: AppRouterClient = createORPCClient(link);

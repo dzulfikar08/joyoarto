@@ -273,6 +273,42 @@ editable draft, then Save, which is `transactions.quickAdd` (pending, as before)
   (`start`, `round`, `text`, `toolStart`, `toolDone`, `proposal`, `done`); the web page renders markdown with JoyoRogo's
   parser (`lib/joyo-ai/markdown/parse.ts`).
 
+## JoyoArto Pro (billing)
+
+JoyoArto is AGPL and free to self-host; the hosted service sells **Pro**, bought for the **household** (every member
+shares it). Ported from JoyoRogo's billing.
+
+- **Free vs Pro** live in one module, `packages/api/src/lib/billing/plans.ts`: Free has manual entries, quick add and CSV
+  import, 2 statement imports a month (WIB, counted in `usage_counter` when an import saves rows; previews are refused
+  once they are used), 5 hosted Joyo AI questions a day and 2 members (pending invites count). Pro: unlimited statement
+  imports (bulk, email-in, share-to-app), the server's `JOYO_AI_DAILY_CAP`, 6 members, saved Plan scenarios and the
+  Claude connector (MCP). The REST API, tokens and the phone app work on Free.
+- **Enforcement** is server-side (`services/billing.ts`): a limit throws `FORBIDDEN` with `data: { upgrade: true,
+  feature }`; the web client's interceptor (`apps/web/src/lib/orpc.ts`) opens the upgrade sheet. A Free household's MCP
+  connector stays connected but every tool answers that it needs Pro. Downgrades delete nothing: saved scenarios stay
+  readable and editable, only new ones need Pro.
+- **Plan resolution** (`lib/billing/entitlement.ts`): billing off → everyone Pro; a member on `PRO_EMAILS`/`ADMIN_EMAILS`
+  → Pro; a live paid entitlement (`household_entitlement`, one row per provider: `active`/`canceled` until `period_end`,
+  `past_due` for 7 more days) → Pro; households created before `PRO_GRANDFATHER_CREATED_BEFORE` → Pro until
+  `PRO_GRANDFATHER_UNTIL`; new households → `PRO_TRIAL_DAYS` of Pro; else Free.
+- **Limits apply only with `PAYWALL=1` and a gateway's secrets set**, so a self-host (or the hosted server before its
+  DOKU keys are in) never shows prompts nobody can act on.
+- **DOKU Checkout** (IDR: QRIS, e-wallets, VA), the primary gateway: `billing.checkout` creates an `ART-…` order in
+  `billing_order` and DOKU's hosted page; the buyer returns to `/payment?order=…`, which polls and offers "check payment"
+  (`billing.checkOrder` asks DOKU's status API). Prepaid months, never auto-renewed; they stack after any Pro time the
+  household has (trial and grandfathered included). Webhook `POST /api/billing/doku/webhook`: HMAC signature, amount
+  check, and a single pending → paid flip in one D1 batch, so replays extend once. Sandbox (`DOKU_ENV`) until switched.
+- **Polar** (USD cards, merchant of record, auto-renewing): `billing.polarCheckout`, `billing.portal` (cancel, invoices).
+  The household id is Polar's `external_customer_id`. Webhook `POST /api/billing/polar/webhook`: Standard Webhooks
+  signature, deliveries recorded in `billing_event` by `webhook-id`, older `modified_at` never overwrites newer state.
+- **Founder price**: `PRO_FOUNDER_*_IDR` for the first `PRO_FOUNDER_SLOTS` paying households; a household that bought at
+  it keeps it. Prices are wrangler vars (placeholders until the owner confirms them); the pricing page and landing read
+  them from `billing.pricing`.
+- **Store billing later**: `household_entitlement.provider` already allows `google_play` and `apple`; a Play purchase
+  becomes another row for the household and the same resolver picks it up.
+- Web: `/pricing` (public), the landing page's Pricing section, Settings → Billing (plan, renewal, usage, orders, card
+  portal), `/payment`.
+
 ## Data & privacy (UU PDP)
 
 Settings → Data & privacy, all browser-session only (`packages/api/src/services/account.ts`):
@@ -316,7 +352,8 @@ bun run db:migrate:remote   # after a schema change
 bun run deploy              # builds apps/web, deploys the worker
 ```
 
-Secrets (`wrangler secret put`, in apps/server): `BETTER_AUTH_SECRET` (set), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
+Secrets (`wrangler secret put`, in apps/server): `BETTER_AUTH_SECRET` (set), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+`ANTHROPIC_API_KEY` (optional), and for Pro billing `DOKU_CLIENT_ID`, `DOKU_SECRET_KEY`, `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET`.
 `ALLOWED_EMAILS` and `ADMIN_EMAILS` (comma-separated) are not in wrangler.jsonc: `deploy.yml` passes them with
 `wrangler deploy --var` from the `production` environment's variables (GitHub → Settings → Environments), and refuses
 to deploy without them. Deploying by hand: `bunx wrangler deploy --var ALLOWED_EMAILS:you@example.com --var ADMIN_EMAILS:you@example.com`.

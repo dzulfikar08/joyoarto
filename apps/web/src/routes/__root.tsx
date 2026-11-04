@@ -5,6 +5,7 @@ import { Link, Outlet, createRootRouteWithContext, useRouterState } from "@tanst
 import BottomNav, { BOTTOM_NAV_SPACE, DesktopBar } from "@/components/bottom-nav";
 import { AddSheet } from "@/components/add-sheet";
 import { Wordmark } from "@/components/kit";
+import { UpgradeSheet } from "@/components/upgrade";
 import { sessionQuery } from "@/lib/auth";
 
 function Shell() {
@@ -12,7 +13,7 @@ function Shell() {
   const { data: session } = useQuery(sessionQuery);
   // Public pages (login, consent, the demo, privacy policy and terms, the landing page for visitors) draw their own layout.
   const bare =
-    ["/login", "/connect", "/demo", "/privasi", "/syarat"].some((p) => path.startsWith(p)) || (path === "/" && !session);
+    ["/login", "/connect", "/demo", "/privasi", "/syarat"].some((p) => path.startsWith(p)) || ((path === "/" || path === "/pricing") && !session);
   const nav = !bare && !!session;
   // The chat keeps its composer at the bottom of the screen and manages its own spacing.
   const chat = path === "/joyo";
@@ -35,6 +36,7 @@ function Shell() {
         <>
           <BottomNav />
           <AddSheet />
+          <UpgradeSheet />
         </>
       )}
     </div>

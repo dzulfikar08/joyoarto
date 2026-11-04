@@ -10,6 +10,7 @@ import { EventChannel } from "../lib/event-channel";
 import { byokEngine, engineLabel, hostedEngine, runChat } from "../lib/joyo-ai/chat";
 import type { ChatEvent, Engine } from "../lib/joyo-ai/chat";
 import { CHAT_LIMITS, reserveSlot, settleSlot, usedToday } from "../lib/joyo-ai/limits";
+import { chatCap, upgradeRequired } from "../services/billing";
 import { BYOK_PROVIDERS, PROVIDERS } from "../lib/joyo-ai/providers";
 import { resultLine, runProposal } from "../lib/joyo-ai/tools";
 import { AiError } from "../lib/joyo-ai/types";
@@ -72,11 +73,14 @@ async function personOf(context: Context & { principal: Principal }) {
 export const joyoRouter = {
   status: readProcedure.route({ method: "GET", path: "/joyo/status", tags: ["joyo"], summary: "Whether Joyo AI is on, its model and today's usage" }).handler(async ({ context }) => {
     const engine = hostedEngine(context.ai);
-    const cap = context.ai?.dailyCap ?? 0;
+    const serverCap = context.ai?.dailyCap ?? 0;
+    const { cap, plan } = await chatCap(context.db, context.principal.householdId, context.billing, serverCap);
     return {
-      hosted: engine && cap > 0 ? { provider: engine.provider, model: engine.conn.model } : null,
+      hosted: engine && serverCap > 0 ? { provider: engine.provider, model: engine.conn.model } : null,
       usedToday: await usedToday(context.db, context.principal.userId, ["chat"], "hosted"),
       dailyCap: cap,
+      /** free: the hosted cap is Free's; Pro gets the server's (JOYO_AI_DAILY_CAP). */
+      plan,
       voice: !!context.ai && (!!context.ai.workersAi || context.ai.fakeTranscript),
       byokProviders: BYOK_PROVIDERS.map((id) => ({ id, label: PROVIDERS[id].label, defaultModel: PROVIDERS[id].defaultModel, suggested: PROVIDERS[id].suggested, keyUrl: PROVIDERS[id].keyUrl, keyPlaceholder: PROVIDERS[id].keyPlaceholder })),
     };
@@ -109,9 +113,9 @@ export const joyoRouter = {
     .handler(async function* ({ context, input, signal }) {
       const { db, principal } = context;
       const hosted = hostedEngine(context.ai);
-      const cap = context.ai?.dailyCap ?? 0;
+      const serverCap = context.ai?.dailyCap ?? 0;
       const engine = input.byok ? byokEngine(input.byok, context.ai?.effort) : hosted;
-      if (!engine || (engine.kind === "hosted" && cap === 0)) {
+      if (!engine || (engine.kind === "hosted" && serverCap === 0)) {
         throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Joyo AI is off on this server. Add your own key in Joyo AI settings to use it.", data: { reason: "off" } });
       }
 
@@ -124,6 +128,7 @@ export const joyoRouter = {
       const userMessage = lastTurn?.role === "user" && lastTurn.content === input.message ? lastTurn : await joyo.appendMessage(db, conversationId, { role: "user", content: input.message });
       if (userMessage !== lastTurn) history.push(userMessage);
 
+      const { cap, plan } = engine.kind === "hosted" ? await chatCap(db, principal.householdId, context.billing, serverCap) : { cap: serverCap, plan: "pro" as const };
       const slot = await reserveSlot(db, {
         userId: principal.userId,
         householdId: principal.householdId,
@@ -133,6 +138,9 @@ export const joyoRouter = {
         cap: engine.kind === "hosted" ? cap : BYOK_DAILY_CAP,
       });
       if (!slot) {
+        if (engine.kind === "hosted" && plan === "free" && cap < serverCap) {
+          upgradeRequired("joyoAi", `That's all of today's ${cap} Joyo AI questions on Free. They come back tomorrow (WIB), or add your own key.`, { reason: "cap", cap });
+        }
         throw new ORPCError("TOO_MANY_REQUESTS", { message: `That's all of today's ${cap} Joyo AI questions. They come back tomorrow (WIB).`, data: { reason: "cap", cap } });
       }
 

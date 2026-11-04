@@ -8,6 +8,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, Check, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { PricingPlans } from "@/components/pricing";
 import { PublicFooter, PublicHeader, REPO_URL, WaitlistForm } from "@/components/public";
 import { useLang } from "@/lib/lang";
 
@@ -24,6 +25,7 @@ export function Landing() {
         <HowItWorks t={t} />
         <Features t={t} />
         <Privacy t={t} />
+        <Pricing t={t} />
         <Waitlist t={t} />
         <Faq t={t} />
       </main>
@@ -337,6 +339,35 @@ function Privacy({ t }: { t: T }) {
   );
 }
 
+function Pricing({ t }: { t: T }) {
+  const tt = <V,>(id: V, eng: V): V => t(id as ReactNode, eng as ReactNode) as V;
+  return (
+    <Section id="harga">
+      <Heading
+        eyebrow={t("Harga", "Pricing")}
+        title={t("Gratis untuk mulai. Pro untuk seluruh keluarga.", "Free to start. Pro for the whole family.")}
+        sub={t(
+          "Satu langganan per rumah tangga, jadi kamu dan pasangan sama-sama Pro. Bayar pakai QRIS, e-wallet atau virtual account.",
+          "One plan per household, so you and your partner both get Pro. Pay with QRIS, e-wallets or a virtual account.",
+        )}
+      />
+      <PricingPlans
+        t={tt}
+        action={() => (
+          <Link to="/pricing" className={buttonVariants({ className: "w-full" })}>
+            {t("Pilih Pro", "Choose Pro")} <ArrowRight aria-hidden />
+          </Link>
+        )}
+        freeAction={
+          <Link to="/login" className={buttonVariants({ variant: "secondary", className: "w-full" })}>
+            {t("Mulai gratis", "Start free")}
+          </Link>
+        }
+      />
+    </Section>
+  );
+}
+
 function Waitlist({ t }: { t: T }) {
   return (
     <Section id="waitlist">
@@ -370,10 +401,10 @@ function Faq({ t }: { t: T }) {
       ),
     ],
     [
-      t("Berapa harganya?", "How much will it cost?"),
+      t("Berapa harganya?", "How much does it cost?"),
       t(
-        "JoyoArto Pro nanti berbayar, murah, dalam rupiah. Yang gabung waitlist sekarang dapat harga founder. Kalau mau gratis, kodenya open source: silakan host sendiri.",
-        "JoyoArto Pro will be paid, cheap, in rupiah. People on the waitlist get a founder price. If you'd rather not pay, the code is open source: host it yourself.",
+        "Ada paket Free (catat manual, CSV, 2 import statement sebulan) dan Pro untuk seluruh rumah tangga, dalam rupiah, bayar per bulan atau per tahun. Rumah tangga yang beli lebih awal dapat harga founder. Kalau mau gratis sepenuhnya, kodenya open source: silakan host sendiri.",
+        "There is a Free plan (manual entries, CSV, 2 statement imports a month) and Pro for the whole household, in rupiah, paid monthly or yearly. Early households get a founder price. If you'd rather not pay at all, the code is open source: host it yourself.",
       ),
     ],
     [

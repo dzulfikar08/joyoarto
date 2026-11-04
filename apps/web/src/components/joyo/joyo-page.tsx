@@ -11,6 +11,7 @@ import { Sheet } from "@baroka/ui/components/sheet";
 import { Textarea } from "@baroka/ui/components/textarea";
 import { cn } from "@baroka/ui/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { ArrowDown, ArrowUp, History, KeyRound, MessageSquarePlus, Sparkles, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -272,6 +273,15 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
               <button type="button" className="font-semibold text-primary underline underline-offset-4" onClick={() => setKeyOpen(true)}>
                 use your own key
               </button>
+              {status.data?.plan === "free" && (
+                <>
+                  {" "}
+                  or{" "}
+                  <Link to="/pricing" className="font-semibold text-primary underline underline-offset-4">
+                    get more with Pro
+                  </Link>
+                </>
+              )}
               .
             </p>
           ) : (

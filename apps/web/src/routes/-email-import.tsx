@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Badge } from "@baroka/ui/components/badge";
 import { Button } from "@baroka/ui/components/button";
 
+import { ProNotice } from "@/components/upgrade";
 import { client, errorMessage, orpc } from "@/lib/orpc";
 
 const STATUS: Record<string, { label: string; tone: "positive" | "warning" | "destructive" | "muted" | "primary" }> = {
@@ -27,6 +28,8 @@ function describe(status: string, detail: Detail): string {
 export function EmailImportSettings() {
   const qc = useQueryClient();
   const status = useQuery(orpc.imports.email.get.queryOptions());
+  const billing = useQuery(orpc.billing.status.queryOptions());
+  const proOnly = billing.data ? !billing.data.limits.emailImport : false;
   const done = (message: string) => (data: unknown) => {
     qc.setQueryData(orpc.imports.email.get.queryKey(), data as typeof status.data);
     toast.success(message);
@@ -78,6 +81,8 @@ export function EmailImportSettings() {
             </Button>
           </div>
         </>
+      ) : s && proOnly ? (
+        <ProNotice feature="emailImport" />
       ) : s ? (
         <Button size="sm" disabled={regenerate.isPending} onClick={() => regenerate.mutate()}>
           {regenerate.isPending ? "Creating…" : "Get an import address"}

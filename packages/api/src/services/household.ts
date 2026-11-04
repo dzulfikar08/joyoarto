@@ -5,6 +5,7 @@ import { and, asc, count, eq, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Principal } from "../context";
+import type { BillingConfig } from "../lib/billing/config";
 import { setDefaultHousehold } from "../lib/household";
 import type { Role } from "../lib/members";
 import {
@@ -17,6 +18,7 @@ import {
   randomInviteToken,
   sha256Hex,
 } from "../lib/members";
+import { assertMemberSeat } from "./billing";
 import { badRequest, notFound } from "./common";
 
 const hm = schema.householdMember;
@@ -125,11 +127,17 @@ export const inviteInput = z.object({
  * Invites an email address to the active household. Returns the token once; the link is /join/<token>. Inviting an
  * address that already has a pending invite replaces it (the old link stops working).
  */
-export async function createInvite(db: Database, p: Principal, input: z.infer<typeof inviteInput>) {
+export async function createInvite(db: Database, p: Principal, input: z.infer<typeof inviteInput>, billing?: BillingConfig) {
   await requireOwner(db, p);
   const email = normalizeEmail(input.email);
   const current = await members(db, p.householdId);
   if (current.some((m) => m.email.toLowerCase() === email)) badRequest(`${email} is already a member of this household.`);
+  // Re-inviting an address replaces its pending invite, so it takes no new seat.
+  const [again] = await db
+    .select({ id: inv.id })
+    .from(inv)
+    .where(and(eq(inv.householdId, p.householdId), eq(inv.email, email), isNull(inv.acceptedAt), gt(inv.expiresAt, new Date())));
+  if (!again) await assertMemberSeat(db, p.householdId, billing, { countPending: true });
   const now = new Date();
   const [pending] = await db
     .select({ n: count() })
@@ -208,7 +216,7 @@ export async function previewInvite(db: Database, p: Principal, input: z.infer<t
  * Joins the invite's household and makes it the active one. The signed-in email must be the invited one. The
  * household the user leaves behind is deleted when it is an untouched personal one (see isDisposableHousehold).
  */
-export async function acceptInvite(db: Database, p: Principal, input: z.infer<typeof tokenInput>) {
+export async function acceptInvite(db: Database, p: Principal, input: z.infer<typeof tokenInput>, billing?: BillingConfig) {
   const { invite, householdName } = await findInvite(db, input.token);
   const status = inviteStatus(invite);
   if (status === "accepted") badRequest("This invite was already used.");
@@ -217,6 +225,9 @@ export async function acceptInvite(db: Database, p: Principal, input: z.infer<ty
   if (email !== invite.email) {
     forbidden(`This invite is for ${invite.email}, but you are signed in as ${email || "another account"}. Sign in with ${invite.email} to accept it.`);
   }
+
+  // The invite held a seat, but the household may have gone back to Free since.
+  if (!(await roleOf(db, invite.householdId, p.userId))) await assertMemberSeat(db, invite.householdId, billing, { countPending: false });
 
   // Claim it first, so a link opened twice cannot add a membership twice.
   const claimed = await db

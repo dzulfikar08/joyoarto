@@ -88,7 +88,7 @@ export const householdRouter = {
         summary: "Invite an email address (owner); the link is shown once",
       })
       .input(household.inviteInput)
-      .handler(({ context, input }) => household.createInvite(context.db, context.principal, input)),
+      .handler(({ context, input }) => household.createInvite(context.db, context.principal, input, context.billing)),
     revoke: writeProcedure
       .route({
         method: "DELETE",
@@ -115,6 +115,6 @@ export const householdRouter = {
         summary: "Join the invite's household and make it active",
       })
       .input(household.tokenInput)
-      .handler(({ context, input }) => household.acceptInvite(context.db, context.principal, input)),
+      .handler(({ context, input }) => household.acceptInvite(context.db, context.principal, input, context.billing)),
   },
 };

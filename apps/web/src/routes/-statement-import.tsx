@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Badge } from "@baroka/ui/components/badge";
 import { Button } from "@baroka/ui/components/button";
@@ -8,7 +8,8 @@ import { useEffect, useRef, useState } from "react";
 import type { DragEvent, ReactNode } from "react";
 import { toast } from "sonner";
 
-import { client, errorMessage } from "@/lib/orpc";
+import { openUpgrade } from "@/lib/billing";
+import { client, errorMessage, orpc } from "@/lib/orpc";
 import { commitOrder, crossMatches, mapLimit, periodLabel, textKey } from "@/lib/statement-batch";
 import type { StatementInfo } from "@/lib/statement-batch";
 import { takeSharedFiles } from "@/lib/shared-files";
@@ -76,6 +77,10 @@ export function StatementImport({ shared }: { shared?: string }) {
   const [dragging, setDragging] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sharedNote, setSharedNote] = useState<{ tone: "info" | "error"; text: string } | null>(null);
+  const billing = useQuery(orpc.billing.status.queryOptions());
+  const importUsage = billing.data?.usage.statementImports;
+  /** Statement imports left this month on Free; null = unlimited. */
+  const importsLeft = importUsage && importUsage.limit !== null ? Math.max(0, importUsage.limit - importUsage.used) : null;
   const input = useRef<HTMLInputElement>(null);
   // The latest items for async work that outlives a render.
   const itemsRef = useRef(items);
@@ -151,6 +156,11 @@ export function StatementImport({ shared }: { shared?: string }) {
   const save = async () => {
     const order = commitOrder(itemsRef.current.filter((x) => canSave(statusOf(x)) && x.info) as (Item & { info: StatementInfo })[]);
     if (!order.length) return;
+    // Free: a couple of statements a month, one batch at a time. The server counts too; this just asks first.
+    if (importsLeft !== null && order.length > importsLeft) {
+      openUpgrade(importsLeft === 0 ? "statementImports" : "bulkImport");
+      return;
+    }
     setSaving(true);
     let saved = 0;
     let failed = 0;
@@ -205,6 +215,15 @@ export function StatementImport({ shared }: { shared?: string }) {
           Add every month at once, Jago and GoPay mixed. Each Jago pocket becomes an account and every running balance is checked; the GoPay
           e-statements name the merchants behind “Gopay - Generic”. Statements already imported add nothing twice.
         </p>
+        {importsLeft !== null && importUsage && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Free plan: {importsLeft} of {importUsage.limit} statement imports left this month.{" "}
+            <Link to="/pricing" className="font-semibold text-primary underline">
+              Pro is unlimited
+            </Link>
+            .
+          </p>
+        )}
       </div>
 
       <div

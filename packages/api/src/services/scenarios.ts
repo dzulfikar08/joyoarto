@@ -7,9 +7,11 @@ import { alias } from "drizzle-orm/sqlite-core";
 import { z } from "zod";
 
 import type { Principal } from "../context";
+import type { BillingConfig } from "../lib/billing/config";
 import { chunk } from "../lib/d1";
 import { savedPlan } from "../lib/plan/schema";
 import type { SavedPlan } from "../lib/plan/schema";
+import { assertScenarioSlot } from "./billing";
 import { badRequest, notFound } from "./common";
 
 const ps = schema.planScenario;
@@ -101,7 +103,7 @@ export async function scenariosByIds(db: Database, p: Principal, ids: string[]) 
   return ids.map((id) => found.get(id)!);
 }
 
-export async function saveScenario(db: Database, p: Principal, input: z.infer<typeof saveScenarioInput>) {
+export async function saveScenario(db: Database, p: Principal, input: z.infer<typeof saveScenarioInput>, billing?: BillingConfig) {
   const view = input.view === undefined ? null : input.view;
   if (view !== null && JSON.stringify(view).length > MAX_VIEW_CHARS) badRequest("view is too large.");
   const scope = eq(ps.householdId, p.householdId);
@@ -122,6 +124,7 @@ export async function saveScenario(db: Database, p: Principal, input: z.infer<ty
     return { created: false, scenario: await getScenario(db, p, id) };
   }
   const count = (await db.select({ id: ps.id }).from(ps).where(scope).limit(MAX_SCENARIOS)).length;
+  await assertScenarioSlot(db, p.householdId, billing, count);
   if (count >= MAX_SCENARIOS) badRequest(`A household can keep at most ${MAX_SCENARIOS} saved scenarios; delete some first.`);
   const newId = crypto.randomUUID();
   await db.insert(ps).values({ id: newId, householdId: p.householdId, createdBy: p.userId, ...values });

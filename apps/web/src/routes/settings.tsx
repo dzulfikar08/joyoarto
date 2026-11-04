@@ -12,6 +12,9 @@ import { PageHeader, ThemeSwitch } from "@/components/kit";
 import { requireSession, signOut } from "@/lib/auth";
 import { SERVER_URL, client, errorMessage, orpc } from "@/lib/orpc";
 
+import { ProNotice } from "@/components/upgrade";
+
+import { BillingSettings } from "./-billing";
 import { DataPrivacySettings } from "./-data-privacy";
 import { EmailImportSettings } from "./-email-import";
 import { HouseholdSettings } from "./-household";
@@ -22,6 +25,7 @@ function Settings() {
   const qc = useQueryClient();
   const me = useQuery(orpc.me.queryOptions());
   const tokens = useQuery(orpc.tokens.list.queryOptions());
+  const billing = useQuery(orpc.billing.status.queryOptions());
   const [name, setName] = useState("");
   const [readOnly, setReadOnly] = useState(false);
   const create = useMutation({
@@ -61,6 +65,8 @@ function Settings() {
 
       <HouseholdSettings />
 
+      <BillingSettings />
+
       <EmailImportSettings />
 
       <section className="card flex flex-wrap items-center justify-between gap-3 text-sm">
@@ -73,6 +79,7 @@ function Settings() {
 
       <section className="card space-y-3 text-sm">
         <h2 className="text-base font-bold tracking-tight">Connect Claude</h2>
+        {billing.data && !billing.data.limits.mcpConnector && <ProNotice feature="mcpConnector" />}
         <p>
           <b>claude.ai / Claude Desktop:</b> Settings → Connectors → Add custom connector, URL <code className="rounded-md bg-muted px-1.5 py-0.5 text-xs break-all">{mcpUrl}</code>. You
           sign in and approve here.

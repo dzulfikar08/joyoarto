@@ -1,5 +1,7 @@
 import type { Database } from "@baroka/db";
 
+import type { BillingConfig } from "./lib/billing/config";
+
 export const SCOPES = ["finance:read", "finance:write"] as const;
 export type Scope = (typeof SCOPES)[number];
 
@@ -74,4 +76,6 @@ export type Context = {
   request?: RequestInfo;
   config?: ServerConfig;
   ai?: AiConfig;
+  /** JoyoArto Pro billing (apps/server/src/env.ts). Absent = no limits, every household gets Pro (tests, self-hosts). */
+  billing?: BillingConfig;
 };

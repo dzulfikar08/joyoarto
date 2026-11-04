@@ -2,6 +2,7 @@ import type { Context as ApiContext, Principal, Scope } from "@baroka/api/contex
 import { SCOPES } from "@baroka/api/context";
 import { ensureHousehold } from "@baroka/api/lib/household";
 import { pruneMcpAudit } from "@baroka/api/services/account";
+import { householdPlan } from "@baroka/api/services/billing";
 import { principalFromToken } from "@baroka/api/services/tokens";
 import { MCP_INSTRUCTIONS, toolCatalog, toolInput } from "@baroka/api/tools";
 import { MCP_DATA_SCOPES, MCP_PATH } from "@baroka/auth/mcp-scopes";
@@ -15,6 +16,7 @@ import { and, eq } from "drizzle-orm";
 import type { Context, Hono } from "hono";
 import { cors } from "hono/cors";
 
+import { billing } from "./billing";
 import { env } from "./env";
 import { getAuth, getDb } from "./services";
 
@@ -38,10 +40,14 @@ function describeError(error: unknown): string {
   return "JoyoArto had an internal error; try again in a moment.";
 }
 
-function createMcpServer(principal: Principal, clientId: string, waitUntil: (p: Promise<unknown>) => void): McpServer {
+/** What a Free household's connector answers to every tool call (tools stay listed, so Claude can explain it). */
+const UPGRADE_MESSAGE =
+  "The Claude connector is part of JoyoArto Pro, and this household is on the Free plan. Tell the user they can upgrade in JoyoArto (Settings → Billing, or /pricing); everything else in the app keeps working on Free.";
+
+function createMcpServer(principal: Principal, clientId: string, waitUntil: (p: Promise<unknown>) => void, connectorAllowed: boolean): McpServer {
   const server = new McpServer({ name: "joyoarto", title: "JoyoArto", version: "0.1.0" }, { instructions: MCP_INSTRUCTIONS });
   const db = getDb();
-  const context: ApiContext = { db, principal };
+  const context: ApiContext = { db, principal, billing };
 
   for (const def of toolCatalog()) {
     const input = toolInput(def);
@@ -80,6 +86,10 @@ function createMcpServer(principal: Principal, clientId: string, waitUntil: (p: 
               .then(() => (Math.random() < 0.02 ? pruneMcpAudit(db) : 0))
               .catch((e: unknown) => console.error("[mcp] audit failed", e)),
           );
+        if (!connectorAllowed) {
+          log("plan");
+          return failure(UPGRADE_MESSAGE);
+        }
         if (!principal.scopes.includes(def.scope)) {
           log("scope");
           return failure(`This connection lacks the "${def.scope}" permission. Reconnect JoyoArto and approve it.`);
@@ -205,7 +215,8 @@ export function registerMcpRoutes(app: Hono) {
     } catch {
       return c.json({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error." }, id: null }, 400);
     }
-    const server = createMcpServer(auth.principal, auth.clientId, waitUntilOf(c));
+    const { limits } = await householdPlan(getDb(), auth.principal.householdId, billing);
+    const server = createMcpServer(auth.principal, auth.clientId, waitUntilOf(c), limits.mcpConnector);
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     await server.connect(transport);
     const response = await transport.handleRequest(c.req.raw, { parsedBody: body });

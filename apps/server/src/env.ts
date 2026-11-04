@@ -1,8 +1,10 @@
+import type { BillingEnv } from "@baroka/api/lib/billing/config";
 import { env as workerEnv } from "cloudflare:workers";
 
 export type RateLimit = { limit(options: { key: string }): Promise<{ success: boolean }> };
 
-export type Env = {
+/** JoyoArto Pro billing vars and secrets are listed in BillingEnv (packages/api/src/lib/billing/config.ts). */
+export type Env = BillingEnv & {
   DB: D1Database;
   BETTER_AUTH_URL: string;
   BETTER_AUTH_SECRET: string;

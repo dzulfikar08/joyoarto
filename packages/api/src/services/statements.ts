@@ -9,11 +9,13 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Principal } from "../context";
+import type { BillingConfig } from "../lib/billing/config";
 import { chunk } from "../lib/d1";
 import { MAX_PDF_BYTES, pdfText } from "../lib/pdf/extract";
 import { classifyJago, cleanGopayName, describeJago, gopayCategory } from "../lib/statements/classify";
 import { isGopayStatement, parseGopay } from "../lib/statements/gopay";
 import { isJagoStatement, parseJago } from "../lib/statements/jago";
+import { assertStatementImport, countStatementImport } from "./billing";
 import { badRequest, categoriesById, money } from "./common";
 import { importTransactions } from "./imports";
 import type { ImportRow } from "./imports";
@@ -35,11 +37,11 @@ export const statementFileInput = z.object({
 });
 
 /** Reads the PDF like the web app does (same pdf.js, same lines), then imports it like importStatement. */
-export async function importStatementFile(db: Database, p: Principal, input: z.infer<typeof statementFileInput>) {
+export async function importStatementFile(db: Database, p: Principal, input: z.infer<typeof statementFileInput>, billing?: BillingConfig) {
   const read = await pdfText(new Uint8Array(await input.file.arrayBuffer()));
   if (!read.ok) throw new ORPCError("BAD_REQUEST", { message: read.message, data: { reason: read.reason } });
   const fileName = input.file.name?.slice(0, 200) || undefined;
-  return importStatement(db, p, { text: read.text, fileName, commit: input.commit }, { source: "pdf" });
+  return importStatement(db, p, { text: read.text, fileName, commit: input.commit }, { source: "pdf", billing });
 }
 
 type PocketResult = {
@@ -63,7 +65,7 @@ type PocketResult = {
 
 type Input = z.infer<typeof statementInput>;
 /** How the statement arrived, for the import log (import_batch.source): "pdf" (app, API upload) or "email". */
-type Options = { source?: "pdf" | "email" };
+type Options = { source?: "pdf" | "email"; billing?: BillingConfig };
 
 /** First and last transaction day in the statement. */
 function period(dates: string[]) {
@@ -73,9 +75,21 @@ function period(dates: string[]) {
 }
 
 export async function importStatement(db: Database, p: Principal, input: Input, options: Options = {}) {
-  if (isJagoStatement(input.text)) return importJago(db, p, input, options.source ?? "pdf");
-  if (isGopayStatement(input.text)) return importGopay(db, p, input, options.source ?? "pdf");
-  return badRequest("Not a statement JoyoArto can read yet (Bank Jago monthly statement, GoPay e-statement). Use CSV import, or ask Claude to read it.");
+  const jago = isJagoStatement(input.text);
+  if (!jago && !isGopayStatement(input.text)) {
+    return badRequest("Not a statement JoyoArto can read yet (Bank Jago monthly statement, GoPay e-statement). Use CSV import, or ask Claude to read it.");
+  }
+  // Free plan: a few statements a month (previews too, so the prompt comes before the work). Counted when rows are saved.
+  await assertStatementImport(db, p.householdId, options.billing);
+  const source = options.source ?? "pdf";
+  if (jago) {
+    const res = await importJago(db, p, input, source);
+    if (input.commit && res.totals.inserted > 0) await countStatementImport(db, p.householdId);
+    return res;
+  }
+  const res = await importGopay(db, p, input, source);
+  if (input.commit && (res.wallet.inserted > 0 || res.bankPaymentsNamed > 0)) await countStatementImport(db, p.householdId);
+  return res;
 }
 
 async function hintsFor(db: Database, householdId: string, refs: string[]) {

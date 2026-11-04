@@ -63,6 +63,10 @@ export const EXPORT_COVERAGE: Record<string, string> = {
   oauth_client_assertion: "not exported: unused, no personal data",
   jwks: "not exported: server signing keys",
   waitlist_signup: "not exported: not linked to accounts; deleted with the account when the email matches",
+  household_entitlement: "billing.entitlements (the household's Pro plan per payment provider)",
+  billing_order: "billing.orders (the household's orders: amount, provider, status, dates)",
+  billing_event: "not exported: ids of payment webhooks already processed, no personal data",
+  usage_counter: "billing.usage (statement imports per month)",
 };
 
 // ------------------------------------------------------------------------------------------------ export
@@ -275,6 +279,29 @@ export async function* exportJsonChunks(db: Database, p: Principal, now = new Da
   yield field("planScenarios", scenarios);
   yield field("emailImport", { enabled: emailImport.length > 0, since: emailImport[0]?.createdAt ?? null });
   yield field("inboundEmails", inbound);
+
+  const [entitlements, orders, usage] = await db.batch([
+    db.select().from(schema.householdEntitlement).where(eq(schema.householdEntitlement.householdId, h)),
+    db
+      .select({
+        id: schema.billingOrder.id,
+        provider: schema.billingOrder.provider,
+        interval: schema.billingOrder.interval,
+        months: schema.billingOrder.months,
+        amount: schema.billingOrder.amount,
+        currency: schema.billingOrder.currency,
+        priceTier: schema.billingOrder.priceTier,
+        status: schema.billingOrder.status,
+        isTest: schema.billingOrder.isTest,
+        periodEnd: schema.billingOrder.periodEnd,
+        createdAt: schema.billingOrder.createdAt,
+        paidAt: schema.billingOrder.paidAt,
+      })
+      .from(schema.billingOrder)
+      .where(eq(schema.billingOrder.householdId, h)),
+    db.select().from(schema.usageCounter).where(eq(schema.usageCounter.householdId, h)),
+  ]);
+  yield field("billing", { entitlements, orders, usage });
 
   const inv = schema.householdInvite;
   const [invites, apiTokens] = await db.batch([

@@ -12,9 +12,11 @@ import PostalMime from "postal-mime";
 import type { Attachment, RawEmail } from "postal-mime";
 
 import type { Principal } from "../context";
+import type { BillingConfig } from "../lib/billing/config";
 import { mailbox, senderAuth } from "../lib/mime";
 import type { SenderAuth } from "../lib/mime";
 import { MAX_PDF_BYTES, pdfText } from "../lib/pdf/extract";
+import { householdPlan, requireFeature } from "./billing";
 import { importStatement } from "./statements";
 
 const addr = schema.emailImportAddress;
@@ -68,8 +70,9 @@ export async function emailImportStatus(db: Database, p: Principal, domain: stri
 }
 
 /** Turns email import on, or gives the household a new address (the old one stops working at once). */
-export async function regenerateEmailImport(db: Database, p: Principal, domain: string | null) {
+export async function regenerateEmailImport(db: Database, p: Principal, domain: string | null, billing?: BillingConfig) {
   if (!domain) notConfigured();
+  await requireFeature(db, p.householdId, billing, "emailImport");
   const token = newImportToken();
   await db
     .insert(addr)
@@ -204,7 +207,11 @@ export function summaryText(files: FileResult[], skipped: number, appUrl: string
   return out.join("\n");
 }
 
-export async function receiveEmail(db: Database, msg: InboundMessage, config: { domain: string | null; appUrl?: string | null }): Promise<InboundOutcome> {
+export async function receiveEmail(
+  db: Database,
+  msg: InboundMessage,
+  config: { domain: string | null; appUrl?: string | null; billing?: BillingConfig },
+): Promise<InboundOutcome> {
   const token = config.domain ? tokenFromRecipient(msg.to, config.domain) : null;
   const [target] = token ? await db.select().from(addr).where(eq(addr.token, token)) : [];
   if (!target) return { action: "reject", reason: "Unknown address" };
@@ -248,6 +255,14 @@ export async function receiveEmail(db: Database, msg: InboundMessage, config: { 
   const automatic = email.headers.some((h) => h.key === "auto-submitted" && !/^no\b/i.test(h.value.trim())) || /mailer-daemon|postmaster/i.test(from);
   const reply = (status: InboundStatus, text: string): InboundOutcome =>
     automatic ? { action: "drop", status } : { action: "reply", status, subject: reSubject, text };
+
+  // Email import is a Pro feature: a household that went back to Free gets told instead of a silent bounce.
+  const { limits } = await householdPlan(db, householdId, config.billing);
+  if (!limits.emailImport) {
+    await logInbound(db, householdId, { fromAddress: from, userId: member.userId, subject, status: "failed", detail: { reason: "Email import needs JoyoArto Pro.", auth } });
+    const url = config.appUrl ? ` ${config.appUrl.replace(/\/$/, "")}/pricing` : "";
+    return reply("failed", `Nothing was imported: importing statements by email is part of JoyoArto Pro.\n\nUpgrade in Settings → Billing${url ? ` (${url.trim()})` : ""}, or upload the PDF in the app.`);
+  }
 
   if (!pdfs.length) {
     await logInbound(db, householdId, { fromAddress: from, userId: member.userId, subject, status: "no_pdf", detail: { attachments: email.attachments.length, auth } });

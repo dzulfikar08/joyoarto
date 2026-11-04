@@ -81,6 +81,12 @@ const sections: Section[] = [
             <li>
               <b>Waitlist</b> (kalau kamu daftar): email, nama panggilan, bank yang kamu centang, sumber dan bahasa, serta hash alamat IP (bukan IP-nya).
             </li>
+            <li>
+              <b>Langganan Pro</b> (per rumah tangga): paket, status dan tanggal berakhirnya; untuk tiap pembayaran: nomor order, jumlah, mata uang, cara bayar
+              (DOKU atau Polar), status, tanggal, dan siapa anggota yang memulainya; ID pelanggan dan langganan dari Polar; serta hitungan import statement per
+              bulan untuk batas paket Free. <b>Kami tidak pernah menerima atau menyimpan nomor kartu, data rekening atau PIN e-wallet-mu</b>: itu diisi di halaman
+              DOKU atau Polar.
+            </li>
           </UL>
           <P>
             <b>Yang tidak kami simpan:</b> PIN atau password bank ({N} tidak pernah login ke bank-mu), file PDF statement, teks statement, rekaman catatan
@@ -124,6 +130,11 @@ const sections: Section[] = [
             <li>
               <b>Waitlist</b> (if you join it): email, nickname, the banks you ticked, source and language, and a hash of your IP address (never the IP itself).
             </li>
+            <li>
+              <b>Pro subscription</b> (per household): the plan, its status and end date; for each payment: the order number, amount, currency, how it was paid (DOKU
+              or Polar), status, dates and which member started it; Polar's customer and subscription ids; and a monthly count of statement imports for the Free
+              plan's limit. <b>We never receive or store your card number, bank account details or e-wallet PIN</b>: you enter those on DOKU's or Polar's page.
+            </li>
           </UL>
           <P>
             <b>What we do not store:</b> bank PINs or passwords ({N} never logs in to your bank), statement PDF files, statement text, voice-note recordings or
@@ -164,6 +175,10 @@ const sections: Section[] = [
             <li>
               <b>Waitlist:</b> mengabari kamu sekali saat {N} Pro dibuka. Dasarnya: persetujuanmu.
             </li>
+            <li>
+              <b>Pembayaran Pro:</b> memproses pembayaran, memberi Pro ke rumah tangga yang membayar, dan menyimpan catatan transaksi. Dasarnya: pemenuhan
+              perjanjian, dan kewajiban hukum untuk menyimpan catatan pembukuan.
+            </li>
           </UL>
           <P>
             Data tidak dijual, tidak dipakai untuk iklan, dan tidak kami pakai untuk melatih model AI. Kami tidak membuat keputusan otomatis yang berakibat hukum
@@ -191,6 +206,10 @@ const sections: Section[] = [
             </li>
             <li>
               <b>Waitlist:</b> telling you once when {N} Pro opens. Basis: your consent.
+            </li>
+            <li>
+              <b>Pro payments:</b> processing payments, giving Pro to the household that paid, and keeping transaction records. Basis: performing our agreement, and
+              the legal obligation to keep bookkeeping records.
             </li>
           </UL>
           <P>
@@ -268,7 +287,17 @@ const sections: Section[] = [
             kamu dan Anthropic. Hal yang sama berlaku untuk aplikasi AI lain yang kamu sambungkan.
           </li>
           <li>
-            <b>Anggota rumah tangga</b> yang kamu undang bisa melihat dan mengubah data keuangan rumah tangga itu.
+            <b>DOKU (PT Nusa Satu Inti Artha)</b>, <b>hanya kalau kamu membayar Pro dalam rupiah</b>: memproses pembayaran QRIS, e-wallet dan virtual account.
+            Yang kami kirim: nomor order, jumlah, nama paket, serta nama dan email pembeli. Data pembayaranmu diisi langsung di halaman DOKU dan diproses menurut
+            kebijakan privasi DOKU.
+          </li>
+          <li>
+            <b>Polar Software, Inc.</b> (Amerika Serikat), <b>hanya kalau kamu membayar Pro dengan kartu dalam dolar AS</b>: merchant of record yang menagih kartumu,
+            menghitung pajak dan mengirim invoice. Yang kami kirim: ID rumah tangga (sebagai ID pelanggan), nama dan email pembeli, dan paket yang dipilih.
+          </li>
+          <li>
+            <b>Anggota rumah tangga</b> yang kamu undang bisa melihat dan mengubah data keuangan rumah tangga itu, serta melihat status langganan dan riwayat
+            pembayaran rumah tangga.
           </li>
         </UL>
       ),
@@ -302,7 +331,15 @@ const sections: Section[] = [
             other AI app you connect.
           </li>
           <li>
-            <b>Household members</b> you invite can see and change that household's finance data.
+            <b>DOKU (PT Nusa Satu Inti Artha)</b>, <b>only if you pay for Pro in rupiah</b>: processes QRIS, e-wallet and virtual account payments. What we send: the
+            order number, amount, plan name, and the buyer's name and email. You enter your payment details on DOKU's own page, under DOKU's privacy policy.
+          </li>
+          <li>
+            <b>Polar Software, Inc.</b> (United States), <b>only if you pay for Pro by card in US dollars</b>: the merchant of record that charges your card, handles
+            tax and sends invoices. What we send: the household id (as the customer id), the buyer's name and email, and the chosen plan.
+          </li>
+          <li>
+            <b>Household members</b> you invite can see and change that household's finance data, and see its subscription status and payment history.
           </li>
         </UL>
       ),
@@ -320,6 +357,10 @@ const sections: Section[] = [
           <li>Percakapan Joyo AI: sampai kamu menghapusnya (paling banyak 50 percakapan terbaru per rumah tangga; yang lebih lama terhapus otomatis), atau bersama akun/rumah tangga.</li>
           <li>Catatan pemakaian AI: selama akunmu aktif.</li>
           <li>Sesi masuk: sampai kedaluwarsa atau kamu keluar.</li>
+          <li>
+            Catatan pembayaran (nomor order, jumlah, tanggal, status): 10 tahun, sesuai kewajiban penyimpanan dokumen pajak, juga setelah rumah tangga atau akun
+            dihapus (tanpa tautan ke rumah tangga atau akunmu lagi). Status langganan dan hitungan import ikut terhapus bersama rumah tangga.
+          </li>
           <li>Token API yang sudah dicabut: datanya (bukan token-nya) tetap tercatat sampai akunmu dihapus, supaya kamu bisa melihat riwayatnya.</li>
           <li>Waitlist: sampai kami mengabari peluncuran, atau lebih cepat kalau kamu minta dihapus (atau saat akunmu dengan email yang sama dihapus).</li>
         </UL>
@@ -332,6 +373,10 @@ const sections: Section[] = [
           <li>Joyo AI conversations: until you delete them (at most the 50 newest per household; older ones are deleted automatically), or with your account or household.</li>
           <li>AI usage records: while your account is active.</li>
           <li>Sign-in sessions: until they expire or you sign out.</li>
+          <li>
+            Payment records (order number, amount, dates, status): 10 years, as tax law requires, also after the household or account is deleted (no longer linked
+            to the household or your account). The subscription status and import counts go with the household.
+          </li>
           <li>Revoked API tokens: their details (never the token) stay until your account is deleted, so you can see the history.</li>
           <li>Waitlist: until we announce the launch, or sooner if you ask (or when your account with the same email is deleted).</li>
         </UL>

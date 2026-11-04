@@ -23,14 +23,18 @@ const sections: Section[] = [
     body: {
       id: (
         <P>
-          {N} di {SITE_URL} adalah catatan keuangan pribadi dan keluarga, dijalankan oleh {CONTROLLER.name} ({CONTROLLER.trade}). Saat ini layanannya masih tahap
-          awal, khusus undangan dan gratis; fitur bisa berubah. Kalau nanti ada versi berbayar, kami beri tahu dulu dan kamu bebas memilih.
+          {N} di {SITE_URL} adalah catatan keuangan pribadi dan keluarga, dijalankan oleh {CONTROLLER.name} ({CONTROLLER.trade}). Ada paket Free dan paket Pro
+          berbayar (lihat <Link to="/pricing" className="underline">harga</Link>); layanannya masih tahap awal dan fitur bisa berubah. Kode {N} open source (AGPL):
+          kamu boleh menjalankannya sendiri secara gratis.
         </P>
       ),
       en: (
         <P>
-          {N} at {SITE_URL} is a personal and family finance ledger run by {CONTROLLER.name} ({CONTROLLER.trade}). It is an early, invite-only service, free for now;
-          features may change. If a paid version comes, we will tell you first and you are free to choose.
+          {N} at {SITE_URL} is a personal and family finance ledger run by {CONTROLLER.name} ({CONTROLLER.trade}). There is a Free plan and a paid Pro plan (see{" "}
+          <Link to="/pricing" className="underline">
+            pricing
+          </Link>
+          ); the service is still early and features may change. {N}'s code is open source (AGPL): you may run it yourself for free.
         </P>
       ),
     },
@@ -51,6 +55,64 @@ const sections: Section[] = [
           <li>You sign in with your Google account and are responsible for keeping it safe, including the API tokens you create.</li>
           <li>Members you invite to a household can see and change its data. Invite only people you trust.</li>
           <li>Make sure you are entitled to the data you import, including data about other family members.</li>
+        </UL>
+      ),
+    },
+  },
+  {
+    id: "pro",
+    title: { id: "Paket Pro, pembayaran dan pengembalian dana", en: "Pro, payments and refunds" },
+    body: {
+      id: (
+        <UL>
+          <li>
+            Pro dibeli untuk satu rumah tangga: semua anggotanya ikut Pro selama masa aktifnya. Isi dan batas tiap paket ada di halaman harga dan bisa berubah;
+            perubahan yang merugikan berlaku mulai periode berikutnya, tidak di tengah periode yang sudah dibayar.
+          </li>
+          <li>
+            <b>Rupiah (DOKU: QRIS, e-wallet, virtual account):</b> prabayar per bulan atau per tahun dan tidak diperpanjang otomatis. Bulan yang dibayar ditambahkan
+            setelah masa Pro yang masih ada (termasuk masa coba).
+          </li>
+          <li>
+            <b>Kartu dalam dolar AS (Polar):</b> langganan yang diperpanjang otomatis tiap periode sampai kamu batalkan di portal langganan (Pengaturan → Langganan).
+            Setelah dibatalkan, Pro tetap aktif sampai akhir periode yang sudah dibayar. Polar adalah merchant of record untuk pembayaran ini.
+          </li>
+          <li>
+            <b>Pengembalian dana:</b> kalau kamu nggak puas, minta lewat {mail} dalam 7 hari setelah pembayaran pertama sebuah paket dan kami kembalikan penuh.
+            Setelah itu, pembayaran yang sudah berjalan tidak dikembalikan, kecuali layanan tidak bisa dipakai karena kesalahan kami atau diwajibkan hukum. Dana
+            kembali lewat cara bayar yang sama; masa Pro dari pembayaran itu ikut berakhir.
+          </li>
+          <li>
+            Kalau Pro berakhir, rumah tangga kembali ke Free. Tidak ada data yang dihapus: semua transaksi dan skenario tersimpan tetap bisa dilihat, hanya fitur Pro
+            dan batas Free yang berlaku lagi.
+          </li>
+          <li>Harga sudah termasuk pajak yang berlaku, kecuali disebutkan lain di halaman pembayaran.</li>
+        </UL>
+      ),
+      en: (
+        <UL>
+          <li>
+            Pro is bought for one household: all its members get Pro while it lasts. What each plan includes and its limits are on the pricing page and may change;
+            changes for the worse apply from the next period, never in the middle of one you paid for.
+          </li>
+          <li>
+            <b>Rupiah (DOKU: QRIS, e-wallets, virtual accounts):</b> prepaid per month or per year and never renewed automatically. Paid months are added after any Pro
+            time you still have (including a trial).
+          </li>
+          <li>
+            <b>Card in US dollars (Polar):</b> a subscription that renews each period until you cancel it in the subscription portal (Settings → Billing). After you
+            cancel, Pro stays on until the end of the period you paid for. Polar is the merchant of record for these payments.
+          </li>
+          <li>
+            <b>Refunds:</b> if you are not happy, ask at {mail} within 7 days of a plan's first payment and we refund it in full. After that, payments are not
+            refunded, unless the service could not be used through our fault or the law requires it. Money goes back the way it was paid, and the Pro time it bought
+            ends.
+          </li>
+          <li>
+            When Pro ends, the household goes back to Free. Nothing is deleted: every transaction and saved scenario stays readable; only the Pro features stop and
+            the Free limits apply again.
+          </li>
+          <li>Prices include applicable taxes unless the payment page says otherwise.</li>
         </UL>
       ),
     },

@@ -112,6 +112,9 @@ async function seedEverything(p: Principal) {
   await db.insert(schema.account).values({ id: crypto.randomUUID(), accountId: "google-1", providerId: "google", userId: p.userId, accessToken: "secret-google-token", updatedAt: new Date() });
   await db.insert(schema.emailImportAddress).values({ householdId: p.householdId, token: "secretimportaddresstokenxx", createdBy: p.userId });
   await db.insert(schema.inboundEmail).values({ id: crypto.randomUUID(), householdId: p.householdId, fromAddress: "a@b.com", userId: p.userId, subject: "Statement", status: "no_pdf", detail: {} });
+  await db.insert(schema.householdEntitlement).values({ householdId: p.householdId, provider: "doku", status: "active", interval: "monthly", periodEnd: new Date(Date.now() + 86_400_000) });
+  await db.insert(schema.billingOrder).values({ id: "ART-261104000000-abcdef12", householdId: p.householdId, userId: p.userId, provider: "doku", interval: "monthly", months: 1, amount: 2_900_000, currency: "IDR", status: "paid" });
+  await db.insert(schema.usageCounter).values({ householdId: p.householdId, metric: "statement_import", period: "2026-11", count: 1 });
   await oauthConnection(p.userId);
   return { accountId, ids };
 }

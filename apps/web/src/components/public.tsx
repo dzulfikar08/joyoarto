@@ -32,6 +32,9 @@ export function PublicHeader() {
         <Link to="/demo" className={NAV_LINK}>
           Demo
         </Link>
+        <a href="/#harga" className={NAV_LINK}>
+          {en ? "Pricing" : "Harga"}
+        </a>
         <a href="/#faq" className={NAV_LINK}>
           FAQ
         </a>
@@ -80,6 +83,9 @@ export function PublicFooter() {
         <div className="flex flex-wrap gap-x-4 gap-y-1 sm:ml-auto">
           <Link to="/demo" className="hover:underline">
             Demo
+          </Link>
+          <Link to="/pricing" className="hover:underline">
+            {en ? "Pricing" : "Harga"}
           </Link>
           <Link to="/privasi" className="hover:underline">
             {en ? "Privacy" : "Privasi"}

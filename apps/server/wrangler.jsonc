@@ -59,8 +59,39 @@
     "JOYO_AI_DAILY_CAP": "30",
     // No ANTHROPIC_API_KEY set: Joyo AI chat and capture parsing run on this Workers AI model (voice uses Whisper).
     "JOYO_WORKERS_AI_MODEL": "@cf/google/gemma-4-26b-a4b-it",
-    "JOYO_CAPTURE_DAILY_CAP": "60"
+    "JOYO_CAPTURE_DAILY_CAP": "60",
     // Optional: "ANTHROPIC_BASE_URL": "https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/anthropic"
+
+    // JoyoArto Pro (packages/api/src/lib/billing). Free limits apply only with PAYWALL=1 AND a payment gateway's
+    // secrets set (DOKU and/or Polar); until then every household stays Pro. Limits themselves: lib/billing/plans.ts.
+    "PAYWALL": "1",
+    // PLACEHOLDER PRICES, whole rupiah: the owner must confirm them before launch.
+    "PRO_MONTHLY_IDR": "29000",
+    "PRO_YEARLY_IDR": "290000",
+    // Founder price for the first PRO_FOUNDER_SLOTS paying households, kept on renewal (placeholder). Remove both to end it.
+    "PRO_FOUNDER_MONTHLY_IDR": "19000",
+    "PRO_FOUNDER_YEARLY_IDR": "190000",
+    "PRO_FOUNDER_SLOTS": "100",
+    // New households: days of Pro to try it.
+    "PRO_TRIAL_DAYS": "14",
+    // Households that existed before billing launched keep Pro until this day (WIB). Paid months start after it.
+    "PRO_GRANDFATHER_CREATED_BEFORE": "2026-11-05",
+    "PRO_GRANDFATHER_UNTIL": "2027-02-01",
+    // PRO_EMAILS (households with one of these members are always Pro; ADMIN_EMAILS count too) is passed by deploy.yml
+    // with --var from the production environment's variables, like ALLOWED_EMAILS, so it is not in the public repo.
+    // DOKU Checkout (IDR): "sandbox" (api-sandbox.doku.com) until the owner switches to "production".
+    "DOKU_ENV": "sandbox",
+    // Polar (USD cards): "sandbox" until switched to "production". Product ids from the Polar dashboard; display prices
+    // in cents must equal the products' prices (placeholders).
+    "POLAR_SERVER": "sandbox",
+    "POLAR_PRODUCT_MONTHLY_ID": "",
+    "POLAR_PRODUCT_YEARLY_ID": "",
+    "POLAR_PRICE_MONTHLY_USD_CENTS": "299",
+    "POLAR_PRICE_YEARLY_USD_CENTS": "2900"
   }
-  // Secrets (wrangler secret put): BETTER_AUTH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, ANTHROPIC_API_KEY.
+  // Secrets (wrangler secret put): BETTER_AUTH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, ANTHROPIC_API_KEY,
+  // DOKU_CLIENT_ID, DOKU_SECRET_KEY, POLAR_ACCESS_TOKEN, POLAR_WEBHOOK_SECRET.
+  // Payment webhooks (under /api, so run_worker_first already covers them):
+  //   DOKU  https://app.arto.joyorogo.com/api/billing/doku/webhook   (also sent per order as override_notification_url)
+  //   Polar https://app.arto.joyorogo.com/api/billing/polar/webhook  (events: order.paid, order.refunded, subscription.*)
 }

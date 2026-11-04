@@ -31,4 +31,7 @@ the Atur project **BRK** (workspace `joyodigitama`).
    - Later: release keystore secrets; OAuth sign-in (needs a `joyoarto://` redirect, and REST must accept OAuth access tokens).
 3. **README rewrite with screenshots:** take them from production using a demo household (never the owner's real data). Cover the phone and desktop dashboard, transactions, import, plan, Joyo AI and the Claude connector.
 4. **Uncategorized transactions (about 29):** ask the owner about the remaining merchants and personal transfers (see `search_transactions uncategorized=true` in the live ledger; never list counterparties in the repo).
-5. **Backlog in Atur:** BCA PDF parser (waiting on a sample), Plan upgrade-path UX, shorter share links, BCA CSV check against a real export, Cloudflare WAF skip for /api and /mcp, audit pruning cron, own Google OAuth brand, Pro/pricing, open-source release.
+5. **Backlog in Atur:** BCA PDF parser (waiting on a sample), Plan upgrade-path UX, shorter share links, BCA CSV check against a real export, Cloudflare WAF skip for /api and /mcp, audit pruning cron, own Google OAuth brand.
+6. **Pro billing (built, not live):** README "JoyoArto Pro". Before launch: confirm prices, founder offer, grandfather date
+   and refund policy (wrangler vars, `/syarat`); set the DOKU (sandbox first) and Polar secrets and webhook URLs; switch
+   `DOKU_ENV`/`POLAR_SERVER` to `production`. Limits stay off until a gateway's secrets exist.

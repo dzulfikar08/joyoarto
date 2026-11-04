@@ -7,6 +7,7 @@ import { authedProcedure, readProcedure, sessionProcedure, writeProcedure } from
 import * as account from "../services/account";
 import * as accounts from "../services/accounts";
 import * as dashboard from "../services/dashboard";
+import { billingRouter } from "./billing";
 import { householdRouter } from "./household";
 import { captureRouter, joyoRouter } from "./joyo";
 import { resolveCategory } from "../services/common";
@@ -181,7 +182,7 @@ export const appRouter = {
       save: writeProcedure
         .route({ method: "PUT", path: "/plan/scenarios", tags: ["plan"], summary: "Save a scenario: by id, else replace the one with the same name, else create" })
         .input(scenarios.saveScenarioInput)
-        .handler(({ context, input }) => scenarios.saveScenario(context.db, context.principal, input)),
+        .handler(({ context, input }) => scenarios.saveScenario(context.db, context.principal, input, context.billing)),
       delete: writeProcedure
         .route({ method: "DELETE", path: "/plan/scenarios/{id}", tags: ["plan"] })
         .input(scenarios.scenarioIdInput)
@@ -201,7 +202,7 @@ export const appRouter = {
     statement: writeProcedure
       .route({ method: "POST", path: "/imports/statement", tags: ["imports"], summary: "Import a Bank Jago or GoPay statement from its PDF text (preview, then commit)" })
       .input(statements.statementInput)
-      .handler(({ context, input }) => statements.importStatement(context.db, context.principal, input)),
+      .handler(({ context, input }) => statements.importStatement(context.db, context.principal, input, { billing: context.billing })),
     statementFile: writeProcedure
       .route({
         method: "POST",
@@ -212,14 +213,14 @@ export const appRouter = {
           "Reads the PDF on the server the way the web app does and returns the same result as POST /imports/statement. Password-protected PDFs are refused with 400 and data.reason \"encrypted\".",
       })
       .input(statements.statementFileInput)
-      .handler(({ context, input }) => statements.importStatementFile(context.db, context.principal, input)),
+      .handler(({ context, input }) => statements.importStatementFile(context.db, context.principal, input, context.billing)),
     email: {
       get: sessionOnly
         .route({ method: "GET", path: "/imports/email", tags: ["imports"], summary: "The household's import email address and the last emails it received" })
         .handler(({ context }) => inbound.emailImportStatus(context.db, context.principal, context.config?.importEmailDomain ?? null)),
       regenerate: sessionOnly
         .route({ method: "POST", path: "/imports/email", tags: ["imports"], summary: "Turn on email import, or replace the address (the old one stops working)" })
-        .handler(({ context }) => inbound.regenerateEmailImport(context.db, context.principal, context.config?.importEmailDomain ?? null)),
+        .handler(({ context }) => inbound.regenerateEmailImport(context.db, context.principal, context.config?.importEmailDomain ?? null, context.billing)),
       disable: sessionOnly
         .route({ method: "DELETE", path: "/imports/email", tags: ["imports"], summary: "Turn off email import" })
         .handler(({ context }) => inbound.disableEmailImport(context.db, context.principal, context.config?.importEmailDomain ?? null)),
@@ -295,6 +296,9 @@ export const appRouter = {
   },
 
   household: householdRouter,
+
+  /** JoyoArto Pro for the household: prices, plan and usage, checkout (DOKU, Polar), orders. */
+  billing: billingRouter,
 
   /** Joyo AI, the in-app finance chat (tools: src/tools.ts entries marked `chat`). */
   joyo: joyoRouter,

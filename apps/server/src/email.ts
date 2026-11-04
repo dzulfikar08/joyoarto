@@ -1,5 +1,6 @@
 import { receiveEmail } from "@baroka/api/services/inbound";
 
+import { billing } from "./billing";
 import { env } from "./env";
 import { getDb } from "./services";
 
@@ -19,7 +20,7 @@ export async function handleEmail(message: ForwardableEmailMessage): Promise<voi
   }
   let outcome: Awaited<ReturnType<typeof receiveEmail>>;
   try {
-    outcome = await receiveEmail(getDb(), { from: message.from, to: message.to, raw: message.raw }, { domain, appUrl: env.APP_URL ?? null });
+    outcome = await receiveEmail(getDb(), { from: message.from, to: message.to, raw: message.raw }, { domain, appUrl: env.APP_URL ?? null, billing });
   } catch (error) {
     console.error("email import failed", error);
     message.setReject("JoyoArto could not process this email. Upload the PDF in the app instead.");
