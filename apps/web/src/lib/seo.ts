@@ -29,15 +29,15 @@ const card = (c: OgCard) => c;
  * Bump when the cards change (scripts/og.ts): WhatsApp, Telegram, X and Facebook cache share images by URL for days,
  * so a new ?v= makes them fetch the new picture.
  */
-export const OG_VERSION = "20261104b";
+export const OG_VERSION = "20261105";
 /** Absolute-path URL of a share card, versioned for scraper caches. */
 export const ogPath = (c: Pick<OgCard, "file">) => `/${c.file}?v=${OG_VERSION}`;
 export const OG = {
   home: card({
     file: "og/home.png",
-    title: ["Catat keuangan keluarga.", "Tanpa ada yang nyadap."],
-    sub: "e-statement Bank Jago & GoPay, setiap saldo dicek sampai cocok. Open source.",
-    alt: "JoyoArto: Catat keuangan keluarga. Tanpa ada yang nyadap. e-statement Bank Jago & GoPay, setiap saldo dicek sampai cocok.",
+    title: ["Mampu nggak beli mobil?", "Lihat dulu angkanya."],
+    sub: "Dihitung dari e-statement Jago & GoPay-mu: dana darurat, porsi cicilan, sisa tiap bulan.",
+    alt: "JoyoArto: Mampu nggak beli mobil? Lihat dulu angkanya, dihitung dari e-statement Jago & GoPay-mu.",
   }),
   demo: card({
     file: "og/demo.png",
@@ -63,9 +63,9 @@ export const OG = {
   /** public/og.png: the fallback for any page without its own card (same picture as home). */
   default: card({
     file: "og.png",
-    title: ["Catat keuangan keluarga.", "Tanpa ada yang nyadap."],
-    sub: "e-statement Bank Jago & GoPay, setiap saldo dicek sampai cocok. Open source.",
-    alt: "JoyoArto: Catat keuangan keluarga. Tanpa ada yang nyadap.",
+    title: ["Mampu nggak beli mobil?", "Lihat dulu angkanya."],
+    sub: "Dihitung dari e-statement Jago & GoPay-mu: dana darurat, porsi cicilan, sisa tiap bulan.",
+    alt: "JoyoArto: Mampu nggak beli mobil? Lihat dulu angkanya.",
   }),
 } satisfies Record<string, OgCard>;
 export const OG_CARDS: OgCard[] = Object.values(OG);
@@ -135,12 +135,12 @@ export const PAGES: PublicPage[] = [
     path: "/",
     file: "index.html",
     sources: ["src/routes/-landing.tsx", "src/routes/index.tsx"],
-    title: "JoyoArto: Catat Keuangan Keluarga dari e-Statement Jago & GoPay",
+    title: "JoyoArto: Mampu Nggak Beli Mobil? Cek dari e-Statement Jago & GoPay",
     description:
-      "Aplikasi keuangan keluarga open source. Upload e-statement Bank Jago & GoPay, setiap saldo dicek sampai cocok. Atur anggaran rumah tangga bareng pasangan.",
+      "Cicilan di brosur selalu kelihatan ringan. JoyoArto baca e-statement Jago & GoPay-mu, hitung uang masuk dan keluar tiap bulan, lalu uji cicilannya.",
     social: {
-      title: "Catat keuangan keluarga. Tanpa ada yang nyadap.",
-      description: "Upload e-statement Bank Jago & GoPay, setiap saldo dicek sampai cocok. Kodenya terbuka, datamu nggak dijual. Coba demonya tanpa akun.",
+      title: "Mampu nggak beli mobil? Lihat dulu angkanya.",
+      description: "JoyoArto baca e-statement Jago & GoPay-mu, lalu uji cicilannya: dana darurat masih 6 bulan, total cicilan di bawah 30% penghasilan. Coba demonya tanpa akun.",
     },
     og: OG.home,
     priority: 1,
@@ -346,14 +346,20 @@ function homeBody(): string {
     ["Open source (AGPL)", "Kodenya terbuka. Mau host sendiri boleh; mau praktis, pakai Joyo Pro yang kami jalankan."],
   ];
   return wrap(
-    `<h1>Catat keuangan keluarga. Tanpa ada yang nyadap.</h1>` +
-      `<p>Kodenya terbuka, jadi siapa pun bisa periksa ke mana datamu pergi. Nggak dijual, nggak dipakai buat iklan. Upload e-statement Bank Jago dan GoPay, JoyoArto cek setiap saldo sampai cocok, lalu tinggal tanya: “bulan ini kita habis berapa buat makan di luar?”</p>` +
+    `<h1>Mampu nggak beli mobil? Lihat dulu angkanya.</h1>` +
+      `<p>Cicilan di brosur dealer selalu kelihatan ringan. JoyoArto baca e-statement Jago dan GoPay-mu, hitung berapa yang benar-benar masuk dan keluar tiap bulan, lalu uji cicilannya: dana darurat masih cukup 6 bulan atau nggak, total cicilan masih di bawah 30% penghasilan atau nggak.</p>` +
       `<p><a href="/demo">Coba demo, tanpa akun</a> · <a href="/#waitlist">Gabung waitlist</a> · <a href="/#${ANDROID_SECTION_ID}">Jadi tester Android</a></p>` +
+      `<p>Simulasinya hitungan dari transaksimu sendiri, bukan nasihat keuangan.</p>` +
+      `<section id="kenapa"><h2>Nyatat pengeluaran itu membosankan kalau nggak ada tujuannya.</h2>` +
+      `<p>Tujuannya biasanya datang sendiri: mau beli mobil, anak mau lahir, kontrak rumah mau habis. Saat itu kamu butuh rata-rata pengeluaran dari bulan-bulan yang sudah lewat, bukan perkiraan. JoyoArto mengumpulkannya dari statement, jadi kamu nggak perlu mengetik tiap transaksi.</p><ul>` +
+      `<li>Cicilan mobil 4 juta sebulan, masih aman?</li><li>Anak pertama lahir tahun depan, tabungan masih jalan?</li>` +
+      `<li>Pindah ke kontrakan yang lebih besar, sisa berapa tiap bulan?</li><li>Cicilan dan paylater sekarang sudah makan berapa persen gaji?</li></ul></section>` +
       `<section id="cara-kerja"><h2>Cara kerjanya: tiga langkah, sebulan sekali</h2><ol>` +
       `<li><strong>Upload statement.</strong> Download e-statement Bank Jago dan GoPay (PDF) dari aplikasinya, lalu taruh di JoyoArto. Bank lain bisa lewat CSV.</li>` +
       `<li><strong>Dicek sampai cocok.</strong> Setiap saldo berjalan dan total per pocket dihitung ulang. Upload ulang pun aman, nggak dobel.</li>` +
       `<li><strong>Tanya Claude, bikin rencana.</strong> Tanya pakai bahasa sehari-hari, atau simulasikan cicilan mobil, biaya bayi, pindah rumah.</li></ol></section>` +
       `<section id="fitur"><h2>Fitur</h2>${features.map(([t, b]) => `<h3>${esc(t)}</h3><p>${esc(b)}</p>`).join("")}</section>` +
+      `<section id="privasi"><h2>Uang itu urusan pribadi. Kami anggap begitu juga.</h2><p>Kodenya terbuka, jadi siapa pun bisa periksa ke mana datamu pergi. Nggak dijual, nggak dipakai buat iklan.</p></section>` +
       `<section id="${ANDROID_SECTION_ID}"><h2>Jadi tester aplikasi Android JoyoArto</h2>` +
       `<p>Aplikasinya sudah di Google Play, masih tahap uji. Dua langkah untuk memasangnya:</p><ol>` +
       `<li><strong>Gabung grup tester.</strong> Siapa pun bisa gabung di <a href="${ANDROID_TESTERS_GROUP_URL}">Google Groups: joyoarto-testers</a> (${esc(ANDROID_TESTERS_GROUP_EMAIL)}), pakai akun Google yang sama dengan di HP-mu.</li>` +

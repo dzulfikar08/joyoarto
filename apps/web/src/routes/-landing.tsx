@@ -23,10 +23,11 @@ export function Landing() {
       <PublicHeader />
       <main>
         <Hero t={t} />
+        <WhyTrack t={t} />
         <HowItWorks t={t} />
         <Features t={t} />
-        <AndroidTesters t={t} />
         <Privacy t={t} />
+        <AndroidTesters t={t} />
         <Pricing t={t} />
         <Waitlist t={t} />
         <Faq t={t} />
@@ -64,13 +65,13 @@ function Hero({ t }: { t: T }) {
       <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[1.1fr_1fr]">
         <div>
           <h1 className="text-[2.5rem] leading-[1.05] font-extrabold tracking-tight text-balance sm:text-6xl">
-            {t("Catat keuangan keluarga.", "Track your family's money.")}{" "}
-            <span className="text-primary">{t("Tanpa ada yang nyadap.", "Nobody listening in.")}</span>
+            {t("Mampu nggak beli mobil?", "Can we afford the car?")}{" "}
+            <span className="text-primary">{t("Lihat dulu angkanya.", "Check the numbers first.")}</span>
           </h1>
           <p className="mt-4 max-w-xl text-lg text-muted-foreground text-pretty">
             {t(
-              "Kodenya terbuka, jadi siapa pun bisa periksa ke mana datamu pergi. Nggak dijual, nggak dipakai buat iklan. Upload e-statement, JoyoArto cek setiap saldo sampai cocok, lalu tinggal tanya: “bulan ini kita habis berapa buat makan di luar?”",
-              "The code is open, so anyone can check where your data goes. Never sold, never used for ads. Upload your statements, JoyoArto checks every balance until it adds up, then just ask: “how much did we spend eating out this month?”",
+              "Cicilan di brosur dealer selalu kelihatan ringan. JoyoArto baca e-statement Jago dan GoPay-mu, hitung berapa yang benar-benar masuk dan keluar tiap bulan, lalu uji cicilannya: dana darurat masih cukup 6 bulan atau nggak, total cicilan masih di bawah 30% penghasilan atau nggak.",
+              "The installment on the dealer's brochure always looks small. JoyoArto reads your Jago and GoPay statements, works out what really comes in and goes out each month, then tests the loan: is your emergency fund still 6 months, are all installments still under 30% of income?",
             )}
           </p>
           <div className="mt-7 flex flex-col gap-2.5 sm:flex-row">
@@ -84,7 +85,10 @@ function Hero({ t }: { t: T }) {
               <Smartphone aria-hidden /> {t("Jadi tester Android", "Test the Android app")}
             </a>
           </div>
-          <p className="mt-3 text-sm text-muted-foreground">
+          <p className="mt-3 text-xs text-muted-foreground">
+            {t("Simulasinya hitungan dari transaksimu sendiri, bukan nasihat keuangan.", "The simulation is arithmetic on your own transactions, not financial advice.")}
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
             {t("Demo-nya jalan di browser kamu. Statement nggak diunggah ke mana-mana.", "The demo runs in your browser. Your statement is not uploaded anywhere.")}
             {REPO_URL && (
               <>
@@ -141,6 +145,43 @@ function HeroVisual({ t }: { t: T }) {
         <p className="mt-0.5">{t("“Kalau ambil mobil Rp 300 jt, tabungan buat si kecil aman nggak?”", "“If we buy a Rp 300m car, is the baby fund still safe?”")}</p>
       </div>
     </div>
+  );
+}
+
+/** Why anyone tracks spending: a decision that needs real averages. The questions are examples, not features. */
+function WhyTrack({ t }: { t: T }) {
+  const questions = [
+    t("Cicilan mobil 4 juta sebulan, masih aman?", "A Rp 4 juta monthly car installment: still safe?"),
+    t("Anak pertama lahir tahun depan, tabungan masih jalan?", "First baby next year: can we keep saving?"),
+    t("Pindah ke kontrakan yang lebih besar, sisa berapa tiap bulan?", "A bigger rental: what's left each month?"),
+    t("Cicilan dan paylater sekarang sudah makan berapa persen gaji?", "How much of my salary do installments and paylater already take?"),
+  ];
+  return (
+    <Section id="kenapa" className="pt-4 sm:pt-6">
+      <div className="grid gap-8 lg:grid-cols-[1.1fr_1fr] lg:items-start">
+        <div className="max-w-2xl">
+          <h2 className="text-[1.75rem] leading-tight font-extrabold tracking-tight text-balance sm:text-4xl">
+            {t("Nyatat pengeluaran itu membosankan kalau nggak ada tujuannya.", "Tracking spending is boring when it isn't for anything.")}
+          </h2>
+          <p className="mt-3 text-pretty text-muted-foreground">
+            {t(
+              "Tujuannya biasanya datang sendiri: mau beli mobil, anak mau lahir, kontrak rumah mau habis. Saat itu kamu butuh rata-rata pengeluaran dari bulan-bulan yang sudah lewat, bukan perkiraan. JoyoArto mengumpulkannya dari statement, jadi kamu nggak perlu mengetik tiap transaksi.",
+              "The reason usually shows up on its own: a car, a baby, a lease running out. Then you need your average spending from past months, not a guess. JoyoArto builds it from your statements, so you don't type in every purchase.",
+            )}
+          </p>
+          <Link to="/demo" className={buttonVariants({ variant: "link", className: "mt-3 px-0" })}>
+            {t("Coba dengan statement-mu di demo", "Try it with your statement in the demo")} <ArrowRight aria-hidden />
+          </Link>
+        </div>
+        <ul className="space-y-2.5" aria-label={t("Contoh pertanyaan", "Example questions") as string}>
+          {questions.map((q, i) => (
+            <li key={i} className="rounded-3xl rounded-tl-md bg-card px-4 py-3 font-semibold text-pretty">
+              {q}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </Section>
   );
 }
 
@@ -268,8 +309,8 @@ function Features({ t }: { t: T }) {
         eyebrow={t("Fitur", "Features")}
         title={t("Dibuat buat rekening yang kamu pakai beneran.", "Built for the accounts you actually use.")}
         sub={t(
-          "Bukan cuma chatbot di atas catatan manual. JoyoArto membaca statement asli, membuktikan angkanya, baru kemudian AI ikut bantu.",
-          "Not just a chatbot on top of manual entries. JoyoArto reads the real statements and proves the numbers first; then AI helps.",
+          "JoyoArto membaca statement asli dan memastikan saldonya cocok dulu. Baru setelah itu Claude ikut bantu.",
+          "JoyoArto reads the real statements and makes sure the balances add up first. Then Claude helps.",
         )}
       />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -405,6 +446,12 @@ function Privacy({ t }: { t: T }) {
         <h2 className="mt-1.5 text-[1.75rem] leading-tight font-extrabold tracking-tight text-balance sm:text-4xl">
           {t("Uang itu urusan pribadi. Kami anggap begitu juga.", "Money is personal. We treat it that way.")}
         </h2>
+        <p className="mt-3 text-pretty text-white/70">
+          {t(
+            "Kodenya terbuka, jadi siapa pun bisa periksa ke mana datamu pergi. Nggak dijual, nggak dipakai buat iklan.",
+            "The code is open, so anyone can check where your data goes. Never sold, never used for ads.",
+          )}
+        </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         {points.map((p, i) => (
