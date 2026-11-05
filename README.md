@@ -471,6 +471,8 @@ off). `DEMO_LOGIN_CODE` (optional) turns on the store reviewers' demo account. N
 `ALLOWED_EMAILS` and `ADMIN_EMAILS` (comma-separated) are not in wrangler.jsonc: `deploy.yml` passes them with
 `wrangler deploy --var` from the `production` environment's variables (GitHub → Settings → Environments), and refuses
 to deploy without them. Deploying by hand: `bunx wrangler deploy --var ALLOWED_EMAILS:you@example.com --var ADMIN_EMAILS:you@example.com`.
+`OPEN_SIGNUP` (same place, optional): `1` or `true` lets anyone with a Google or Apple account sign up; unset or anything
+else keeps sign-up to `ALLOWED_EMAILS` and pending invites.
 Google OAuth redirect URI: `https://app.arto.joyorogo.com/api/auth/callback/google`. Moving to a custom
 domain means updating the four URL vars in wrangler.jsonc, `SITE_URL`/`APP_ORIGIN` in brand.ts (and the hosts in `apps/web/index.html`, `public/_headers`, `apps/server/src/seo.ts`), the Google redirect URI, and reconnecting Claude.
 

@@ -98,7 +98,7 @@ export default function Login() {
             {googleAvailable ? <Button title="Continue with Google" icon="logo-google" loading={busy === "google"} disabled={!!busy} onPress={() => void google()} /> : null}
             {error ? <Text tone="destructive" style={{ textAlign: "center" }}>{error}</Text> : null}
             <Text variant="caption" tone="muted" style={{ textAlign: "center" }}>
-              JoyoArto is invite-only for now: use the Google account your household owner invited.
+              New here? Signing in creates your household. Invited to one? Use the Google account the invite was sent to.
             </Text>
             <View style={styles.or}>
               <View style={styles.line} />

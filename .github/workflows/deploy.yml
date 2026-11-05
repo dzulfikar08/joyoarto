@@ -57,11 +57,12 @@ jobs:
         # in wrangler.jsonc. Refuse to deploy without them: an empty allowlist would lock everyone but invitees out.
         run: |
           [ -n "$ALLOWED_EMAILS" ] && [ -n "$ADMIN_EMAILS" ] || { echo "::error::Set ALLOWED_EMAILS and ADMIN_EMAILS in the production environment's variables"; exit 1; }
-          bunx wrangler deploy --var "ALLOWED_EMAILS:$ALLOWED_EMAILS" --var "ADMIN_EMAILS:$ADMIN_EMAILS" ${PRO_EMAILS:+--var "PRO_EMAILS:$PRO_EMAILS"}
+          bunx wrangler deploy --var "ALLOWED_EMAILS:$ALLOWED_EMAILS" --var "ADMIN_EMAILS:$ADMIN_EMAILS" ${PRO_EMAILS:+--var "PRO_EMAILS:$PRO_EMAILS"} ${OPEN_SIGNUP:+--var "OPEN_SIGNUP:$OPEN_SIGNUP"}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           ALLOWED_EMAILS: ${{ vars.ALLOWED_EMAILS }}
           PRO_EMAILS: ${{ vars.PRO_EMAILS }}
+          OPEN_SIGNUP: ${{ vars.OPEN_SIGNUP }}
           ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
       - name: Smoke test
         run: |
