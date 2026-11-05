@@ -44,16 +44,18 @@ picks the active one in Settings (`household_member.is_default`); sessions, API 
 ## Plan & simulate
 
 `/plan` (and the MCP tools `plan_baseline`, `plan_templates`, `simulate_plan`, `compare_plans`) answers "can we afford
-this?" from the ledger. The baseline uses the last complete months: recurring income (gifts, refunds, other income and
-sources in under half the months left out; salary paid at month end for the next month is re-attributed), core
-spending without one-offs above max(Rp 2 jt, 25% of the month) and without the refunds that offset them (same
-top-level category, ±31 days, at least half the one-off; the plan uses the higher of core average and median),
-existing installments (outgoing transfers for the household's own debt such as cicilan/KPR/paylater, net of money paid
-back, in at least half the months; money lent to family and card-bill payments are not counted), and liquid balances
-by role (emergency, goal, spending). Scenarios (car loans with flat or effective rates or the dealer's quoted
-installment, one-offs, monthly costs, income changes) are projected month by month and judged by explicit rules
-(emergency fund ≥ 6 months of outflow, installments ≤ 30% of income and car ≤ 20%, no negative balance). All maths is
-pure in `packages/api/src/lib/plan/`.
+this?" from the ledger. The baseline uses the last complete months (default 6), but none before the household's first
+full month (the month of its first transaction, or the next one when that came after the 7th), so a new household's
+empty months do not halve its income and spending; `history` reports the months used and `tooLittle` under 2 of them.
+Recurring income (gifts, refunds, other income and sources in under half the months left out; salary paid at month end
+for the next month is re-attributed), core spending without one-offs above max(Rp 2 jt, 25% of the month) and without
+the refunds that offset them (same top-level category, ±31 days, at least half the one-off; the plan uses the higher
+of core average and median), existing installments (outgoing transfers for the household's own debt such as
+cicilan/KPR/paylater, net of money paid back, in at least half the months; money lent to family and card-bill payments
+are not counted), and liquid balances by role (emergency, goal, spending). Scenarios (car loans with flat or effective
+rates or the dealer's quoted installment, one-offs, monthly costs, income changes) are projected month by month and
+judged by explicit rules (emergency fund ≥ 6 months of outflow, installments ≤ 30% of income and car ≤ 20%, no
+negative balance). All maths is pure in `packages/api/src/lib/plan/`.
 
 - **Upgrade path**: a loan can have a `sale` (after N months, at a resale % or amount). From the sale month it costs
   nothing; the sale price first settles the outstanding principal (declining-balance schedule at the loan's effective
@@ -62,8 +64,8 @@ pure in `packages/api/src/lib/plan/`.
   months). The default resale is an assumption for battery EVs in Indonesia (`lib/plan/resale.ts`): 35% of the OTR
   price lost in year one, 10% a year after, at least 15% left (65% after 12 months, 60% after 18).
 - **Where to save** ("Bisa hemat di mana", `GET /api/plan/savings`, oRPC `plan.savings`, MCP `spending_cuts`; rules in
-  `lib/plan/savings.ts`): everyday habits from the same complete months as the baseline, starting at the household's
-  first full month. Habits are `food/coffee`, `food/snacks`, `food/dining`, `food/delivery`, `transport/ride-hailing`
+  `lib/plan/savings.ts`): everyday habits from the same complete months as the baseline (which start at the household's
+  first full month). Habits are `food/coffee`, `food/snacks`, `food/dining`, `food/delivery`, `transport/ride-hailing`
   and `shopping/online` with their children (by slug, so a renamed category keeps working; slugs the household lacks
   are listed as missing), plus minimarket snacks: Indomaret, Alfamart, Alfamidi, Lawson, FamilyMart and Circle K
   baskets up to Rp 100.000 (`minimarketMax`) in any other category. A row counts once (habit category first). Only
@@ -209,9 +211,9 @@ router types, `src/lib/orpc.ts`). Structure and conventions for new screens: `ap
 - **Receipts and Reimburse**: Foto struk in the add sheet (camera permission asked the first time; the gallery uses
   the system photo picker), photos and the Diganti kantor switch on the transaction screen, More → Reimburse (claim
   PDF/CSV saved and shared with expo-sharing), Settings → Reimbursement.
-- **Plan & simulate** (More → Plan): the web's planner with the same templates, editors, verdicts, projection chart,
-  side by side and household saved scenarios (a scenario saved on the phone opens with the same blocks on the web). The
-  unsaved draft stays on the phone, per household.
+- **Plan & simulate** (More → Plan): the web's planner with the same templates, editors (spending cuts too), verdicts,
+  projection chart, side by side, a read-only Where to save summary and household saved scenarios (a scenario saved on
+  the phone opens with the same blocks on the web). The unsaved draft stays on the phone, per household.
 - **More**: profile with the Google photo, Import, Accounts, Plan, Household, Settings, appearance, sign out.
 - **Notification capture (Android)**: `modules/notification-capture` is a local Expo module (Kotlin) with a
   `NotificationListenerService`. Capture is off by default. When it is on, the service drops every notification whose

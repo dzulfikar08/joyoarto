@@ -12,6 +12,7 @@ import { useMe } from "@/components/data";
 import { BaselineCard } from "@/components/plan/baseline-card";
 import { CompareView } from "@/components/plan/compare-view";
 import { ChoiceField } from "@/components/plan/fields";
+import { SavingsCard } from "@/components/plan/savings-card";
 import { ScenarioCard } from "@/components/plan/scenario-card";
 import { Button, Card, ErrorState, ListRow, Screen, SkeletonCard, Text } from "@/components/ui";
 import { errorMessage } from "@/src/lib/errors";
@@ -166,6 +167,7 @@ export default function PlanScreen() {
 
       {baseline.data ? <BaselineCard b={baseline.data} state={state} update={update} /> : null}
       {baseline.isError ? <ErrorState compact={!!baseline.data} error={baseline.error} onRetry={() => void baseline.refetch()} /> : null}
+      {baseline.data ? <SavingsCard state={state} /> : null}
 
       {saved.data?.scenarios.length ? (
         <Card title="Saved scenarios" subtitle="Shared with your household. Open one to compare it with what is on this page." padded>

@@ -8,7 +8,6 @@ import { z } from "zod";
 
 import type { Principal } from "../context";
 import { formatMoney } from "../lib/money";
-import { addMonths } from "../lib/plan/months";
 import { DEFAULT_HABIT_SLUGS, DEFAULT_MINIMARKET_MAX, cutEffect, cutItems, detectHabits } from "../lib/plan/savings";
 import type { Habit } from "../lib/plan/savings";
 import { DEFAULT_RULES } from "../lib/plan/simulate";
@@ -42,13 +41,6 @@ export const savingsInput = simulatePlanInput.extend({
   effect: z.boolean().default(true).describe("Simulate the cuts against the plan (no items, a saved scenarioId, or the items given)"),
 });
 
-/** The household's first full month: the month of its first transaction, or the next one if that started after the 7th. */
-function firstFullMonth(firstDate: string | null): string | null {
-  if (!firstDate) return null;
-  const m = firstDate.slice(0, 7);
-  return Number(firstDate.slice(8, 10)) > 7 ? addMonths(m, 1) : m;
-}
-
 export async function savings(db: Database, p: Principal, raw: z.infer<typeof savingsInput>) {
   const { categories: wanted, minimarketMax, targets, goalAmount, effect, ...planRaw } = raw;
   const { plan } = await resolveSimulateInput(db, p, planRaw);
@@ -61,8 +53,7 @@ export async function savings(db: Database, p: Principal, raw: z.infer<typeof sa
   const text = sql<string>`lower(coalesce(${t.merchant}, ${t.description}))`;
   const byCategory: SQL[] = habitSlugs.flatMap((s) => [eq(c.slug, s), like(c.slug, `${s}/%`)]);
   const byMinimarket = and(gte(t.amount, -max), or(...MINIMARKET_LIKE.map((x) => like(text, `%${x}%`))));
-  const [first, rows, cats] = await Promise.all([
-    db.select({ date: sql<string | null>`min(${t.date})` }).from(t).where(scope),
+  const [rows, cats] = await Promise.all([
     db
       .select({ id: t.id, date: t.date, amount: t.amount, merchant: t.merchant, description: t.description, slug: c.slug })
       .from(t)
@@ -72,8 +63,8 @@ export async function savings(db: Database, p: Principal, raw: z.infer<typeof sa
     categoriesById(db, p.householdId),
   ]);
 
-  const start = firstFullMonth(first[0]?.date ?? null);
-  const months = start ? b.window.filter((m) => m >= start) : [];
+  // The baseline's window already starts at the household's first full month.
+  const months = b.window;
   const names = new Map([...cats.values()].filter((x) => x.kind === "expense").map((x) => [x.slug, x.name]));
   const excludedIds = new Set(b.spending.excluded.filter((e) => e.kind === "expense").map((e) => e.id));
   const result = detectHabits({
@@ -138,7 +129,7 @@ export async function savings(db: Database, p: Principal, raw: z.infer<typeof sa
     "Only the household's own history and income are compared; there are no outside benchmarks.",
     "Transfers, top-ups, reimbursable expenses (until rejected) and the one-offs the plan baseline leaves out are not counted. Pending quick adds count, as in reports.",
     `Minimarket snacks: Indomaret, Alfamart, Alfamidi, Lawson, FamilyMart and Circle K baskets up to ${rp(max)}, in any category except the habit categories above (a row counts once).`,
-    months.length < b.window.length && months.length ? `History starts in ${months[0]}; only ${months.length} complete month(s) are used.` : null,
+    months.length < b.history.requested && months.length ? `History starts in ${months[0]}; only ${months.length} complete month(s) are used.` : null,
     !months.length ? "No complete months of history yet." : null,
     result.missing.length ? `Not in this household's categories: ${result.missing.join(", ")}.` : null,
   ].filter((x): x is string => !!x);

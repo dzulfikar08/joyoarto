@@ -15,11 +15,14 @@ import {
   EMPTY_PLAN,
   flatten,
   freeSlot,
+  habitLabel,
+  isHabitCut,
   isDirty,
   itemWhen,
   markDeleted,
   markSaved,
   moneyText,
+  newCut,
   nextCarLabel,
   numText,
   openSaved,
@@ -38,13 +41,16 @@ import {
   setRole,
   shiftBaby,
   signedAmount,
+  savingsInput,
   slotOf,
+  suggestionText,
   tenorChoices,
   tickMonths,
   toggleSale,
   upgradeBlocks,
   yearChoices,
   type BabyBlock,
+  type Block,
   type LoanIn,
   type PlanState,
   type Scenario,
@@ -276,5 +282,44 @@ describe("the draft on this phone", () => {
     expect(draftFor(null, "h1")).toEqual(EMPTY_PLAN);
     expect(draftFor({ v: 1, householdId: "h1", state: { v: 2 } }, "h1")).toEqual(EMPTY_PLAN);
     expect(draftFor({ v: 1, householdId: "h1", state }, null)).toEqual(EMPTY_PLAN);
+  });
+});
+
+describe("spending cuts", () => {
+  const habitCut = { type: "cut" as const, id: "cut:food/coffee", habit: "food/coffee", label: "Coffee: 3x → 2x a week", monthly: 120_000_00, startMonth: START };
+
+  test("a saved scenario with cuts opens with each cut as its own block and saves the same items back", () => {
+    const loan = carBlock(START, "Car A") as Extract<Block, { kind: "loan" }>;
+    const items = [loan.item, habitCut, { type: "cut" as const, label: "Fewer dinners out", monthly: 300_000_00, startMonth: START, endMonth: "2027-12" }];
+    const blocks = blocksFromSaved(items, null);
+    expect(blocks.map((b) => b.kind)).toEqual(["loan", "item", "item"]);
+    expect(blocks[1]!.kind === "item" && blocks[1]!.item).toEqual(habitCut);
+    const r = openSaved(EMPTY_PLAN, { id: "srv2", name: "Car + cuts", plan: { items }, view: null });
+    if (!r.ok) throw new Error(r.reason);
+    const s = r.state.scenarios[0]!;
+    expect(flatten(s)).toEqual(items);
+    expect(compareInput(r.state)!.scenarios[0]!.items).toEqual(items);
+    expect(savePayload(r.state, s).plan.items).toEqual(items);
+    expect(isDirty(s)).toBe(false);
+  });
+
+  test("editing a cut changes only its saving; a new cut starts empty", () => {
+    const [b] = blocksFromSaved([habitCut], null);
+    const edited = { ...habitCut, monthly: 80_000_00 };
+    expect(flatten({ blocks: [{ ...b!, kind: "item", item: edited }] })).toEqual([edited]);
+    const fresh = newCut(START);
+    expect(fresh.kind === "item" && fresh.item).toEqual({ type: "cut", label: "Spending cut", startMonth: START, monthly: 0 });
+    expect(isHabitCut(habitCut)).toBe(true);
+    expect(isHabitCut({ type: "cut", label: "x", monthly: 1 })).toBe(false);
+    expect(itemWhen(habitCut, (x) => `Rp ${x / 100}`)).toBe(`Rp 120000 less a month from ${START}`);
+  });
+
+  test("where to save: the page's baseline, no simulation; suggestions in words", () => {
+    expect(savingsInput({ ...EMPTY_PLAN, monthlyIncome: 9 })).toEqual({ monthlyIncome: 9, roles: {}, horizonMonths: 36, effect: false });
+    expect(suggestionText({ unit: "week", current: 2.66, target: 2, options: [] })).toBe("2,7x → 2x a week");
+    expect(suggestionText({ unit: "month", current: 6, target: 4, options: [] })).toBe("6x → 4x a month");
+    expect(suggestionText({ unit: "cap", current: 800_000_00, target: 600_000_00, options: [{ target: 600_000_00, display: "Rp 600.000" }] })).toBe("at most Rp 600.000 a month");
+    expect(habitLabel({ kind: "minimarket", name: "minimarket" })).toBe("Minimarket snacks");
+    expect(habitLabel({ kind: "category", name: "Coffee" })).toBe("Coffee");
   });
 });

@@ -122,7 +122,7 @@ const TOOLS: () => ToolDef[] = () => [
     name: "plan_baseline",
     chat: "read",
     title: "Planning baseline",
-    description: "Starting point for affordability planning, from the last complete months (default 6): recurring income per source (irregular income such as gifts, refunds and other income excluded; salary paid at month end for the next month detected), core monthly spending with large one-offs excluded (and listed), existing loan installments found in transfers, liquid balances per account with a suggested role (emergency, goal, spending, exclude) and free cash flow. Call before simulate_plan or compare_plans.",
+    description: "Starting point for affordability planning, from the last complete months (default 6, only those since the household's first full month: history.monthsUsed of history.monthsRequested; history.tooLittle under 2 months, when the numbers are rough or zero and you should ask the member for their usual income and spending): recurring income per source (irregular income such as gifts, refunds and other income excluded; salary paid at month end for the next month detected), core monthly spending with large one-offs excluded (and listed), existing loan installments found in transfers, liquid balances per account with a suggested role (emergency, goal, spending, exclude) and free cash flow. Call before simulate_plan or compare_plans.",
     scope: "finance:read",
     procedure: () => appRouter.plan.baseline,
     readOnly: true,
