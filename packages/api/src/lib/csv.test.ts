@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { MAPPING_PRESETS, applyMapping, findHeaderRow, parseCsv, parseDate } from "./csv";
+import { MAPPING_PRESETS, applyMapping, findHeaderRow, parseCsv, parseDate, resolveYears } from "./csv";
 
 /** A KlikBCA "mutasi rekening" CSV: account details (with the period's dates), the table, then the totals. parseCsv drops the blank line, so the header is row 4. */
 const BCA_MUTASI = [
@@ -106,5 +106,47 @@ describe("applyMapping", () => {
     expect(errors).toEqual([]);
     expect(rows.map((r) => r.amount)).toEqual([1000000000, -300000000]);
     expect(rows[1]!.balanceAfter).toBe(700000000);
+  });
+});
+
+describe("DD/MM years across New Year", () => {
+  const rolloverCsv = (period?: string) =>
+    [
+      "No. rekening : ,'1234567890",
+      ...(period ? [`Periode : ,${period}`] : []),
+      "Tanggal Transaksi,Keterangan,Cabang,Jumlah,,Saldo",
+      "'20/12,KARTU DEBIT A,0000,10000.00,DB,990000.00",
+      "'31/12,KARTU DEBIT B,0000,10000.00,DB,980000.00",
+      "'02/01,KARTU DEBIT C,0000,10000.00,DB,970000.00",
+      "'10/01,KARTU DEBIT D,0000,10000.00,DB,960000.00",
+    ].join("\n");
+  const bca = MAPPING_PRESETS.bca!.mapping;
+
+  test("the Periode line decides each row's year", () => {
+    const { rows, errors } = applyMapping(parseCsv(rolloverCsv("20/12/2025 - 10/01/2026")), bca, "IDR", { today: "2026-11-05" });
+    expect(errors).toEqual([]);
+    expect(rows.map((r) => r.date)).toEqual(["2025-12-20", "2025-12-31", "2026-01-02", "2026-01-10"]);
+  });
+
+  test("an explicit year is the latest row's; December rows take the year before", () => {
+    const { rows } = applyMapping(parseCsv(rolloverCsv()), { ...bca, year: 2026 });
+    expect(rows.map((r) => r.date)).toEqual(["2025-12-20", "2025-12-31", "2026-01-02", "2026-01-10"]);
+  });
+
+  test("without a year: the current WIB year, rolled back when the latest row would be in the future", () => {
+    expect(applyMapping(parseCsv(rolloverCsv()), bca, "IDR", { today: "2026-01-15" }).rows.map((r) => r.date)).toEqual([
+      "2025-12-20", "2025-12-31", "2026-01-02", "2026-01-10",
+    ]);
+    expect(resolveYears([{ d: 20, m: 12 }], { today: "2026-11-05" })).toEqual(["2025-12-20"]);
+    expect(resolveYears([{ d: 1, m: 11 }], { today: "2026-11-05" })).toEqual(["2026-11-01"]);
+  });
+
+  test("29/02 is checked against the resolved year", () => {
+    const { rows, errors } = applyMapping(
+      [["Tanggal Transaksi", "Keterangan", "Jumlah", "Saldo"], ["29/02", "X", "-1", ""]],
+      { ...bca, year: 2026, decimal: undefined },
+    );
+    expect(rows).toEqual([]);
+    expect(errors.length).toBe(1);
   });
 });

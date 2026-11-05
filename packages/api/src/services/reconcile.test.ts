@@ -158,3 +158,33 @@ test("pending rows: editable, deletable, counted in the dashboard", async () => 
   expect(posted.inserted).toBe(1);
   await expect(updateTransaction(db, p, { id: stmtRow!.id, amount: -2 })).rejects.toThrow(/cannot be edited/);
 });
+
+test("statement import: two concurrent commits of the same statement save each row once", async () => {
+  const pend = await quick({ accountId: bca, amountText: "25rb", description: "Kopi", occurredAt: "2026-11-02", clientRef: "c-race" });
+  const rows: ImportRow[] = [
+    { date: "2026-11-01", amount: -1000000, description: "INDOMARET" },
+    { date: "2026-11-02", amount: -2500000, description: "QRIS KOPI KENANGAN" },
+  ];
+  // Hold the first write until the second import has read too, so both see the same pending row and no saved rows.
+  const batch = db.batch.bind(db);
+  let waiting: (() => void) | null = null;
+  let calls = 0;
+  (db as { batch: unknown }).batch = async (stmts: Parameters<typeof batch>[0]) => {
+    calls++;
+    if (calls === 1) await new Promise<void>((resolve) => (waiting = resolve));
+    else if (calls === 2) waiting!();
+    return batch(stmts);
+  };
+  const [a, b] = await Promise.all([importRows(bca, rows, true), importRows(bca, rows, true)]);
+  (db as { batch: unknown }).batch = batch;
+  expect(a.inserted + b.inserted).toBe(2);
+  expect(a.reconciled + b.reconciled).toBe(1);
+  const all = await db.select().from(schema.transaction).where(eq(schema.transaction.accountId, bca));
+  expect(all.map((r) => r.status).sort()).toEqual(["posted", "posted"]);
+  expect(all.find((r) => r.amount === -2500000)!.clientRef).toBe("c-race");
+  expect(all.some((r) => r.id === pend.transaction.id)).toBe(false);
+  // The import log counts what each import actually saved; an import that saved nothing leaves no entry.
+  const batches = await db.select().from(schema.importBatch).where(eq(schema.importBatch.accountId, bca));
+  expect(batches.reduce((s, x) => s + x.insertedCount, 0)).toBe(2);
+  for (const x of batches) expect(x.insertedCount + x.duplicateCount).toBe(2);
+});

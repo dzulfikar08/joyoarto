@@ -55,7 +55,11 @@ export const csvMapping = z.object({
   hasHeader: z.boolean().default(true),
   date: column,
   dateFormat: z.enum(DATE_FORMATS),
-  /** Year for formats without one (DD/MM); defaults to the current year. */
+  /**
+   * Year for formats without one (DD/MM): the year of the latest row. Defaults to the current WIB year (the previous one
+   * when that would put the latest row in the future). A "Periode" line above the table (BCA) takes precedence. Rows of a
+   * statement that crosses New Year (Dec..Jan) take the year before for the late months.
+   */
   year: z.number().int().optional(),
   /** Joined with a space: some banks split the description over several columns. */
   description: z.array(column).min(1),
@@ -159,8 +163,66 @@ export function adjacentMarker(header: string[], amount: number): number | undef
 /** Footer lines of BCA's CSV (totals, not transactions); their first cell sits where the date is. */
 export const SUMMARY_ROWS = ["Saldo Awal", "Mutasi Kredit", "Mutasi Debet", "Saldo Akhir"];
 
+const PERIOD = /(\d{1,2})\/(\d{1,2})\/(\d{4})\s*-\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/;
+
+/** The statement period printed above the table ("Periode : ,01/12/2025 - 10/01/2026"), as YYYY-MM-DD bounds. */
+export function findPeriod(lines: string[][]): { from: string; to: string } | undefined {
+  for (const cells of lines) {
+    const m = PERIOD.exec(cells.join(" "));
+    if (!m) continue;
+    try {
+      return { from: parseDate(`${m[1]}/${m[2]}/${m[3]}`, "DD/MM/YYYY"), to: parseDate(`${m[4]}/${m[5]}/${m[6]}`, "DD/MM/YYYY") };
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+const wibToday = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+
+/**
+ * Years for day/month dates (DD/MM). Order-independent: within the period when one is known; otherwise the latest row
+ * gets `year` (or the current WIB year, or the one before when that is in the future) and, when the months wrap
+ * around New Year (they span more than six months), the late months (Jul..Dec) get the year before.
+ */
+export function resolveYears(
+  dayMonths: { d: number; m: number }[],
+  opts: { year?: number; period?: { from: string; to: string }; today?: string },
+): string[] {
+  const iso = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(d)}`;
+  if (opts.period) {
+    const { from, to } = opts.period;
+    const y0 = Number(from.slice(0, 4));
+    const y1 = Number(to.slice(0, 4));
+    return dayMonths.map(({ d, m }) => {
+      for (let y = y0; y <= y1; y++) if (iso(y, m, d) >= from && iso(y, m, d) <= to) return iso(y, m, d);
+      return iso(y1, m, d);
+    });
+  }
+  if (!dayMonths.length) return [];
+  const months = dayMonths.map((r) => r.m);
+  const wraps = Math.max(...months) - Math.min(...months) > 6;
+  const lateYearOffset = (m: number) => (wraps && m > 6 ? -1 : 0);
+  let year = opts.year;
+  if (year === undefined) {
+    const today = opts.today ?? wibToday();
+    year = Number(today.slice(0, 4));
+    const latest = dayMonths
+      .map(({ d, m }) => iso(year! + lateYearOffset(m), m, d))
+      .reduce((a, b) => (a > b ? a : b));
+    if (latest > today) year -= 1;
+  }
+  return dayMonths.map(({ d, m }) => iso(year! + lateYearOffset(m), m, d));
+}
+
 /** Applies a mapping to raw rows (from parseCsv or a spreadsheet). Bad rows are reported, not fatal. */
-export function applyMapping(raw: string[][], mapping: CsvMapping, currency = "IDR"): { rows: ParsedRow[]; errors: RowError[] } {
+export function applyMapping(
+  raw: string[][],
+  mapping: CsvMapping,
+  currency = "IDR",
+  opts: { today?: string } = {},
+): { rows: ParsedRow[]; errors: RowError[] } {
   let body = raw.slice(mapping.skipRows);
   let skipped = mapping.skipRows;
   // Bank exports put account details above the table: with a named date column, the header is the first row naming it.
@@ -197,13 +259,20 @@ export function applyMapping(raw: string[][], mapping: CsvMapping, currency = "I
   const skip = mapping.skipDateValues.map((v) => v.toLowerCase());
   const rows: ParsedRow[] = [];
   const errors: RowError[] = [];
+  const dayMonth = mapping.dateFormat === "DD/MM";
+  /** DD/MM rows wait for their year until every row is read; `line` per row for errors. */
+  const pendingDates: { d: number; m: number; line: number }[] = [];
   body.slice(start).forEach((cells, i) => {
     const line = skipped + start + i + 1;
     const cell = (at: number | undefined) => (at === undefined ? "" : (cells[at] ?? "").trim());
     const dateCell = cell(cols.date);
     if (!dateCell || skip.includes(dateCell.replace(/^'/, "").toLowerCase())) return;
     try {
-      const date = parseDate(dateCell, mapping.dateFormat, mapping.year);
+      let date: string;
+      if (dayMonth) {
+        // 2000 is a leap year, so 29/02 passes here and is checked against the real year below.
+        date = parseDate(dateCell, "DD/MM", 2000);
+      } else date = parseDate(dateCell, mapping.dateFormat, mapping.year);
       let amount: number;
       if (cols.amount !== undefined) {
         amount = parseAmount(cell(cols.amount), currency, mapping.decimal);
@@ -226,11 +295,27 @@ export function applyMapping(raw: string[][], mapping: CsvMapping, currency = "I
       const ref = cell(cols.reference);
       if (ref) row.externalRef = ref;
       rows.push(row);
+      if (dayMonth) pendingDates.push({ d: Number(date.slice(8, 10)), m: Number(date.slice(5, 7)), line });
     } catch (error) {
       errors.push({ line, message: error instanceof Error ? error.message : String(error) });
     }
   });
-  return { rows, errors };
+  if (!dayMonth) return { rows, errors };
+  const period = findPeriod(raw.slice(0, skipped + start));
+  const dates = resolveYears(pendingDates, { year: mapping.year, period, today: opts.today });
+  const kept: ParsedRow[] = [];
+  rows.forEach((row, i) => {
+    const date = dates[i]!;
+    const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+    const check = new Date(Date.UTC(y, m - 1, d));
+    if (check.getUTCMonth() !== m - 1) {
+      errors.push({ line: pendingDates[i]!.line, message: `Not a date: ${pad(d)}/${pad(m)}/${y}` });
+      return;
+    }
+    kept.push({ ...row, date });
+  });
+  errors.sort((a, b) => a.line - b.line);
+  return { rows: kept, errors };
 }
 
 /**

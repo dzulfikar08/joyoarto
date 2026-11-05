@@ -57,9 +57,10 @@ export function parseGopay(text: string): GopayStatement {
     let id = tokens[j]!;
     while (!id.endsWith("ID") && j + 1 < tokens.length) id += tokens[++j];
     const rest = tokens.slice(j + 1).join(" ");
-    const m = /(-?)(Rp)?([\d.]+)$/.exec(rest);
+    // The sign may be split off the amount ("- Rp25.000", or "-" on its own line, which joins as "- ").
+    const m = /([+-]?)\s*(Rp)?\s*([\d.]+)$/.exec(rest);
     const method = (m ? rest.slice(0, m.index) : rest).trim();
-    const amount = m?.[2] ? Number(m[3]!.replace(/\./g, "")) * 100 * (m[1] ? -1 : 1) : null;
+    const amount = m?.[2] ? Number(m[3]!.replace(/\./g, "")) * 100 * (m[1] === "-" ? -1 : 1) : null;
     rows.push({ date: g.date, time, name: tokens.slice(0, at).join(" "), id, method, amount });
   }
   const flat = text.replace(/\s+/g, " ");
