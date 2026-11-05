@@ -85,6 +85,13 @@
       "when": 1793837401196,
       "tag": "0011_receipts_reimburse",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1793894663243,
+      "tag": "0012_statement_format_requests",
+      "breakpoints": true
     }
   ]
 }

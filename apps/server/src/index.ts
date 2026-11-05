@@ -101,6 +101,13 @@ function requestInfo(request: Request): RequestInfo {
 const serverConfig: ServerConfig = {
   importEmailDomain: env.IMPORT_EMAIL_DOMAIN?.trim().toLowerCase() || null,
   demoCode: env.DEMO_LOGIN_CODE?.trim() || null,
+  atur: env.ATUR_INGEST_KEY?.trim()
+    ? {
+        ingestKey: env.ATUR_INGEST_KEY.trim(),
+        baseUrl: env.ATUR_BASE_URL?.trim() || undefined,
+        environment: env.DEV_LOGIN === "1" || env.DEV_LOGIN === "true" ? "development" : "production",
+      }
+    : null,
 };
 
 const effort = env.JOYO_AI_EFFORT?.trim();

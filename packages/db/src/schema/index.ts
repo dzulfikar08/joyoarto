@@ -6,3 +6,4 @@ export * from "./plan";
 export * from "./inbound";
 export * from "./joyo";
 export * from "./billing";
+export * from "./statements";

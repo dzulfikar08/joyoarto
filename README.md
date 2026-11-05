@@ -121,6 +121,40 @@ they differ or when the two extractions of the same PDF do not match. Upgrade th
 
 Other banks: CSV import with a column mapping, or ask Claude to read the PDF (`import_transactions`).
 
+### Format requests (statements JoyoArto can't read yet)
+
+When a PDF is not a Jago or GoPay statement, the import page (web and phone) says "We can't read this statement yet"
+and offers **Request support**. The sheet shows exactly what would be sent; nothing leaves before the member presses
+Send.
+
+- **What is sent: a masked skeleton** (`packages/api/src/lib/statements/skeleton.ts`, pure and tested). Every digit
+  becomes `9` (`99/99/9999`, `9.999.999,99`), every word that is not statement vocabulary (column labels, months, bank
+  and e-wallet names, transaction-type words like TRSF, QRIS, BIAYA ADM) becomes `XXXX`/`Xxxx`/`xxxx`/`XxXx`, always four
+  letters, so even name lengths are hidden. Punctuation, spacing and lines stay; runs of identical lines collapse to
+  one with `⟨×N⟩`, and long statements are cut to about 200 lines / 15k characters (header, one of each row shape,
+  footer). Merchants and person names are never on the allowlist.
+- **Checked before it leaves.** The server rebuilds the skeleton from the text itself (it never accepts one from a
+  client) and `verifySkeleton` refuses it if any digit other than 9, any word that is neither vocabulary nor a mask, or
+  any non-vocabulary word of 3+ letters from the original is in it.
+- **AI notes from the skeleton only.** The parse engine (`JOYO_PARSE_MODEL`, or Workers AI without an Anthropic key;
+  usage kind `format` in `ai_usage`) writes a parser spec (detection markers, columns, date and amount format, debit
+  vs credit, balance checks, regexes, open questions). No AI or a failure: the skeleton is filed alone.
+- **Filed in Atur** via log ingest (`POST https://app.diatur.com/api/ingest/<ATUR_INGEST_KEY>`, service
+  `statement-formats`, level info). The fingerprint is a hash of the header and column-label lines, so every statement
+  of one format lands on one issue and Atur counts the requests. Context: line and page counts, source, platform; never
+  user ids, emails or household ids.
+- **Limits.** One request per format per household, 3 per member per WIB day (`statement_format_request`: household,
+  user, fingerprint, Atur issue id; never statement text). AI connections and email cannot file requests; an unsupported
+  PDF sent by email only gets a reply pointing to Request support in the app.
+- **API:** `POST /api/statements/format-preview` (text → skeleton, fingerprint, `available`, `alreadyRequested`),
+  `POST /api/statements/format-requests` (text, source, platform), and `-file` variants taking the PDF as multipart (the
+  phone). Not an MCP tool: Claude reads other banks' PDFs itself with `import_transactions`, and a request needs the
+  member to see the masked text first.
+
+Setup: in Atur, enable the feedback board of project BRK and create its ingest key (project settings → feedback board
+→ Ingest key), then `cd apps/server && bunx wrangler secret put ATUR_INGEST_KEY`. Unset, the sheet says requests are
+not available. `ATUR_BASE_URL` overrides `https://app.diatur.com`.
+
 ### Statements by email
 
 Settings → Import by email gives the household a private address, `import+<token>@arto.joyorogo.com` (26 random base32

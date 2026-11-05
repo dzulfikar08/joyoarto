@@ -117,6 +117,7 @@ async function seedEverything(p: Principal) {
   const profileId = crypto.randomUUID();
   await db.insert(schema.reimbursementProfile).values({ id: profileId, householdId: p.householdId, companyName: "PT Maju", claimantName: "Dewi" });
   await db.insert(schema.reimbursementClaim).values({ id: crypto.randomUUID(), householdId: p.householdId, profileId, number: "RB-2026-0001", periodFrom: "2026-01-01", periodTo: "2026-01-31", total: 100, currency: "IDR", itemCount: 1, snapshot: "{}" });
+  await db.insert(schema.statementFormatRequest).values({ id: crypto.randomUUID(), householdId: p.householdId, userId: p.userId, fingerprint: "stmt-0123456789abcdef", aturIssueId: "iss_1" });
   await db.insert(schema.attachment).values({ id: crypto.randomUUID(), householdId: p.householdId, transactionId: ids[0]!, r2Key: `h/${p.householdId}/r/x`, mime: "image/jpeg", size: 10 });
   await oauthConnection(p.userId);
   return { accountId, ids };

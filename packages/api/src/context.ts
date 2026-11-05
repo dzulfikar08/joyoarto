@@ -36,6 +36,20 @@ export type ServerConfig = {
   importEmailDomain: string | null;
   /** DEMO_LOGIN_CODE (secret): the code store reviewers type to reach the demo account. Unset = demo login off. */
   demoCode?: string | null;
+  /** Statement format requests go to Atur's log ingest (services/statement-formats.ts). Absent = the feature is off. */
+  atur?: AturConfig | null;
+};
+
+/** Where statement format requests are filed: Atur's log ingest for the BRK feedback board. */
+export type AturConfig = {
+  /** ATUR_INGEST_KEY (secret): the board's ingest key, the only credential. */
+  ingestKey: string;
+  /** Default https://app.diatur.com. */
+  baseUrl?: string;
+  /** "production" or "development", shown on the issue. */
+  environment: string;
+  /** Tests pass a fake. */
+  fetch?: (input: string, init?: RequestInit) => Promise<Response>;
 };
 
 /** The Workers AI binding (`ai.run(model, input)`), as far as JoyoArto uses it. */

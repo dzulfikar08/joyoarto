@@ -93,5 +93,7 @@
     // production environment's variables, like ALLOWED_EMAILS, so it is not in the public repo.
   }
   // Secrets (wrangler secret put): BETTER_AUTH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, ANTHROPIC_API_KEY,
-  // JOYO_INTERNAL_KEY (same value as JoyoRogo's), DEMO_LOGIN_CODE (optional: the store reviewers' demo code; unset = off). No payment secrets and no payment webhooks: JoyoRogo sells Joyo Pro.
+  // JOYO_INTERNAL_KEY (same value as JoyoRogo's), DEMO_LOGIN_CODE (optional: the store reviewers' demo code; unset = off),
+  // ATUR_INGEST_KEY (optional: the BRK feedback board's ingest key in Atur, for statement format requests; unset = off).
+  // No payment secrets and no payment webhooks: JoyoRogo sells Joyo Pro.
 }

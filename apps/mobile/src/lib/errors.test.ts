@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
 import { ApiError, STORE_SAFE_LIMIT_MESSAGE } from "./api";
-import { errorMessage, isDemoError, isSessionOnlyError, isNetworkError, SESSION_ONLY_MESSAGE, isRetryable, isUnauthorized, isUpgradeError } from "./errors";
+import { errorMessage, isDemoError, isSessionOnlyError, isNetworkError, SESSION_ONLY_MESSAGE, isRetryable, isUnauthorized, isUnsupportedStatement, isUpgradeError } from "./errors";
 import { procedureOfKey, shouldPersistQuery, shouldRetry } from "./query-policy";
 
 const orpcError = (code: string, status: number, message: string, data?: unknown) => Object.assign(new Error(message), { code, status, data });
@@ -46,4 +46,11 @@ test("demo and session-only refusals", () => {
   expect(isDemoError(web)).toBe(false);
   expect(errorMessage(web, { storeSafe: true })).toBe(SESSION_ONLY_MESSAGE);
   expect(SESSION_ONLY_MESSAGE).not.toMatch(/web/i);
+});
+
+test("unsupported statements, from oRPC and from the REST upload", () => {
+  expect(isUnsupportedStatement({ code: "BAD_REQUEST", status: 400, data: { reason: "unsupported" } })).toBe(true);
+  expect(isUnsupportedStatement(new ApiError("Not a statement", 400, "BAD_REQUEST", { reason: "unsupported" }))).toBe(true);
+  expect(isUnsupportedStatement(new ApiError("Password", 400, "BAD_REQUEST", { reason: "encrypted" }))).toBe(false);
+  expect(isUnsupportedStatement(new ApiError("Offline", 0))).toBe(false);
 });

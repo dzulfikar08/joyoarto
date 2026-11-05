@@ -154,6 +154,7 @@ describe("receiving", () => {
       { name: "invoice.pdf", content: makePdf("INVOICE 123\nTotal Rp 50.000") },
     ]);
     expect(res).toMatchObject({ action: "reply", status: "partial" });
+    expect(res.action === "reply" && res.text).toContain("import the PDF in the JoyoArto app and choose Request support");
     expect(res.action === "reply" && res.text).toContain("✗ invoice.pdf\n  Not a statement JoyoArto can read yet");
   });
 

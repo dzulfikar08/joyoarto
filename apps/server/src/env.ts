@@ -55,6 +55,13 @@ export type Env = BillingEnv & {
    * Never commit it: `wrangler secret put DEMO_LOGIN_CODE`.
    */
   DEMO_LOGIN_CODE?: string;
+  /**
+   * Secret. Ingest key of the BRK feedback board in Atur: statement format requests (masked skeletons, never statement
+   * data) are filed there as issues. Unset = "Request support" is not offered. `wrangler secret put ATUR_INGEST_KEY`.
+   */
+  ATUR_INGEST_KEY?: string;
+  /** Optional: Atur's base URL (default https://app.diatur.com). */
+  ATUR_BASE_URL?: string;
 };
 
 export const env = workerEnv as unknown as Env;

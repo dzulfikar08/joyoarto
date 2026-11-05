@@ -9,12 +9,13 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 
 import { invalidateLedger } from "@/components/data";
+import { FormatRequestSheet } from "@/components/import/format-request";
 import { Button, Card, Icon, IconButton, Pill, Row, Text } from "@/components/ui";
 import { uploadStatement } from "@/src/imports/statement-file";
 import type { UploadFile } from "@/src/lib/api";
 import { getApi } from "@/src/lib/auth";
 import { importsLeft, type BillingStatus } from "@/src/lib/billing";
-import { errorMessage } from "@/src/lib/errors";
+import { errorMessage, isUnsupportedStatement } from "@/src/lib/errors";
 import { plural } from "@/src/lib/format";
 import { batchSummary, canSave, ENTRY_STATUS, entryFacts, entryStatus, saveOrder, type BatchEntry, type EntryStatus } from "@/src/lib/imports";
 import { storeSafe } from "@/src/lib/platform";
@@ -43,11 +44,11 @@ export function StatementBatch({ billing }: { billing: BillingStatus | undefined
   const left = importsLeft(billing);
 
   async function preview(e: Entry) {
-    patch(e.key, { busy: "checking", previewError: undefined, preview: undefined, saveError: undefined });
+    patch(e.key, { busy: "checking", previewError: undefined, unsupported: undefined, preview: undefined, saveError: undefined });
     try {
       patch(e.key, { busy: null, preview: await uploadStatement(await getApi(), e.file, false, mock) });
     } catch (err) {
-      patch(e.key, { busy: null, previewError: errorMessage(err, { storeSafe }) });
+      patch(e.key, { busy: null, previewError: errorMessage(err, { storeSafe }), unsupported: isUnsupportedStatement(err) });
     }
   }
 
@@ -171,6 +172,7 @@ export function StatementBatch({ billing }: { billing: BillingStatus | undefined
 
 function EntryCard({ entry: e, status, onRetry, onRemove }: { entry: Entry; status: EntryStatus; onRetry: () => void; onRemove?: () => void }) {
   const [pockets, setPockets] = useState(false);
+  const [requesting, setRequesting] = useState(false);
   const r = e.result ?? e.preview;
   const s = ENTRY_STATUS[status];
   return (
@@ -182,7 +184,15 @@ function EntryCard({ entry: e, status, onRetry, onRemove }: { entry: Entry; stat
         {onRemove && status !== "saved" ? <IconButton name="close" size={18} label={`Remove ${e.name}`} onPress={onRemove} /> : null}
       </Row>
       {r ? <Text variant="caption" tone="muted">{[...entryFacts(r), r.period?.from ? `${r.period.from} → ${r.period.to}` : null].filter(Boolean).join(" · ")}</Text> : null}
-      {status === "failed" ? (
+      {status === "unsupported" ? (
+        <View style={{ gap: 6 }}>
+          <Text variant="caption" tone="warning">
+            We can't read this statement yet: JoyoArto reads Bank Jago monthly statements and GoPay e-statements. Use CSV import below, or ask us to support this bank.
+          </Text>
+          <Button title="Request support" icon="chatbox-ellipses-outline" small variant="secondary" onPress={() => setRequesting(true)} />
+          <FormatRequestSheet open={requesting} onClose={() => setRequesting(false)} file={e.file} />
+        </View>
+      ) : status === "failed" ? (
         <Row>
           <Text variant="caption" tone="destructive" style={{ flex: 1 }}>{e.previewError}</Text>
           <Button title="Try again" small variant="ghost" onPress={onRetry} />

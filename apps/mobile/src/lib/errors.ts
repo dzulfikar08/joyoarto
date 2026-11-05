@@ -35,6 +35,12 @@ export function isDemoError(e: unknown): boolean {
   return err.code === "FORBIDDEN" && data?.demo === true;
 }
 
+/** A statement PDF JoyoArto cannot read yet (the server's BAD_REQUEST with data.reason "unsupported"): offer a format request. */
+export function isUnsupportedStatement(e: unknown): boolean {
+  const data = asErr(e).data as { reason?: unknown } | undefined;
+  return data?.reason === "unsupported";
+}
+
 /** A procedure that needs a signed-in session (Google or Apple), not an access token (sessionProcedure). */
 export function isSessionOnlyError(e: unknown): boolean {
   const err = asErr(e);

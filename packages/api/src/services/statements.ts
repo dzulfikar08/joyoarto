@@ -64,6 +64,14 @@ type PocketResult = {
 };
 
 type Input = z.infer<typeof statementInput>;
+
+export const UNSUPPORTED_MESSAGE =
+  "Not a statement JoyoArto can read yet (Bank Jago monthly statement, GoPay e-statement). Use CSV import, ask Claude to read it, or request support for this format.";
+
+/** A statement JoyoArto parses itself. */
+export function isSupportedStatement(text: string): boolean {
+  return isJagoStatement(text) || isGopayStatement(text);
+}
 /** How the statement arrived, for the import log (import_batch.source): "pdf" (app, API upload) or "email". */
 type Options = { source?: "pdf" | "email"; billing?: BillingConfig };
 
@@ -77,7 +85,8 @@ function period(dates: string[]) {
 export async function importStatement(db: Database, p: Principal, input: Input, options: Options = {}) {
   const jago = isJagoStatement(input.text);
   if (!jago && !isGopayStatement(input.text)) {
-    return badRequest("Not a statement JoyoArto can read yet (Bank Jago monthly statement, GoPay e-statement). Use CSV import, or ask Claude to read it.");
+    // data.reason lets the apps offer a format request (services/statement-formats.ts).
+    throw new ORPCError("BAD_REQUEST", { message: UNSUPPORTED_MESSAGE, data: { reason: "unsupported" } });
   }
   // Free plan: a few statements a month (previews too, so the prompt comes before the work). Counted when rows are saved.
   await assertStatementImport(db, p.userId, options.billing);

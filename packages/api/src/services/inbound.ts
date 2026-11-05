@@ -175,6 +175,10 @@ async function importPdf(db: Database, p: Principal, name: string, bytes: Uint8A
       ...(r.committed ? {} : { message: "The totals do not add up, so nothing was saved. Upload it in the app, or report it." }),
     };
   } catch (error) {
+    // Unsupported formats are never reported from email: the member decides in the app, after seeing what would be sent.
+    if ((error as { data?: { reason?: unknown } }).data?.reason === "unsupported") {
+      return { name, ok: false, message: "Not a statement JoyoArto can read yet (Bank Jago monthly statements and GoPay e-statements). To ask for this bank, import the PDF in the JoyoArto app and choose Request support." };
+    }
     const message = error instanceof Error ? error.message : String(error);
     // Expected refusals (not a statement we read, no rows) carry a status; anything else is a bug worth logging.
     if (!(error as { status?: number }).status) console.error("email import", error);

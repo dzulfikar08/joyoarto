@@ -15,6 +15,8 @@ type Output<F> = F extends (...args: never[]) => Promise<infer R> ? R : never;
 /** capture.receipt's answer: the stored photo, the draft, and whether the AI could read it. */
 export type ReceiptResult = Output<AppRouterClient["capture"]["receipt"]>;
 export type AttachmentUpload = Output<AppRouterClient["attachments"]["upload"]>;
+export type FormatPreview = Output<AppRouterClient["statements"]["formatPreview"]>;
+export type FormatRequestResult = Output<AppRouterClient["statements"]["requestFormat"]>;
 
 /** The hosted service (app host: app, REST API, MCP). The old baroka.by.dzulfikar.com only redirects. */
 export const DEFAULT_SERVER = "https://app.arto.joyorogo.com";
@@ -25,6 +27,8 @@ export class ApiError extends Error {
     /** HTTP status; 0 = no response (offline, DNS, timeout). */
     readonly status: number,
     readonly code?: string,
+    /** The server's error data (e.g. { reason: "unsupported" } for a statement JoyoArto cannot read yet). */
+    readonly data?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "ApiError";
@@ -114,7 +118,7 @@ export function createApi(creds: Credentials, fetchImpl: FetchLike = fetch, opti
       // not JSON (proxy error page)
     }
     if (!res.ok) {
-      const err = (json ?? {}) as { message?: string; code?: string; data?: { upgrade?: boolean } };
+      const err = (json ?? {}) as { message?: string; code?: string; data?: { upgrade?: boolean } & Record<string, unknown> };
       const message =
         options.storeSafe && err.data?.upgrade === true
           ? STORE_SAFE_LIMIT_MESSAGE
@@ -123,7 +127,7 @@ export function createApi(creds: Credentials, fetchImpl: FetchLike = fetch, opti
           : res.status === 403
             ? (err.message ?? "This token is not allowed to do that (it needs finance:write).")
             : (err.message ?? `Server error ${res.status}`);
-      throw new ApiError(message, res.status, err.code);
+      throw new ApiError(message, res.status, err.code, err.data);
     }
     return json as T;
   }
@@ -157,6 +161,14 @@ export function createApi(creds: Credentials, fetchImpl: FetchLike = fetch, opti
     /** POST /api/attachments: a photo for an existing transaction; `replace` removes its other photos. */
     uploadAttachment: (file: UploadFile, transactionId: string, replace: boolean) =>
       upload<AttachmentUpload>("/attachments", "file", file, { transactionId, replace: replace ? "true" : "false" }, 60_000),
+    /**
+     * POST /api/statements/format-preview-file: multipart `file`. For a statement JoyoArto can't read yet: the masked
+     * skeleton a format request would send (nothing is sent here).
+     */
+    formatPreviewFile: (file: UploadFile) => upload<FormatPreview>("/statements/format-preview-file", "file", file, {}, 120_000),
+    /** POST /api/statements/format-requests-file: sends the format request (the server masks the PDF again itself). */
+    requestFormatFile: (file: UploadFile, platform: "android" | "ios" | "other") =>
+      upload<FormatRequestResult>("/statements/format-requests-file", "file", file, { source: "app", platform }, 120_000),
     /** GET this with `Authorization: Bearer <token>` to show or save a photo or a claim report. */
     url: (path: string) => `${base}${path.startsWith("/api/") ? path : `/api${path}`}`,
   };

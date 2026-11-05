@@ -23,6 +23,7 @@ import * as reports from "../services/reports";
 import * as rules from "../services/rules";
 import * as savings from "../services/savings";
 import * as scenarios from "../services/scenarios";
+import * as formats from "../services/statement-formats";
 import * as statements from "../services/statements";
 import * as tokens from "../services/tokens";
 import * as tx from "../services/transactions";
@@ -250,6 +251,36 @@ export const appRouter = {
     mappings: readProcedure
       .route({ method: "GET", path: "/imports/mappings", tags: ["imports"] })
       .handler(({ context }) => imports.listMappings(context.db, context.principal)),
+  },
+
+  /** Statements JoyoArto cannot read yet: a masked skeleton the member sees, then a format request to the owner. */
+  statements: {
+    formatPreview: readProcedure
+      .route({
+        method: "POST",
+        path: "/statements/format-preview",
+        tags: ["imports"],
+        summary: "The masked skeleton a format request would send for this statement text (nothing is sent)",
+      })
+      .input(formats.formatPreviewInput)
+      .handler(({ context, input }) => formats.formatPreview(context.db, context.principal, context.config?.atur, input)),
+    formatPreviewFile: readProcedure
+      .route({ method: "POST", path: "/statements/format-preview-file", tags: ["imports"], summary: "formatPreview for a statement PDF (multipart/form-data: file)" })
+      .input(formats.formatPreviewFileInput)
+      .handler(({ context, input }) => formats.formatPreviewFile(context.db, context.principal, context.config?.atur, input)),
+    requestFormat: writeProcedure
+      .route({
+        method: "POST",
+        path: "/statements/format-requests",
+        tags: ["imports"],
+        summary: "Ask for support of this statement format: sends the masked skeleton (rebuilt on the server) and an AI parser spec to the JoyoArto team",
+      })
+      .input(formats.formatRequestInput)
+      .handler(({ context, input }) => formats.requestFormat(context.db, context.principal, context.config?.atur, context.ai, input)),
+    requestFormatFile: writeProcedure
+      .route({ method: "POST", path: "/statements/format-requests-file", tags: ["imports"], summary: "requestFormat for a statement PDF (multipart/form-data: file, source, platform)" })
+      .input(formats.formatRequestFileInput)
+      .handler(({ context, input }) => formats.requestFormatFile(context.db, context.principal, context.config?.atur, context.ai, input)),
   },
 
   tokens: {
