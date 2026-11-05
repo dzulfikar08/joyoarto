@@ -131,7 +131,8 @@ export function ReimburseSwitch({
 export function useLedgerRefresh() {
   const qc = useQueryClient();
   return () => {
-    void qc.invalidateQueries({ queryKey: ["transactions"] });
+    void qc.invalidateQueries({ queryKey: orpc.transactions.key() });
+    void qc.invalidateQueries({ queryKey: orpc.budgets.key() });
     void qc.invalidateQueries({ queryKey: orpc.reports.key() });
     void qc.invalidateQueries({ queryKey: orpc.accounts.key() });
     void qc.invalidateQueries({ queryKey: orpc.reimburse.key() });

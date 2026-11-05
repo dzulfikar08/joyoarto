@@ -1,3 +1,5 @@
+import { parseAmountText } from "@baroka/api/lib/amount-text";
+
 /** Same notation as the API's display strings: "Rp 12.500", decimals only when present. */
 export function formatMoney(minor: number, currency = "IDR"): string {
   const exp = ["JPY", "KRW"].includes(currency) ? 0 : 2;
@@ -8,10 +10,15 @@ export function formatMoney(minor: number, currency = "IDR"): string {
   return `${minor < 0 ? "-" : ""}${symbol} ${whole}${frac ? `,${frac.toString().padStart(exp, "0")}` : ""}`;
 }
 
-/** "25000" or "25.000" (rupiah, major units) -> minor units. */
-export function rupiahToMinor(input: string): number {
-  const digits = input.replace(/[^\d-]/g, "");
-  return Number(digits || "0") * 100;
+/**
+ * A typed rupiah amount -> signed minor units, with the same rules as quick add ("25.000", "1.250.000,50", "1,5jt",
+ * "-500rb"). Empty or zero is 0. Throws when the text is not an amount.
+ */
+export function rupiahToMinor(input: string, currency = "IDR"): number {
+  const s = input.trim();
+  if (!s || /^[+\-−]?\s*(Rp\.?\s*)?0+([.,]0+)?$/i.test(s)) return 0;
+  const { amount, sign } = parseAmountText(s, currency);
+  return sign === -1 ? -amount : amount;
 }
 
 /** Short rupiah for chart axes, in Indonesian shorthand: 250 rb, 2,5 jt, 1,2 M. */

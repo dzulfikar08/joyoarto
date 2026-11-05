@@ -11,7 +11,7 @@ export const Route = createFileRoute("/syarat")({ component: Terms });
 const N = PRODUCT_NAME;
 const mail = <A href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</A>;
 const privacy = (label: string) => (
-  <Link to="/privasi" className="text-emerald-700 underline dark:text-emerald-400">
+  <Link to="/privasi" className="text-primary underline">
     {label}
   </Link>
 );

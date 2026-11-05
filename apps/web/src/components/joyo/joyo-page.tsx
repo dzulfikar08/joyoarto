@@ -157,11 +157,14 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
       setMessages((m) => m.map((msg) => (msg.id === messageId ? { ...msg, proposals: msg.proposals.map((p) => (p.id === proposal.id ? res.proposal : p)) } : msg)));
       if (res.proposal.status === "done") {
         toast.success(res.proposal.result ?? "Done");
-        void qc.invalidateQueries({ queryKey: ["transactions"] });
+        void qc.invalidateQueries({ queryKey: orpc.transactions.key() });
         void qc.invalidateQueries({ queryKey: orpc.reports.key() });
         void qc.invalidateQueries({ queryKey: orpc.accounts.key() });
         void qc.invalidateQueries({ queryKey: orpc.plan.key() });
         void qc.invalidateQueries({ queryKey: orpc.rules.key() });
+        void qc.invalidateQueries({ queryKey: orpc.reimburse.key() });
+        void qc.invalidateQueries({ queryKey: orpc.budgets.key() });
+        void qc.invalidateQueries({ queryKey: orpc.categories.key() });
       } else if (res.proposal.status === "failed") toast.error(res.proposal.result ?? "Couldn't make this change");
     } catch (err) {
       toast.error(errorMessage(err));
