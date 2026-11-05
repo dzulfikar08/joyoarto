@@ -32,10 +32,14 @@
       "migrations_dir": "../../packages/db/src/migrations"
     }
   ],
+  // Receipt photos (proof for reimbursable expenses). Private: served only through /api/attachments/{id} to members of
+  // the household; keys are h/<householdId>/r/<id>. deploy.yml creates the bucket when it is missing.
+  "r2_buckets": [{ "binding": "RECEIPTS", "bucket_name": "joyoarto-receipts" }],
   // Workers AI: Whisper turns voice notes into text (the add sheet); also Joyo AI's chat model when ANTHROPIC_API_KEY is unset.
   // Local `wrangler dev` reaches it remotely (needs `wrangler login`); without it, DEV_LOGIN answers with a fixed transcript.
   "ai": { "binding": "AI" },
-  // 20:00 UTC = 03:00 WIB: the demo account (store reviewers) is reset, when the DEMO_LOGIN_CODE secret is set.
+  // 20:00 UTC = 03:00 WIB: the demo account (store reviewers) is reset, when the DEMO_LOGIN_CODE secret is set, and
+  // receipt photos never attached to a transaction (older than a day) are removed.
   "triggers": { "crons": ["0 20 * * *"] },
   "ratelimits": [
     { "name": "MCP_LIMITER", "namespace_id": "2001", "simple": { "limit": 120, "period": 60 } },
@@ -68,6 +72,8 @@
     "JOYO_AI_DAILY_CAP": "30",
     // No ANTHROPIC_API_KEY set: Joyo AI chat and capture parsing run on this Workers AI model (voice uses Whisper).
     "JOYO_WORKERS_AI_MODEL": "@cf/google/gemma-4-26b-a4b-it",
+    // No ANTHROPIC_API_KEY: receipt photos are read by this Workers AI vision model (Gemma 4 reads images).
+    "JOYO_VISION_WORKERS_AI_MODEL": "@cf/google/gemma-4-26b-a4b-it",
     "JOYO_CAPTURE_DAILY_CAP": "60",
     // Optional: "ANTHROPIC_BASE_URL": "https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/anthropic"
 
