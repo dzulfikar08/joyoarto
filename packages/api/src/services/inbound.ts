@@ -222,7 +222,7 @@ export async function receiveEmail(
   const from = msg.from.trim().toLowerCase();
   const auth: SenderAuth = senderAuth(email.headers, from);
 
-  if (mailbox(from) === "forwarding-noreply@google.com" && auth !== "fail") {
+  if (mailbox(from) === "forwarding-noreply@google.com" && auth === "pass") {
     const code = forwardingCode(subject, email.text ?? "");
     if (code) {
       await logInbound(db, householdId, { fromAddress: from, userId: null, subject, status: "forwarding_confirmation", detail: { code } });
@@ -236,7 +236,8 @@ export async function receiveEmail(
     .innerJoin(schema.user, eq(schema.user.id, schema.householdMember.userId))
     .where(eq(schema.householdMember.householdId, householdId));
   const member = members.find((m) => mailbox(m.email) === mailbox(from));
-  if (!member || auth === "fail") {
+  // Only a positive result counts: "unknown" means Cloudflare's verdict is missing, not that the sender is fine.
+  if (!member || auth !== "pass") {
     await logInbound(db, householdId, {
       fromAddress: from,
       userId: member?.userId ?? null,
