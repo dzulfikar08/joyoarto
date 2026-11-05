@@ -164,7 +164,7 @@ async function importPdf(db: Database, p: Principal, name: string, bytes: Uint8A
     }
     return {
       name,
-      ok: true,
+      ok: r.committed,
       kind: "gopay",
       period: r.period,
       newRows: r.wallet.inserted,
@@ -172,6 +172,7 @@ async function importPdf(db: Database, p: Principal, name: string, bytes: Uint8A
       verified: r.totalsVerified,
       uncategorized: r.wallet.uncategorized,
       named: r.bankPaymentsNamed,
+      ...(r.committed ? {} : { message: "The totals do not add up, so nothing was saved. Upload it in the app, or report it." }),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
