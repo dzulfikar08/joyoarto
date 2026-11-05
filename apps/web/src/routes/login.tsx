@@ -7,6 +7,7 @@ import { BrandMark } from "@/components/kit";
 import { sessionQuery } from "@/lib/auth";
 import { authClient } from "@/lib/auth-client";
 import { SERVER_URL, queryClient } from "@/lib/orpc";
+import { safeRedirect } from "@/lib/safe-redirect";
 
 type Search = { redirect?: string };
 
@@ -17,11 +18,6 @@ export const Route = createFileRoute("/login")({
   },
   component: Login,
 });
-
-/** Only same-origin paths: an open redirect would let a link send someone elsewhere after signing in. */
-function safeRedirect(target: string | undefined): string {
-  return target && target.startsWith("/") && !target.startsWith("//") ? target : "/";
-}
 
 function Login() {
   const { redirect: target } = Route.useSearch();

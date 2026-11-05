@@ -12,7 +12,7 @@ export const Route = createFileRoute("/privasi")({ component: Privacy });
 const N = PRODUCT_NAME;
 const mail = <A href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</A>;
 const settings = (label: string) => (
-  <Link to="/settings" className="text-emerald-700 underline dark:text-emerald-400">
+  <Link to="/settings" className="text-primary underline">
     {label}
   </Link>
 );

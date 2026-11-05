@@ -56,7 +56,12 @@ iOS compiles and ships through TestFlight. Read the repo's README.md "Mobile app
   the server's Joyo Pro purchase text and never link to the web app (App Review 3.1.1; `src/lib/platform.ts`).
 - Cache: `src/lib/query.ts`. Fresh for a minute, refetch on app focus and reconnect, offline-first. Cheap reads in
   `PERSISTED_PROCEDURES` (`src/lib/query-policy.ts`) are saved on the device for offline starts; add a procedure there
-  only if its answer is small. Everything cached is dropped at sign-in and sign-out. `UNAUTHORIZED` signs out.
+  only if its answer is small. Everything cached is dropped at sign-in and sign-out. `UNAUTHORIZED` signs out
+  (`signOut({ expired: true })`, also from the headless capture sync on a 401).
+- Notification captures belong to the account that read them (`src/capture/session.ts`): signing out deletes the queue,
+  the native inbox and the capture settings and turns the listener off; an expired sign-in keeps the queue paused for
+  the same account and resumes it after sign-in. Android backup is off (`allowBackup: false`): nothing in the app's
+  files goes to Google Drive.
 
 ## UI conventions
 

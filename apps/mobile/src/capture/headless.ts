@@ -1,5 +1,6 @@
 import { AppRegistry } from "react-native";
 
+import "./session";
 import { syncCaptures } from "./sync";
 
 /**

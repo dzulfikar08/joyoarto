@@ -127,6 +127,42 @@ describe("reimbursable expenses are not household spending", () => {
 });
 
 describe("claims", () => {
+  test("concurrent claims never take the same item twice, and each report lists what it took", async () => {
+    const prof = await profile();
+    const a = await add(-12_500_000, 4, "Grab");
+    const b = await add(-8_750_000, 5, "Bakmi");
+    await call(r.mark, { ids: [a, b], profileId: prof.id, reimbursable: true }, { context: ctx() });
+    // Hold the first claim's write until the second has read the same drafts.
+    const batch = db.batch.bind(db);
+    let release: (() => void) | null = null;
+    let calls = 0;
+    (db as { batch: unknown }).batch = async (stmts: Parameters<typeof batch>[0]) => {
+      calls++;
+      if (calls === 1) await new Promise<void>((resolve) => (release = resolve));
+      else if (calls === 2) release!();
+      return batch(stmts);
+    };
+    const results = await Promise.allSettled([
+      call(r.claims.create, { profileId: prof.id, transactionIds: [a] }, { context: ctx() }),
+      call(r.claims.create, { profileId: prof.id }, { context: ctx() }),
+    ]);
+    (db as { batch: unknown }).batch = batch;
+    expect(calls).toBe(2);
+    const made = results.flatMap((x) => (x.status === "fulfilled" ? [x.value.claim] : []));
+    expect(made.length).toBeGreaterThan(0);
+    const rows = await db.select().from(schema.transaction).where(eq(schema.transaction.reimburseProfileId, prof.id));
+    expect(rows.every((x) => x.reimburseStatus === "submitted" && x.reimburseClaimId)).toBe(true);
+    for (const c of made) {
+      const mine = rows.filter((x) => x.reimburseClaimId === c.id);
+      expect(c.itemCount).toBe(mine.length);
+      expect(c.total.amount).toBe(-mine.reduce((sum, x) => sum + x.amount, 0));
+      const [saved] = await db.select().from(schema.reimbursementClaim).where(eq(schema.reimbursementClaim.id, c.id));
+      expect((JSON.parse(saved!.snapshot) as { items: { transactionId: string }[] }).items.map((i) => i.transactionId).sort()).toEqual(mine.map((x) => x.id).sort());
+    }
+    // A failed claim leaves no report behind.
+    expect((await db.select().from(schema.reimbursementClaim).where(eq(schema.reimbursementClaim.profileId, prof.id))).length).toBe(made.length);
+  });
+
   test("generate: PDF with the receipts, CSV, numbering, items submitted, then withdraw", async () => {
     const prof = await profile();
     const a = await add(-12_500_000, 4, "Grab");
@@ -225,6 +261,18 @@ describe("receipt photos", () => {
     expect(files.objects.size).toBe(2);
     const [h] = await db.select().from(schema.household).where(eq(schema.household.id, p.householdId));
     await deleteHousehold(db, p, { confirmName: h!.name }, files);
+    expect(files.objects.size).toBe(0);
+  });
+
+  test("the sweep keeps the rows when R2 fails, and removes them the next time", async () => {
+    await upload();
+    const failing = { ...files, delete: async () => { throw new Error("R2 down"); } };
+    const later = Date.now() + 25 * 3_600_000;
+    expect(await sweepOrphanAttachments(db, failing, later)).toBe(0);
+    expect((await db.select().from(schema.attachment)).length).toBe(1);
+    expect(files.objects.size).toBe(1);
+    expect(await sweepOrphanAttachments(db, files, later)).toBe(1);
+    expect((await db.select().from(schema.attachment)).length).toBe(0);
     expect(files.objects.size).toBe(0);
   });
 

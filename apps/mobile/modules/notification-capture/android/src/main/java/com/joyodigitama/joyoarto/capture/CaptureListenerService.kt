@@ -38,6 +38,7 @@ class CaptureListenerService : NotificationListenerService() {
       title = title.take(300),
       text = text.take(1500),
       simulated = false,
+      shownAt = n.`when`,
     ))
   }
 

@@ -13,20 +13,22 @@ data class InboxItem(
   val title: String,
   val text: String,
   val simulated: Boolean,
+  /** Notification.when: kept across updates and re-alerts of one notification, new for a new one. 0 = unknown. */
+  val shownAt: Long = 0L,
 ) {
   fun toJson(): JSONObject = JSONObject()
     .put("id", id).put("packageName", packageName).put("key", key).put("postedAt", postedAt)
-    .put("title", title).put("text", text).put("simulated", simulated)
+    .put("title", title).put("text", text).put("simulated", simulated).put("shownAt", shownAt)
 
   fun toMap(): Map<String, Any> = mapOf(
     "id" to id, "packageName" to packageName, "key" to key, "postedAt" to postedAt.toDouble(),
-    "title" to title, "text" to text, "simulated" to simulated,
+    "title" to title, "text" to text, "simulated" to simulated, "shownAt" to shownAt.toDouble(),
   )
 
   companion object {
     fun fromJson(o: JSONObject) = InboxItem(
       o.getString("id"), o.getString("packageName"), o.optString("key"), o.getLong("postedAt"),
-      o.optString("title"), o.optString("text"), o.optBoolean("simulated"),
+      o.optString("title"), o.optString("text"), o.optBoolean("simulated"), o.optLong("shownAt", 0L),
     )
   }
 }

@@ -16,27 +16,36 @@ export function flatInstallment(principal: number, ratePct: number, months: numb
   return roundUpRupiah((principal + interest) / months);
 }
 
-/** Effective (annuity) rate: the payment that clears the declining balance at ratePct/12 per month. */
-export function annuityInstallment(principal: number, ratePct: number, months: number): number {
+/** Unrounded annuity payment at monthly rate i; paid in advance, the first one is due at once (no interest on it). */
+function annuity(principal: number, i: number, months: number, advance: boolean): number {
+  if (i === 0) return principal / months;
+  const arrears = (principal * i) / (1 - (1 + i) ** -months);
+  return advance ? arrears / (1 + i) : arrears;
+}
+
+/**
+ * Effective (annuity) rate: the payment that clears the declining balance at ratePct/12 per month. In advance (the
+ * first installment paid with the down payment) each payment comes a month earlier, so it is smaller by (1 + i).
+ */
+export function annuityInstallment(principal: number, ratePct: number, months: number, advance = false): number {
   if (principal <= 0) return 0;
-  const i = ratePct / 100 / 12;
-  if (i === 0) return roundUpRupiah(principal / months);
-  return roundUpRupiah((principal * i) / (1 - (1 + i) ** -months));
+  return roundUpRupiah(annuity(principal, ratePct / 100 / 12, months, advance));
 }
 
 /** The effective yearly rate (annuity, %) that a given installment implies; one decimal. Bisection. */
-export function impliedEffectiveRate(principal: number, installment: number, months: number): number {
-  return Math.round(impliedRateRaw(principal, installment, months) * 10) / 10;
+export function impliedEffectiveRate(principal: number, installment: number, months: number, advance = false): number {
+  return Math.round(impliedRateRaw(principal, installment, months, advance) * 10) / 10;
 }
 
-function impliedRateRaw(principal: number, installment: number, months: number): number {
+function impliedRateRaw(principal: number, installment: number, months: number, advance = false): number {
   if (principal <= 0 || installment * months <= principal) return 0;
+  // One installment paid at once carries no interest, whatever the rate.
+  if (advance && months <= 1) return 0;
   let lo = 0;
   let hi = 200;
   for (let k = 0; k < 80; k++) {
     const mid = (lo + hi) / 2;
-    const i = mid / 100 / 12;
-    const pmt = (principal * i) / (1 - (1 + i) ** -months);
+    const pmt = annuity(principal, mid / 100 / 12, months, advance);
     if (pmt > installment) hi = mid;
     else lo = mid;
   }
@@ -89,11 +98,18 @@ export function loanTerms(item: LoanItem): LoanTerms {
   const n = item.tenorMonths;
   const rate = item.ratePct ?? 0;
   const quoted = item.installment !== undefined;
+  const inAdvance = item.payment === "advance";
   const installment =
-    principal <= 0 ? 0 : quoted ? item.installment! : item.rateType === "flat" ? flatInstallment(principal, rate, n) : annuityInstallment(principal, rate, n);
+    principal <= 0
+      ? 0
+      : quoted
+        ? item.installment!
+        : item.rateType === "flat"
+          ? flatInstallment(principal, rate, n)
+          : annuityInstallment(principal, rate, n, inAdvance);
   const totalInstallments = installment * n;
   const totalInterest = Math.max(0, totalInstallments - principal);
-  const advance = item.payment === "advance" && installment > 0;
+  const advance = inAdvance && installment > 0;
   const upfront =
     downPayment + (item.feesFinanced ? 0 : fees) + (item.insuranceFinanced ? 0 : insuranceFirstYear) + (advance ? installment : 0);
   const runningMonthly = item.fuelMonthly + item.parkingTollMonthly + item.maintenanceMonthly;
@@ -117,8 +133,9 @@ export function loanTerms(item: LoanItem): LoanTerms {
     tenorMonths: n,
     totalInstallments,
     totalInterest,
-    effectiveRatePct: item.rateType === "effective" && !quoted ? rate : impliedEffectiveRate(principal, installment, n),
-    monthlyRate: item.rateType === "effective" && !quoted ? rate / 1200 : impliedRateRaw(principal, installment, n) / 1200,
+    // Solved on the same timing (arrears or advance) that outstandingPrincipal runs the schedule on.
+    effectiveRatePct: item.rateType === "effective" && !quoted ? rate : impliedEffectiveRate(principal, installment, n, advance),
+    monthlyRate: item.rateType === "effective" && !quoted ? rate / 1200 : impliedRateRaw(principal, installment, n, advance) / 1200,
     advance,
     upfront,
     runningMonthly,

@@ -18,23 +18,38 @@ export function mailbox(address: string): string {
 
 export type SenderAuth = "pass" | "fail" | "unknown";
 
+/** Whether `a` and `b` are the same domain or one is a subdomain of the other (DMARC-style relaxed alignment). */
+function aligned(a: string, b: string): boolean {
+  const x = a.toLowerCase().replace(/\.$/, "");
+  const y = b.toLowerCase().replace(/\.$/, "");
+  return !!x && !!y && (x === y || x.endsWith(`.${y}`) || y.endsWith(`.${x}`));
+}
+
 /**
  * Whether the receiving server (Cloudflare Email Routing, authserv-id mx.cloudflare.net) authenticated the sender's
- * domain: SPF for the envelope domain, DKIM for it, or DMARC. "unknown" when no such result header is present.
+ * domain: SPF for the envelope domain, DKIM for it, or DMARC for a From domain aligned with it.
+ *
+ * Only the topmost Authentication-Results / ARC-Authentication-Results header is read: Cloudflare prepends its own
+ * (as `ARC-Authentication-Results: i=N; mx.cloudflare.net; ...`), so anything below it came with the message and
+ * can be forged by the sender. That header must name mx.cloudflare.net as its authserv-id, else "unknown".
  */
 export function senderAuth(headers: { key: string; value: string }[], envelopeFrom: string): SenderAuth {
   const domain = envelopeFrom.toLowerCase().split("@")[1] ?? "";
-  const results = headers
-    .filter((h) => h.key === "authentication-results" || h.key === "arc-authentication-results")
-    .map((h) => h.value.replace(/\s+/g, " "))
-    .filter((v) => /(^|;|\s)mx\.cloudflare\.net\b/i.test(v));
-  if (!results.length) return "unknown";
-  const sameDomain = (d: string | undefined) => !!d && (d.toLowerCase() === domain || domain.endsWith(`.${d.toLowerCase()}`));
-  for (const r of results) {
-    if (/\bdmarc=pass\b/i.test(r)) return "pass";
-    const spf = /\bspf=pass\b[^;]*?smtp\.mailfrom=(?:[^@\s;]*@)?([^\s;]+)/i.exec(r);
-    if (spf && sameDomain(spf[1])) return "pass";
-    for (const m of r.matchAll(/\bdkim=pass\b[^;]*?header\.(?:d|i)=@?([^\s;]+)/gi)) if (sameDomain(m[1])) return "pass";
+  const top = headers.find((h) => h.key === "authentication-results" || h.key === "arc-authentication-results");
+  if (!top) return "unknown";
+  // authserv-id: the first ;-separated field, after the "i=N" instance tag on ARC headers.
+  const fields = top.value.replace(/\s+/g, " ").split(";").map((f) => f.trim());
+  if (top.key === "arc-authentication-results" && /^i=\d+$/i.test(fields[0] ?? "")) fields.shift();
+  const authservId = (fields.shift() ?? "").split(" ")[0]!.toLowerCase();
+  if (authservId !== "mx.cloudflare.net" || !domain) return "unknown";
+  const parentOrSame = (d: string | undefined) => !!d && (d.toLowerCase() === domain || domain.endsWith(`.${d.toLowerCase()}`));
+  for (const r of fields) {
+    const dmarc = /^dmarc=pass\b.*?\bheader\.from=([^\s;]+)/i.exec(r);
+    if (dmarc && aligned(dmarc[1]!, domain)) return "pass";
+    const spf = /^spf=pass\b.*?\bsmtp\.mailfrom=(?:[^@\s;]*@)?([^\s;]+)/i.exec(r);
+    if (spf && parentOrSame(spf[1])) return "pass";
+    const dkim = /^dkim=pass\b.*?\bheader\.(?:d|i)=@?([^\s;]+)/i.exec(r);
+    if (dkim && parentOrSame(dkim[1])) return "pass";
   }
   return "fail";
 }

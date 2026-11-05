@@ -7,7 +7,8 @@ import { babyTemplate, carTemplate, carUpgradeTemplate } from "@baroka/api/lib/p
 import { shiftMonth } from "./format";
 
 export type LoanIn = Extract<ScenarioItemInput, { type: "loan" }>;
-export type PlainIn = Extract<ScenarioItemInput, { type: "oneOff" | "recurring" | "incomeChange" }>;
+export type PlainIn = Extract<ScenarioItemInput, { type: "oneOff" | "recurring" | "incomeChange" | "cut" }>;
+export type CutIn = Extract<ScenarioItemInput, { type: "cut" }>;
 
 export type Block =
   | { key: string; kind: "loan"; item: LoanIn }
@@ -166,4 +167,30 @@ export function addSharedScenarios(local: PlanState, shared: PlanState): PlanSta
     scenarios.push({ ...structuredClone(s), id: uid(), name: `${s.name || "Untitled"} (shared)`, slot: freeSlot(scenarios) });
   }
   return { ...local, scenarios };
+}
+
+// ------------------------------------------------------------------------------------------------ spending cuts
+
+/** Cuts added from "Where to save" carry ids "cut:<habit>", so adding them again replaces them. */
+export const isHabitCut = (b: Block) => b.kind === "item" && b.item.type === "cut" && (b.item.id ?? "").startsWith("cut:");
+
+/** A scenario's items without the habit cuts: the plan "Where to save" measures the cuts against. */
+export const itemsWithoutCuts = (s: Scenario): ScenarioItemInput[] => flatten({ ...s, blocks: s.blocks.filter((b) => !isHabitCut(b)) });
+
+/**
+ * Puts the chosen cuts into scenario `target`, replacing the cuts added before (none chosen: removes them). Without a
+ * target (or one that is gone) it adds a scenario holding only the cuts, which compare shows against "No change".
+ */
+export function applyCuts(st: PlanState, cuts: CutIn[], target: string | null, name: string): { state: PlanState; scenarioId: string | null } {
+  const blocks = (): Block[] => cuts.map((item) => ({ key: uid(), kind: "item", item }));
+  const at = target ? st.scenarios.find((s) => s.id === target) : undefined;
+  if (at) {
+    return {
+      state: { ...st, scenarios: st.scenarios.map((s) => (s.id === at.id ? { ...s, blocks: [...s.blocks.filter((b) => !isHabitCut(b)), ...blocks()] } : s)) },
+      scenarioId: at.id,
+    };
+  }
+  if (!cuts.length || st.scenarios.length >= 6) return { state: st, scenarioId: null };
+  const id = uid();
+  return { state: { ...st, scenarios: [...st.scenarios, { id, name, slot: freeSlot(st.scenarios), blocks: blocks() }] }, scenarioId: id };
 }

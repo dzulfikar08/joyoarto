@@ -1,6 +1,6 @@
 import { schema } from "@baroka/db";
 import type { Database } from "@baroka/db";
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Principal } from "../context";
@@ -32,7 +32,7 @@ function monthEnd(m: string) {
 }
 
 /** Raw baseline in minor units: what the simulator starts from. */
-async function computeBaseline(db: Database, p: Principal, input: z.infer<typeof baselineInput>) {
+export async function computeBaseline(db: Database, p: Principal, input: z.infer<typeof baselineInput>) {
   const cur = await baseCurrency(db, p.householdId);
   const window = completeMonthsBefore(currentMonth(), input.months);
   const from = `${window[0]}-01`;
@@ -62,6 +62,8 @@ async function computeBaseline(db: Database, p: Principal, input: z.infer<typeof
       .from(t)
       .leftJoin(c, eq(c.id, t.categoryId))
       .where(and(scope(from), sql`${kindExpr} = 'expense'`, lte(t.amount, -Math.max(1, opts.outlierMin))))
+      // Largest outflow first, so the capped list keeps the real one-offs.
+      .orderBy(asc(t.amount), asc(t.date))
       .limit(500),
     // Money back into expense categories big enough to offset a one-off (refunds, someone else's share).
     db
@@ -69,6 +71,7 @@ async function computeBaseline(db: Database, p: Principal, input: z.infer<typeof
       .from(t)
       .innerJoin(c, eq(c.id, t.categoryId))
       .where(and(scope(from), ownMoney, eq(c.kind, "expense"), gte(t.amount, Math.max(1, Math.ceil(opts.outlierMin / 2)))))
+      .orderBy(desc(t.amount), asc(t.date))
       .limit(500),
     db
       .select({
@@ -213,7 +216,7 @@ export const comparePlanInput = compareInput.extend({
 const defined = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
 
 /** The plan to simulate: a saved scenario's, with whatever the call names on top. */
-async function resolveSimulateInput(db: Database, p: Principal, input: z.infer<typeof simulatePlanInput>) {
+export async function resolveSimulateInput(db: Database, p: Principal, input: z.infer<typeof simulatePlanInput>) {
   const { scenarioId, ...overrides } = input;
   const saved = scenarioId ? (await scenariosByIds(db, p, [scenarioId]))[0]! : null;
   return { plan: simulateInput.parse({ ...saved?.plan, ...defined(overrides) }), saved };
@@ -221,8 +224,13 @@ async function resolveSimulateInput(db: Database, p: Principal, input: z.infer<t
 
 const OVERRIDE_KEYS = ["monthlyIncome", "monthlySpending", "existingInstallments", "roles", "balances", "startingBalances", "startMonth", "horizonMonths", "baselineMonths", "rules"] as const;
 
-async function simBaseline(db: Database, p: Principal, input: z.infer<typeof planInput>): Promise<{ base: SimBaseline; accounts: { id: string; name: string; role: AccountRole; balance: number }[] }> {
-  const b = await computeBaseline(db, p, { months: input.baselineMonths });
+export async function simBaseline(
+  db: Database,
+  p: Principal,
+  input: z.infer<typeof planInput>,
+  computed?: Awaited<ReturnType<typeof computeBaseline>>,
+): Promise<{ base: SimBaseline; accounts: { id: string; name: string; role: AccountRole; balance: number }[] }> {
+  const b = computed ?? (await computeBaseline(db, p, { months: input.baselineMonths }));
   const accounts = b.accountRows.map((a) => ({
     id: a.id,
     name: a.name,
@@ -315,7 +323,7 @@ function baseOut(base: SimBaseline, accounts: { id: string; name: string; role: 
   };
 }
 
-function startOf(input: { startMonth?: string }) {
+export function startOf(input: { startMonth?: string }) {
   return input.startMonth ?? addMonths(currentMonth(), 1);
 }
 

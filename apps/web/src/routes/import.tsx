@@ -42,7 +42,19 @@ function ImportPage() {
   const [start, setStart] = useState("");
 
   const account = accounts.data?.accounts.find((a) => a.id === accountId);
-  const set = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f));
+  // A preview (and its Import button) belongs to the account and mapping it was read with; any change drops it.
+  const stale = () => {
+    preview.reset();
+    commit.reset();
+  };
+  const set = (patch: Partial<Form>) => {
+    setForm((f) => (f ? { ...f, ...patch } : f));
+    stale();
+  };
+  const chooseAccount = (id: string) => {
+    setAccountId(id);
+    stale();
+  };
   const header = useMemo(() => (table && form ? (table[form.headerRow] ?? []) : []), [table, form]);
 
   const load = async (file: File) => {
@@ -55,8 +67,7 @@ function ImportPage() {
     setTable(parsed);
     setFileName(file.name);
     setForm(initialForm(parsed, preset?.mapping));
-    preview.reset();
-    commit.reset();
+    stale();
   };
 
   const run = (doCommit: boolean) =>
@@ -102,7 +113,7 @@ function ImportPage() {
               id="csv-account"
               className="w-full"
               value={accountId}
-              onValueChange={setAccountId}
+              onValueChange={chooseAccount}
               placeholder="Choose…"
               items={accountOptions(accounts.data?.accounts ?? [])}
               searchPlaceholder="Search accounts"
@@ -142,6 +153,7 @@ function ImportPage() {
                   if (!m) return;
                   const headerRow = presetHeaderRow(table, m, form.headerRow);
                   setForm({ ...form, headerRow, ...formFromPreset(table, headerRow, m) });
+                  stale();
                 }}
                 items={[
                   ...(mappings.data?.saved.map((s) => ({ value: `saved:${s.id}`, label: `Saved: ${s.name}` })) ?? []),
@@ -352,7 +364,7 @@ function ImportPage() {
                 <Field label="Save mapping as" htmlFor="map-save-as" hint="Optional: reuse it next time from “Start from”." className="sm:w-72">
                   <Input id="map-save-as" placeholder="e.g. BCA CSV" value={saveAs} onChange={(e) => setSaveAs(e.target.value)} />
                 </Field>
-                <Button className="sm:mb-[1.375rem]" disabled={commit.isPending || !result.newRows} onClick={() => commit.mutate()}>
+                <Button className="sm:mb-[1.375rem]" disabled={commit.isPending || preview.isPending || !preview.data || !result.newRows} onClick={() => commit.mutate()}>
                   {commit.isPending ? "Saving…" : `Import ${result.newRows} transactions`}
                 </Button>
               </div>

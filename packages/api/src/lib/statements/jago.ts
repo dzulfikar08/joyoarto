@@ -38,18 +38,22 @@ export type JagoStatement = {
 
 const MONTHS: Record<string, number> = {
   Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6, Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
+  // Indonesian-language statements.
+  Mei: 5, Agu: 8, Agt: 8, Okt: 10, Des: 12,
 };
 const DATE = /^(\d{2}) ([A-Z][a-z]{2}) (\d{4})$/;
 const TIME = /^\d{2}:\d{2}$/;
 const MONEY = "[\\d.]+,\\d{2}";
 const AMOUNT_ONLY = new RegExp(`^(.*?)\\s*([+-])\\s?(${MONEY})$`);
-const AMOUNT_AND_BALANCE = new RegExp(`^(.*?)\\s*([+-])\\s?(${MONEY})\\s+(${MONEY})$`);
-const BALANCE_ONLY = new RegExp(`^${MONEY}$`);
+const AMOUNT_AND_BALANCE = new RegExp(`^(.*?)\\s*([+-])\\s?(${MONEY})\\s+(-?${MONEY})$`);
+const BALANCE_ONLY = new RegExp(`^-?${MONEY}$`);
 
-/** "1.250.000,50" -> 125000050 (rupiah has two decimals). */
+/** "1.250.000,50" -> 125000050 (rupiah has two decimals); a leading "-" makes it negative. */
 export function idr(s: string): number {
-  const [whole, frac = "00"] = s.replace(/\./g, "").split(",");
-  return Number(whole) * 100 + Number(frac.padEnd(2, "0").slice(0, 2));
+  const negative = s.trim().startsWith("-");
+  const [whole, frac = "00"] = s.replace(/^\s*-\s*/, "").replace(/\./g, "").split(",");
+  const value = Number(whole) * 100 + Number(frac.padEnd(2, "0").slice(0, 2));
+  return negative ? -value : value;
 }
 
 export function isJagoStatement(text: string): boolean {
@@ -65,6 +69,7 @@ export function parseJago(text: string): JagoStatement {
     .map((l) => l.replace(/\s+/g, " ").trim())
     .filter(Boolean);
   const pockets: JagoPocket[] = [];
+  const parseProblems: string[] = [];
   let current: JagoPocket | null = null;
   const accountName = lines.find((l) => / \/ \d{9,}$/.test(l))?.split(" / ")[0] ?? null;
 
@@ -73,14 +78,22 @@ export function parseJago(text: string): JagoStatement {
     const pocket = /^Pocket ID (\S+)$/.exec(line);
     if (pocket) {
       // Previous / incoming / outgoing / closing follow "Closing Balance"; a sign may sit on its own line.
-      let j = lines.indexOf("Closing Balance", i) + 1;
+      const header = lines.indexOf("Closing Balance", i);
       const nums: number[] = [];
-      while (nums.length < 4 && j < lines.length) {
-        let t = lines[j]!;
-        if (t === "+" || t === "-") t += lines[++j]!;
-        const m = new RegExp(`^([+-]?)(${MONEY})$`).exec(t);
-        if (m) nums.push(idr(m[2]!));
-        j++;
+      let j = i + 1;
+      if (header < 0) {
+        parseProblems.push(`${lines[i - 1] ?? "Pocket"} (${pocket[1]}): no balance summary found`);
+      } else {
+        j = header + 1;
+        while (nums.length < 4 && j < lines.length) {
+          let t = lines[j]!;
+          if ((t === "+" || t === "-") && j + 1 < lines.length) t += lines[++j]!;
+          const m = new RegExp(`^([+-]?)\\s?(${MONEY})$`).exec(t);
+          // Previous and closing balances keep their sign (an overdrawn pocket); incoming/outgoing are totals.
+          if (m) nums.push(nums.length === 0 || nums.length === 3 ? idr(m[1] + m[2]!) : idr(m[2]!));
+          j++;
+        }
+        if (nums.length < 4) parseProblems.push(`${lines[i - 1] ?? "Pocket"} (${pocket[1]}): balance summary incomplete`);
       }
       current = {
         name: lines[i - 1]!,
@@ -92,7 +105,8 @@ export function parseJago(text: string): JagoStatement {
         rows: [],
       };
       pockets.push(current);
-      i = j - 1;
+      // Always move forward, even when the summary was not found.
+      i = Math.max(i, j - 1);
       continue;
     }
     const d = DATE.exec(line);
@@ -128,8 +142,13 @@ export function parseJago(text: string): JagoStatement {
     const kind = before.at(-1)!;
     const source = before.slice(0, -1);
     const notes = body.slice(idAt + 1).filter((n) => !n.startsWith("physicial"));
+    const month = MONTHS[d[2]!];
+    if (!month) {
+      parseProblems.push(`${current.name}: unknown month in "${line}"`);
+      continue;
+    }
     const row: JagoRow = {
-      date: `${d[3]}-${String(MONTHS[d[2]!] ?? 0).padStart(2, "0")}-${d[1]}`,
+      date: `${d[3]}-${String(month).padStart(2, "0")}-${d[1]}`,
       time: lines[i + 1]!,
       kind,
       source,
@@ -144,7 +163,7 @@ export function parseJago(text: string): JagoStatement {
     current.rows.push(row);
     i = j;
   }
-  return { accountName, pockets, problems: verifyJago(pockets) };
+  return { accountName, pockets, problems: [...parseProblems, ...verifyJago(pockets)] };
 }
 
 /** Running balances and section totals; any mismatch means a row was read wrong. */

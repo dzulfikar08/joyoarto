@@ -150,12 +150,18 @@ export async function attachmentsByTransaction(db: Database, householdId: string
 export async function purgeTransactionFiles(db: Database, files: FileStore | undefined, householdId: string, txIds: readonly string[]): Promise<number> {
   let removed = 0;
   for (const part of chunk([...new Set(txIds)], 90)) {
+    const found = await db
+      .select({ id: at.id, key: at.r2Key })
+      .from(at)
+      .where(and(eq(at.householdId, householdId), inArray(at.transactionId, part)));
+    if (!found.length) continue;
+    // Objects first: if R2 fails the rows stay (and the error stops the caller), so no object loses its row.
+    if (files) await files.delete(found.map((g) => g.key));
     const gone = await db
       .delete(at)
-      .where(and(eq(at.householdId, householdId), inArray(at.transactionId, part)))
-      .returning({ key: at.r2Key });
+      .where(and(eq(at.householdId, householdId), inArray(at.id, found.map((g) => g.id))))
+      .returning({ id: at.id });
     removed += gone.length;
-    if (files && gone.length) await files.delete(gone.map((g) => g.key));
   }
   return removed;
 }
@@ -177,12 +183,29 @@ export async function purgeHouseholdFiles(files: FileStore | undefined, househol
 
 /** Daily: uploads the add sheet never saved. */
 export async function sweepOrphanAttachments(db: Database, files: FileStore | undefined, now = Date.now()): Promise<number> {
-  const gone = await db
-    .delete(at)
-    .where(inArray(at.id, db.select({ id: at.id }).from(at).where(and(isNull(at.transactionId), lt(at.createdAt, new Date(now - ORPHAN_AFTER_MS)))).limit(500)))
-    .returning({ key: at.r2Key });
-  if (files && gone.length) for (const part of chunk(gone.map((g) => g.key), 1000)) await files.delete(part);
-  return gone.length;
+  const found = await db
+    .select({ id: at.id, key: at.r2Key })
+    .from(at)
+    .where(and(isNull(at.transactionId), lt(at.createdAt, new Date(now - ORPHAN_AFTER_MS))))
+    .limit(500);
+  // R2 first, then only the rows whose objects are gone: when R2 fails, the rows stay for the next night's sweep.
+  let removed = 0;
+  for (const part of chunk(found, 90)) {
+    if (files) {
+      try {
+        await files.delete(part.map((g) => g.key));
+      } catch (error) {
+        console.error("orphan receipts: R2 delete failed", error instanceof Error ? error.message : String(error));
+        continue;
+      }
+    }
+    const gone = await db
+      .delete(at)
+      .where(and(inArray(at.id, part.map((g) => g.id)), isNull(at.transactionId)))
+      .returning({ id: at.id });
+    removed += gone.length;
+  }
+  return removed;
 }
 
 /** An in-memory FileStore (tests, local dev without R2). */

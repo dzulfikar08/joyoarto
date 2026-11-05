@@ -164,7 +164,7 @@ async function importPdf(db: Database, p: Principal, name: string, bytes: Uint8A
     }
     return {
       name,
-      ok: true,
+      ok: r.committed,
       kind: "gopay",
       period: r.period,
       newRows: r.wallet.inserted,
@@ -172,6 +172,7 @@ async function importPdf(db: Database, p: Principal, name: string, bytes: Uint8A
       verified: r.totalsVerified,
       uncategorized: r.wallet.uncategorized,
       named: r.bankPaymentsNamed,
+      ...(r.committed ? {} : { message: "The totals do not add up, so nothing was saved. Upload it in the app, or report it." }),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -222,7 +223,7 @@ export async function receiveEmail(
   const from = msg.from.trim().toLowerCase();
   const auth: SenderAuth = senderAuth(email.headers, from);
 
-  if (mailbox(from) === "forwarding-noreply@google.com" && auth !== "fail") {
+  if (mailbox(from) === "forwarding-noreply@google.com" && auth === "pass") {
     const code = forwardingCode(subject, email.text ?? "");
     if (code) {
       await logInbound(db, householdId, { fromAddress: from, userId: null, subject, status: "forwarding_confirmation", detail: { code } });
@@ -236,7 +237,8 @@ export async function receiveEmail(
     .innerJoin(schema.user, eq(schema.user.id, schema.householdMember.userId))
     .where(eq(schema.householdMember.householdId, householdId));
   const member = members.find((m) => mailbox(m.email) === mailbox(from));
-  if (!member || auth === "fail") {
+  // Only a positive result counts: "unknown" means Cloudflare's verdict is missing, not that the sender is fine.
+  if (!member || auth !== "pass") {
     await logInbound(db, householdId, {
       fromAddress: from,
       userId: member?.userId ?? null,

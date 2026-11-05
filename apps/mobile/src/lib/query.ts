@@ -15,7 +15,7 @@ import { toast } from "./toast";
 /** A credential that stopped working (revoked token, expired session) signs out once, with a note. */
 function onUnauthorized(error: unknown) {
   if (!isUnauthorized(error) || !sessions.get()) return;
-  void signOut();
+  void signOut({ expired: true });
   toast.error("Signed out", "Your sign-in expired or was revoked. Sign in again.");
 }
 

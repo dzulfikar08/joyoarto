@@ -1,6 +1,7 @@
 import { ADB_TEST_PACKAGE, SOURCES, type SourceId } from "@/src/capture/parsers";
 import { NotificationCapture } from "@/modules/notification-capture";
 
+import { loadSession } from "./auth";
 import { jsonFile } from "./json-file";
 import { observable, useObservable } from "./observable";
 
@@ -50,13 +51,26 @@ export async function updateSettings(patch: Partial<Settings>) {
   const next = { ...store.get(), ...patch };
   store.set(next);
   file.write(next);
-  syncNativeConfig(next);
+  await syncNativeConfig(next);
 }
 
-/** The native listener only knows the switch and the allow-list. */
-export function syncNativeConfig(s: Settings) {
+/** What belongs to the signed-in account: reset at sign-out so the next account starts clean. */
+export const ACCOUNT_CAPTURE_SETTINGS = ["captureEnabled", "packages", "accountBySource", "autoSendLowConfidence"] as const;
+
+export function resetAccountSettings() {
+  const patch: Partial<Settings> = {};
+  for (const k of ACCOUNT_CAPTURE_SETTINGS) Object.assign(patch, { [k]: DEFAULT_SETTINGS[k] });
+  return updateSettings(patch);
+}
+
+/**
+ * The native listener only knows the switch and the allow-list. It reads notifications only while capture is on
+ * and someone is signed in: signed out, nothing is read (the switch comes back on at the next sign-in).
+ */
+export async function syncNativeConfig(s: Settings) {
   const packages = s.acceptAdbTests ? [...new Set([...s.packages, ADB_TEST_PACKAGE])] : s.packages;
-  NotificationCapture.setConfig(s.captureEnabled, packages);
+  const signedIn = (await loadSession()) !== null;
+  NotificationCapture.setConfig(s.captureEnabled && signedIn, packages);
 }
 
 export function useSettings() {

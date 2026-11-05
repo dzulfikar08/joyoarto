@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@baroka/ui/components/button";
+import { Checkbox } from "@baroka/ui/components/checkbox";
 import { Input } from "@baroka/ui/components/input";
 
 import { Avatar } from "@/components/avatar";
@@ -117,8 +118,8 @@ function Settings() {
           }}
         >
           <Input className="h-10 flex-1 basis-full px-3 sm:basis-64 sm:text-sm" aria-label="Token name" placeholder="Token name (e.g. Claude Code laptop)" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
-          <label className="flex items-center gap-1.5 text-sm">
-            <input type="checkbox" checked={readOnly} onChange={(e) => setReadOnly(e.target.checked)} /> read-only
+          <label className="flex cursor-pointer items-center gap-1.5 text-sm">
+            <Checkbox checked={readOnly} onCheckedChange={setReadOnly} /> read-only
           </label>
           <Button type="submit" size="sm" disabled={create.isPending || !name.trim()}>
             {create.isPending ? "Creating…" : "Create token"}

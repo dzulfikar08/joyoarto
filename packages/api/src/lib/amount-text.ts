@@ -105,3 +105,22 @@ export function counterpartyInText(text: string): string | null {
   if (!name || /^\d+$/.test(name)) return null;
   return name.slice(0, 80);
 }
+
+/**
+ * The signed amount a quick add saves: `amount` as sent; otherwise `amountText` (or an amount found in `rawText`) with
+ * the sign from `direction`, then the text's own marker ("+", "-", DB/CR), then the notification's wording, else out.
+ * Shared by the server and Joyo AI's proposal preview, so what the member confirms is what is saved.
+ */
+export function quickAddAmount(
+  input: { amount?: number; amountText?: string; rawText?: string; direction?: "in" | "out" },
+  currency = "IDR",
+): number {
+  if (input.amount !== undefined) return input.amount;
+  const raw = input.rawText?.trim() ?? "";
+  let parsed: ParsedAmountText | null = null;
+  if (input.amountText?.trim()) parsed = parseAmountText(input.amountText, currency);
+  else if (raw) parsed = findAmountInText(raw, currency);
+  if (!parsed) throw new Error("Send amount, amountText or a rawText that contains an amount.");
+  const sign = input.direction ? (input.direction === "in" ? 1 : -1) : (parsed.sign ?? (raw ? directionInText(raw) : null) ?? -1);
+  return sign * parsed.amount;
+}

@@ -1,7 +1,7 @@
 /// <reference types="bun" />
 import { expect, test } from "bun:test";
 
-import { compactMoney, currentMonthWib, monthLabel, niceTicks, shiftMonth } from "./format";
+import { compactMoney, currentMonthWib, monthLabel, niceTicks, rupiahToMinor, shiftMonth } from "./format";
 
 test("compactMoney uses Indonesian shorthand", () => {
   expect(compactMoney(0)).toBe("0");
@@ -22,4 +22,16 @@ test("month helpers", () => {
   expect(monthLabel("2026-11")).toBe("November 2026");
   expect(monthLabel("2026-11", "short")).toBe("Nov");
   expect(currentMonthWib(new Date("2026-10-31T17:30:00Z"))).toBe("2026-11");
+});
+
+test("rupiahToMinor reads Indonesian amounts like quick add", () => {
+  expect(rupiahToMinor("")).toBe(0);
+  expect(rupiahToMinor("0")).toBe(0);
+  expect(rupiahToMinor("25000")).toBe(2_500_000);
+  expect(rupiahToMinor("25.000")).toBe(2_500_000);
+  expect(rupiahToMinor("1.250.000,50")).toBe(125_000_050);
+  expect(rupiahToMinor("1,5jt")).toBe(150_000_000);
+  expect(rupiahToMinor("Rp 500rb")).toBe(50_000_000);
+  expect(rupiahToMinor("-2.000.000")).toBe(-200_000_000);
+  expect(() => rupiahToMinor("abc")).toThrow();
 });

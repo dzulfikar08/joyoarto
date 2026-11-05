@@ -236,8 +236,12 @@ export async function budgetStatus(db: Database, p: Principal, input: z.infer<ty
     };
   });
   items.sort((a, b) => b.usedPct - a.usedPct);
-  const totalBudget = items.reduce((s, i) => s + i.budget.amount, 0);
-  const totalSpent = items.reduce((s, i) => s + i.spent.amount, 0);
+  // A child budget (food/groceries) sits inside its parent's (food), whose spending already includes it: the totals
+  // only count the top-most budgeted categories.
+  const budgeted = new Set(items.map((i) => i.category));
+  const topMost = items.filter((i) => !i.category.split("/").some((_, k, parts) => k > 0 && budgeted.has(parts.slice(0, k).join("/"))));
+  const totalBudget = topMost.reduce((s, i) => s + i.budget.amount, 0);
+  const totalSpent = topMost.reduce((s, i) => s + i.spent.amount, 0);
   return {
     month: mo,
     budgets: items,

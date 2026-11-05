@@ -26,6 +26,8 @@ import { loadSession, useSession } from "@/src/lib/auth";
 // Side effects only: both clear their on-device data (own API key, plan draft) at sign-out, even if never opened.
 import "@/src/lib/joyo-byok";
 import "@/src/lib/plan-draft";
+// Captures belong to the signed-in account: deleted at sign-out, held for the same account after an expired sign-in.
+import "@/src/capture/session";
 import { bindQueryLifecycle, persistOptions, queryClient } from "@/src/lib/query";
 import { loadSettings, syncNativeConfig } from "@/src/lib/settings";
 

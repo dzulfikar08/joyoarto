@@ -194,9 +194,10 @@ export async function importTransactions(db: Database, p: Principal, input: z.in
   let inserted = 0;
   let reconciled = 0;
   if (input.commit && fresh.length) {
-    batchId = crypto.randomUUID();
-    await db.insert(schema.importBatch).values({
-      id: batchId,
+    const id = crypto.randomUUID();
+    batchId = id;
+    const logBatch = db.insert(schema.importBatch).values({
+      id,
       householdId: p.householdId,
       accountId: account.id,
       source: input.source,
@@ -208,44 +209,74 @@ export async function importTransactions(db: Database, p: Principal, input: z.in
       periodTo: period.to,
       createdBy: p.userId,
     });
-    const values = fresh.filter((r) => !replaced.has(r.index)).map(({ index: _i, merchantFrom: _m, ...row }) => ({ ...row, importBatchId: batchId }));
-    // 18 bound columns per row (status included: drizzle binds a literal default when it is left out).
+    const values = fresh.filter((r) => !replaced.has(r.index)).map(({ index: _i, merchantFrom: _m, ...row }) => ({ ...row, importBatchId: id }));
+    // 18 bound columns per row (status included: drizzle binds a literal default when it is left out). A concurrent
+    // import of the same statement may have saved some rows already: those conflict on the dedupe key and are skipped.
     const statements = values.length ? chunk(values, rowsPerInsert(18)).map((part) => db.insert(t).values(part).onConflictDoNothing().returning({ id: t.id })) : [];
-    for (const group of chunk(statements, 50)) {
-      const results = await db.batch(group as [(typeof group)[number], ...(typeof group)[number][]]);
-      inserted += results.reduce((s, res) => s + res.length, 0);
-    }
+    const saved = (rowId: string) => sql`exists (select 1 from ${t} where ${t.id} = ${rowId})`;
     // Each confirmed pending row: insert the statement row, move its tags over, delete it, keep its clientRef. One
-    // batch is one transaction, so a failure leaves the pending row as it was.
+    // batch is one transaction, so a failure leaves the pending row as it was. When the insert is skipped (another
+    // import saved the same row first), the follow-up statements match nothing and the pending row stays untouched.
     const swaps = fresh
       .filter((r) => replaced.has(r.index))
       .map(({ index, merchantFrom: _m, ...row }) => {
         const pend = replaced.get(index)!;
         return [
-          db.insert(t).values({
-            ...row,
-            importBatchId: batchId,
-            note: pend.note,
-            capturedVia: pend.capturedVia,
-            capturedAt: pend.capturedAt,
-            reimburseStatus: pend.reimburseStatus,
-            reimburseProfileId: pend.reimburseProfileId,
-            reimburseClaimId: pend.reimburseClaimId,
-          }),
-          db.update(schema.transactionTag).set({ transactionId: row.id }).where(eq(schema.transactionTag.transactionId, pend.id)),
+          db
+            .insert(t)
+            .values({
+              ...row,
+              importBatchId: id,
+              note: pend.note,
+              capturedVia: pend.capturedVia,
+              capturedAt: pend.capturedAt,
+              reimburseStatus: pend.reimburseStatus,
+              reimburseProfileId: pend.reimburseProfileId,
+              reimburseClaimId: pend.reimburseClaimId,
+            })
+            .onConflictDoNothing()
+            .returning({ id: t.id }),
+          db.update(schema.transactionTag).set({ transactionId: row.id }).where(and(eq(schema.transactionTag.transactionId, pend.id), saved(row.id))),
           // Receipt photos move with it (deleting the pending row would delete them).
-          db.update(schema.attachment).set({ transactionId: row.id }).where(eq(schema.attachment.transactionId, pend.id)),
-          db.delete(t).where(and(eq(t.id, pend.id), eq(t.householdId, p.householdId), eq(t.status, "pending"))),
+          db.update(schema.attachment).set({ transactionId: row.id }).where(and(eq(schema.attachment.transactionId, pend.id), saved(row.id))),
+          db.delete(t).where(and(eq(t.id, pend.id), eq(t.householdId, p.householdId), eq(t.status, "pending"), saved(row.id))),
           db.update(t).set({ clientRef: pend.clientRef }).where(eq(t.id, row.id)),
         ] as const;
       });
-    for (const group of chunk(swaps, 10)) {
-      const ops = group.flat();
-      await db.batch(ops as unknown as [(typeof ops)[number], ...(typeof ops)[number][]]);
-      reconciled += group.length;
-      inserted += group.length;
+    // The import log row goes in with the first batch; at most 50 statements per batch.
+    type Op = { stmt: unknown; kind: "log" | "insert" | "swap" | "other" };
+    const ops: Op[] = [
+      { stmt: logBatch, kind: "log" },
+      ...statements.map((stmt) => ({ stmt, kind: "insert" as const })),
+      ...swaps.flatMap(([ins, ...rest]) => [{ stmt: ins, kind: "swap" as const }, ...rest.map((stmt) => ({ stmt, kind: "other" as const }))]),
+    ];
+    // A swap's five statements must stay in one batch: cut only before an insert.
+    const groups: Op[][] = [];
+    for (const op of ops) {
+      const last = groups.at(-1);
+      const room = op.kind === "swap" ? 5 : 1;
+      if (!last || (op.kind !== "other" && last.length + room > 50)) groups.push([op]);
+      else last.push(op);
     }
-    await db.update(schema.importBatch).set({ insertedCount: inserted }).where(eq(schema.importBatch.id, batchId));
+    for (const group of groups) {
+      const stmts = group.map((o) => o.stmt) as unknown as Parameters<typeof db.batch>[0];
+      const results = (await db.batch(stmts)) as unknown as unknown[];
+      group.forEach((o, k) => {
+        const n = o.kind === "insert" || o.kind === "swap" ? (results[k] as unknown[]).length : 0;
+        inserted += n;
+        if (o.kind === "swap") reconciled += n;
+      });
+    }
+    if (inserted === 0) {
+      // Another import saved every row first: no empty entry in the import log.
+      await db.delete(schema.importBatch).where(eq(schema.importBatch.id, id));
+      batchId = null;
+    } else {
+      await db
+        .update(schema.importBatch)
+        .set({ insertedCount: inserted, duplicateCount: input.rows.length - inserted })
+        .where(eq(schema.importBatch.id, id));
+    }
   }
 
   const preview = fresh.slice(0, input.previewLimit).map((r) => {

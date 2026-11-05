@@ -104,6 +104,7 @@
     },
     "android": {
       "package": "com.joyodigitama.joyoarto",
+      "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#3752ae",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
