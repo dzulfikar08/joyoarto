@@ -42,6 +42,8 @@ jobs:
     environment: release
     env:
       UPLOAD: ${{ inputs.upload_testflight && '1' || '0' }}
+      # EAS Update channel of the TestFlight/App Store build (apps/mobile/app.config.ts, docs/ota.md).
+      JOYOARTO_UPDATE_CHANNEL: production
       XCODE_VERSION: ${{ inputs.xcode_version || 'latest-stable' }}
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -130,6 +132,13 @@ jobs:
           uuid="$(cut -f1 <<<"$out")"
           cp "$RUNNER_TEMP/store.mobileprovision" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/$uuid.mobileprovision"
           echo "EXPORT_PROFILE=$(cut -f2 <<<"$out")" >> "$GITHUB_ENV"
+
+      # The fingerprint runtimeVersion this binary embeds (docs/ota.md): an OTA update reaches it only when published
+      # from a commit that resolves to the same value. Keep it from the job summary.
+      - name: OTA runtimeVersion
+        env:
+          JOYOARTO_GOOGLE_IOS_CLIENT_ID: ${{ vars.JOYOARTO_GOOGLE_IOS_CLIENT_ID }}
+        run: apps/mobile/scripts/ota.sh --runtime --channel "$JOYOARTO_UPDATE_CHANNEL" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Build IPA
         env:

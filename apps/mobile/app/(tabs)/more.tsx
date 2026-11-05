@@ -3,6 +3,7 @@
 
 import Constants from "expo-constants";
 import { useRouter, type Href } from "expo-router";
+import * as Updates from "expo-updates";
 import { Alert, Linking, Platform, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
@@ -12,6 +13,7 @@ import { Avatar, Button, Card, FieldLabel, ListRow, ListSection, Pill, Row, Scre
 import { setAppearance, useAppearance, type Appearance } from "@/src/lib/appearance";
 import { signOut, useSession } from "@/src/lib/auth";
 import { signOutOfGoogle } from "@/src/lib/google-native-device";
+import { otaLabel } from "@/src/lib/ota";
 import { storeSafe } from "@/src/lib/platform";
 
 export default function More() {
@@ -21,6 +23,15 @@ export default function More() {
   const appearance = useAppearance();
   const go = (href: Href) => router.push(href);
   const version = Constants.expoConfig?.version ?? "";
+  // Which JS bundle runs (docs/ota.md): null in dev clients and on the web.
+  const bundle = otaLabel({
+    enabled: Platform.OS !== "web" && Updates.isEnabled,
+    isEmbeddedLaunch: Updates.isEmbeddedLaunch,
+    isEmergencyLaunch: Updates.isEmergencyLaunch,
+    updateId: Updates.updateId,
+    runtimeVersion: Updates.runtimeVersion,
+    channel: Updates.channel,
+  });
 
   const confirmSignOut = () =>
     Alert.alert("Sign out?", session?.kind === "session" ? "You can sign in again with Google or Apple." : "The token is removed from this phone. Revoke it on the web if the phone is lost.", [
@@ -92,6 +103,11 @@ export default function More() {
         <Text variant="caption" tone="muted" style={{ textAlign: "center" }}>
           JoyoArto {version} · not affiliated with any bank or e-wallet
         </Text>
+        {bundle ? (
+          <Text variant="caption" tone="muted" style={{ textAlign: "center" }}>
+            {bundle}
+          </Text>
+        ) : null}
       </Screen>
     </SafeAreaView>
   );

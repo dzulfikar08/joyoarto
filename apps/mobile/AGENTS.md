@@ -99,5 +99,6 @@ Each replaces a placeholder or a "coming" note; the web page is the spec.
 
 - Done: **Import**, **Accounts**, **Household / Settings / Billing / Data & privacy**, **Budgets editing**, **Plan &
   simulate**, **Joyo AI chat**, **Voice quick add** (Nov 2026), **Receipt photos and Reimburse** (Nov 2026).
-- **OTA updates** (expo-updates + EAS Update like
-  JoyoRogo's docs/ota.md; needs an EAS project id from the owner).
+- Done: **OTA updates** (expo-updates + EAS Update, Nov 2026): `docs/ota.md`. JS-only changes may ship through the
+  "OTA update" workflow; anything native, permissions, billing or new data collection needs a store build. Never rename
+  the `JoyoArtoCapture` headless task or drop its import from `index.js`.

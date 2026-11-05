@@ -285,6 +285,13 @@ scenario (`packages/api/src/services/demo.ts`, ids and restrictions in `lib/demo
 can upload it to TestFlight, the same pipeline as JoyoRogo: `gh workflow run release-ios.yml -R dzulfikar08/joyoarto -f
 upload_testflight=true`. Secrets, signing, the privacy manifest and the App Store notes: `docs/ios-release.md`.
 
+### Over-the-air JS updates
+
+JS and asset fixes reach installed apps through EAS Update (`expo-updates`, EAS project `@dzulfikar08/joyoarto`)
+without a store review: Actions → **OTA update** (`.github/workflows/ota.yml`, environment `release`), or
+`apps/mobile/scripts/ota.sh` on the Linux box. Play and TestFlight builds listen to `production`, the sideload APK to `preview`. What
+may ship over the air, rollback and the owner's one-time setup (`EXPO_TOKEN`): `docs/ota.md`.
+
 ## Public pages and waitlist
 
 - `/` shows the landing page to visitors (Bahasa Indonesia first, English via the toggle or `?lang=en`); signed-in users
