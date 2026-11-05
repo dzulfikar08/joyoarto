@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Alert } from "react-native";
 
 import { AccountFormSheet } from "@/components/accounts/account-form";
@@ -22,6 +22,9 @@ export default function AccountScreen() {
   const q = useQuery(orpc.accounts.list.queryOptions({ input: { includeArchived: true } }));
   const [editing, setEditing] = useState(false);
   const a = q.data?.accounts.find((x) => x.id === id);
+  // Stable options: a new object each render makes expo-router call setOptions every time.
+  const name = a?.name;
+  const screenOptions = useMemo(() => ({ title: name }), [name]);
 
   const archive = useMutation({
     mutationFn: (archived: boolean) => client.accounts.update({ id, archived }),
@@ -65,7 +68,7 @@ export default function AccountScreen() {
 
   return (
     <Screen refreshing={q.isRefetching} onRefresh={() => void q.refetch()}>
-      <Stack.Screen options={{ title: a.name }} />
+      <Stack.Screen options={screenOptions} />
       {q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} compact /> : null}
       <Card>
         <Row style={{ justifyContent: "space-between" }}>

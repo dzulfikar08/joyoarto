@@ -3,7 +3,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { AccountFormSheet } from "@/components/accounts/account-form";
 import { Button, EmptyState, ErrorState, IconButton, ListRow, ListSection, Money, Pill, Screen, SkeletonCard, Text } from "@/components/ui";
@@ -14,6 +14,8 @@ export default function AccountsScreen() {
   const router = useRouter();
   const q = useQuery(orpc.accounts.list.queryOptions({ input: { includeArchived: true } }));
   const [adding, setAdding] = useState(false);
+  // Stable options: a new object each render makes expo-router call setOptions every time.
+  const screenOptions = useMemo(() => ({ headerRight: () => <IconButton name="add" label="Add an account" onPress={() => setAdding(true)} /> }), []);
   const [showArchived, setShowArchived] = useState(false);
   const { active, archived } = splitArchived(q.data?.accounts ?? []);
 
@@ -29,7 +31,7 @@ export default function AccountsScreen() {
 
   return (
     <Screen refreshing={q.isRefetching} onRefresh={() => void q.refetch()}>
-      <Stack.Screen options={{ headerRight: () => <IconButton name="add" label="Add an account" onPress={() => setAdding(true)} /> }} />
+      <Stack.Screen options={screenOptions} />
       {q.isError && q.data ? <ErrorState error={q.error} onRetry={() => void q.refetch()} compact /> : null}
       {q.isPending ? (
         <>
