@@ -83,7 +83,30 @@ export function createApi(creds: Credentials, fetchImpl: FetchLike = fetch, opti
       clearTimeout(timer);
       opts.signal?.removeEventListener("abort", abort);
     }
-    const text = await res.text();
+    return answer<T>(res.status, await res.text());
+  }
+
+  /**
+   * One file as multipart. On the phone this goes through Expo's native uploader (src/imports/native-upload.ts): React
+   * Native's fetch cannot reliably send a { uri } file part and fails before the request leaves ("No connection to the
+   * server"). Tests and other runtimes use fetch + FormData. navigator.product is checked instead of importing
+   * react-native, so the plain bun tests still load this file.
+   */
+  async function upload<T>(path: string, field: string, file: UploadFile, params: Record<string, string>, timeoutMs: number, signal?: AbortSignal): Promise<T> {
+    if (typeof navigator !== "undefined" && navigator.product === "ReactNative") {
+      const { nativeMultipart } = await import("../imports/native-upload");
+      const res = await nativeMultipart({ url: `${base}/api${path}`, token: creds.token, file, fieldName: field, parameters: params, timeoutMs, signal });
+      return answer<T>(res.status, res.text);
+    }
+    const form = new FormData();
+    // React Native's FormData takes { uri, name, type } for a file part.
+    form.append(field, file as unknown as Blob);
+    for (const [k, v] of Object.entries(params)) form.append(k, v);
+    return request<T>("POST", path, { form, timeoutMs, signal });
+  }
+
+  function answer<T>(status: number, text: string): T {
+    const res = { ok: status >= 200 && status < 300, status };
     let json: unknown = null;
     try {
       json = text ? JSON.parse(text) : null;
@@ -119,39 +142,21 @@ export function createApi(creds: Credentials, fetchImpl: FetchLike = fetch, opti
      * POST /api/imports/statement-file: multipart with `file` (the PDF) and `commit` ("false" = preview).
      * Same JSON as POST /api/imports/statement.
      */
-    uploadStatementFile: (file: UploadFile, commit: boolean) => {
-      const form = new FormData();
-      // React Native's FormData takes { uri, name, type } for a file part.
-      form.append("file", file as unknown as Blob);
-      form.append("commit", commit ? "true" : "false");
-      return request<StatementResult>("POST", "/imports/statement-file", { form, timeoutMs: 120_000 });
-    },
+    uploadStatementFile: (file: UploadFile, commit: boolean) =>
+      upload<StatementResult>("/imports/statement-file", "file", file, { commit: commit ? "true" : "false" }, 120_000),
     /**
      * POST /api/capture/transcribe: multipart with `audio` (the voice note, at most about 60 s). The server passes it to
      * Whisper and drops it; neither the audio nor the text is stored. Returns the text for capture.parse.
      */
-    transcribe: (file: UploadFile, signal?: AbortSignal) => {
-      const form = new FormData();
-      form.append("audio", file as unknown as Blob);
-      return request<{ text: string }>("POST", "/capture/transcribe", { form, timeoutMs: 45_000, signal });
-    },
+    transcribe: (file: UploadFile, signal?: AbortSignal) => upload<{ text: string }>("/capture/transcribe", "audio", file, {}, 45_000, signal),
     /**
      * POST /api/capture/receipt: multipart `image` (a JPEG the app shrank to ~1600 px). The server keeps the photo
      * (unattached until a quick add names it in attachmentIds) and reads it into a draft; nothing else is saved.
      */
-    receipt: (file: UploadFile, signal?: AbortSignal) => {
-      const form = new FormData();
-      form.append("image", file as unknown as Blob);
-      return request<ReceiptResult>("POST", "/capture/receipt", { form, timeoutMs: 60_000, signal });
-    },
+    receipt: (file: UploadFile, signal?: AbortSignal) => upload<ReceiptResult>("/capture/receipt", "image", file, {}, 60_000, signal),
     /** POST /api/attachments: a photo for an existing transaction; `replace` removes its other photos. */
-    uploadAttachment: (file: UploadFile, transactionId: string, replace: boolean) => {
-      const form = new FormData();
-      form.append("file", file as unknown as Blob);
-      form.append("transactionId", transactionId);
-      form.append("replace", replace ? "true" : "false");
-      return request<AttachmentUpload>("POST", "/attachments", { form, timeoutMs: 60_000 });
-    },
+    uploadAttachment: (file: UploadFile, transactionId: string, replace: boolean) =>
+      upload<AttachmentUpload>("/attachments", "file", file, { transactionId, replace: replace ? "true" : "false" }, 60_000),
     /** GET this with `Authorization: Bearer <token>` to show or save a photo or a claim report. */
     url: (path: string) => `${base}${path.startsWith("/api/") ? path : `/api${path}`}`,
   };
