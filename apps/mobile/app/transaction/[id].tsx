@@ -2,7 +2,7 @@
 // this merchant"), merchant name, note. Pending quick adds can also fix amount, direction, date, description and
 // account, or be deleted (the web's EditPending). Opened from a list row (src/lib/tx-cache.ts hands it over).
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { matchQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useReducer, useState } from "react";
 import { Alert, View } from "react-native";
@@ -25,11 +25,22 @@ export default function TransactionScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const [local, setLocal] = useState<Tx | null>(null);
-  // Re-read when the list refetches (after a categorize, the new category name arrives with it).
+  // Re-read when a transactions list gets new data (after a categorize, the new category name arrives with it). Only
+  // successful fetches of those lists count: re-rendering on every cache event (observers on this screen report each
+  // render) looped until React gave up ("Maximum update depth exceeded" after toggling Diganti kantor).
   const [, refresh] = useReducer((n: number) => n + 1, 0);
-  useEffect(() => qc.getQueryCache().subscribe(refresh), [qc]);
+  useEffect(
+    () =>
+      qc.getQueryCache().subscribe((event) => {
+        if (event.type === "updated" && event.action.type === "success" && matchQuery({ queryKey: orpc.transactions.key() }, event.query)) refresh();
+      }),
+    [qc],
+  );
   const t = local ?? findTransaction(qc, orpc.transactions.key(), id);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  // A new options object on every render makes expo-router call setOptions every time; keep it stable.
+  const title = t?.status === "pending" ? "Pending transaction" : "Transaction";
+  const screenOptions = useMemo(() => ({ title }), [title]);
 
   if (!t) {
     return (
@@ -46,7 +57,7 @@ export default function TransactionScreen() {
 
   return (
     <Screen>
-      <Stack.Screen options={{ title: t.status === "pending" ? "Pending transaction" : "Transaction" }} />
+      <Stack.Screen options={screenOptions} />
       <Card>
         <Row style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
           <View style={{ flex: 1, gap: 4 }}>
