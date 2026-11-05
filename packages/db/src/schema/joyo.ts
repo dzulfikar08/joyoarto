@@ -62,8 +62,8 @@ export const aiUsage = sqliteTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     householdId: text("household_id").references(() => household.id, { onDelete: "cascade" }),
-    /** chat (Joyo AI), transcribe (voice note to text), parse (text to a transaction draft). */
-    kind: text("kind", { enum: ["chat", "transcribe", "parse", "receipt"] }).notNull(),
+    /** chat (Joyo AI), transcribe (voice note to text), parse (text to a transaction draft), receipt, format (a statement format request's parser spec). */
+    kind: text("kind", { enum: ["chat", "transcribe", "parse", "receipt", "format"] }).notNull(),
     /** hosted = JoyoArto's key or Workers AI; byok = the member's own key (not counted in the cap). */
     engine: text("engine", { enum: ["hosted", "byok"] }).notNull(),
     model: text("model").notNull(),

@@ -13,16 +13,19 @@ export type BatchEntry = {
   busy: "checking" | "saving" | null;
   preview?: StatementResult;
   previewError?: string;
+  /** The server can't read this kind of statement yet: offer "Request support". */
+  unsupported?: boolean;
   result?: StatementResult;
   saveError?: string;
 };
 
-export type EntryStatus = "checking" | "saving" | "failed" | "problems" | "nothing-new" | "ready" | "saved" | "save-failed";
+export type EntryStatus = "checking" | "saving" | "unsupported" | "failed" | "problems" | "nothing-new" | "ready" | "saved" | "save-failed";
 export type StatusTone = "muted" | "primary" | "positive" | "warning" | "destructive";
 
 export const ENTRY_STATUS: Record<EntryStatus, { label: string; tone: StatusTone }> = {
   checking: { label: "Checking…", tone: "muted" },
   saving: { label: "Saving…", tone: "primary" },
+  unsupported: { label: "Not supported yet", tone: "warning" },
   failed: { label: "Check failed", tone: "destructive" },
   problems: { label: "Doesn't add up", tone: "warning" },
   "nothing-new": { label: "Already in", tone: "muted" },
@@ -42,6 +45,7 @@ export function newRows(r: StatementResult): number {
 export function entryStatus(e: BatchEntry): EntryStatus {
   if (e.busy) return e.busy;
   if (e.result?.committed) return "saved";
+  if (e.unsupported) return "unsupported";
   if (e.previewError) return "failed";
   if (!e.preview) return "checking";
   if (!verified(e.preview)) return "problems";

@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import type { DragEvent, ReactNode } from "react";
 import { toast } from "sonner";
 
+import { FormatRequestSheet } from "@/components/format-request";
 import { openUpgrade } from "@/lib/billing";
 import { client, errorMessage, orpc } from "@/lib/orpc";
 import { commitOrder, crossMatches, mapLimit, periodLabel, textKey } from "@/lib/statement-batch";
@@ -404,8 +405,7 @@ function FileCheck({ item: x, status, result: r }: { item: Item; status: Status;
   if (status === "failed") return bad(x.previewError!);
   if (status === "save-failed") return bad(`Not saved: ${x.saveError}. Press Import to try again.`);
   if (status === "duplicate") return <p className="text-xs text-muted-foreground">Same statement as {x.duplicateOf}; added once.</p>;
-  if (status === "unknown")
-    return <p className="text-xs text-warning-ink">Not a Bank Jago monthly statement or GoPay e-statement. For other banks use CSV import below, or ask Claude to read the PDF.</p>;
+  if (status === "unknown") return <Unsupported item={x} />;
   if (!r) return null;
   if (r.problems.length)
     return (
@@ -421,6 +421,27 @@ function FileCheck({ item: x, status, result: r }: { item: Item; status: Status;
       <CircleCheck aria-hidden className="mt-0.5 size-3.5 shrink-0 text-positive" />
       {r.kind === "jago" ? "Every running balance and pocket total matches." : "Totals match the statement."}
     </p>
+  );
+}
+
+/** A statement JoyoArto can't read yet: say so, and offer to request support (masked; components/format-request.tsx). */
+function Unsupported({ item: x }: { item: Item }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs text-warning-ink">
+        We can't read this statement yet: JoyoArto reads Bank Jago monthly statements and GoPay e-statements. Use CSV import below, ask Claude to read the PDF, or ask
+        us to support this bank.
+      </p>
+      {x.text && (
+        <>
+          <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+            Request support
+          </Button>
+          <FormatRequestSheet open={open} onOpenChange={setOpen} text={x.text} fileName={x.name} />
+        </>
+      )}
+    </div>
   );
 }
 

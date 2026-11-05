@@ -12,6 +12,8 @@ test("entry status follows the preview and the save", () => {
   expect(entryStatus(e)).toBe("checking");
   expect(entryStatus({ ...e, busy: "saving" })).toBe("saving");
   expect(entryStatus({ ...e, previewError: "x" })).toBe("failed");
+  expect(entryStatus({ ...e, previewError: "x", unsupported: true })).toBe("unsupported");
+  expect(canSave("unsupported")).toBe(false);
   expect(entryStatus({ ...e, preview: jago() })).toBe("ready");
   const bad = { ...jago(), balancesVerified: false, problems: ["Row 3 does not add up"] } as StatementResult;
   expect(entryStatus({ ...e, preview: bad })).toBe("problems");

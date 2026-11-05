@@ -5,7 +5,7 @@
 import { schema } from "@baroka/db";
 import type { Database } from "@baroka/db";
 import { ORPCError } from "@orpc/server";
-import { and, asc, count, desc, eq, gt, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { z } from "zod";
 
@@ -69,6 +69,7 @@ export const EXPORT_COVERAGE: Record<string, string> = {
   attachment: "attachments (receipt photo metadata: transaction, type, size; the images themselves stay in the app, GET /api/attachments/{id})",
   reimbursement_profile: "reimbursementProfiles",
   reimbursement_claim: "reimbursementClaims (with the printed snapshot)",
+  statement_format_request: "statementFormatRequests (yours: the format fingerprint and when; the statement itself was never kept)",
 };
 
 // ------------------------------------------------------------------------------------------------ export
@@ -368,6 +369,11 @@ export async function* exportJsonChunks(db: Database, p: Principal, now = new Da
       .from(u)
       .where(eq(u.userId, p.userId))
       .orderBy(asc(u.createdAt)),
+  );
+  const fr = schema.statementFormatRequest;
+  yield field(
+    "statementFormatRequests",
+    await db.select({ fingerprint: fr.fingerprint, filed: sql<boolean>`${fr.aturIssueId} is not null`, createdAt: fr.createdAt }).from(fr).where(eq(fr.userId, p.userId)).orderBy(asc(fr.createdAt)),
   );
 
   yield `"mcpAudit":[`;

@@ -84,10 +84,10 @@ export async function uploadStatementNative(server: string, token: string, file:
     // not JSON
   }
   if (res.status < 200 || res.status >= 300) {
-    const err = (json ?? {}) as { message?: string; code?: string; data?: { upgrade?: boolean } };
+    const err = (json ?? {}) as { message?: string; code?: string; data?: { upgrade?: boolean } & Record<string, unknown> };
     // iOS never shows the server's "Joyo Pro ... in JoyoRogo" limit text (App Review 3.1.1; src/lib/platform.ts).
     const message = storeSafe && err.data?.upgrade === true ? STORE_SAFE_LIMIT_MESSAGE : (err.message ?? `Server error ${res.status}`);
-    throw new ApiError(message, res.status, err.code);
+    throw new ApiError(message, res.status, err.code, err.data);
   }
   return json as StatementResult;
 }
