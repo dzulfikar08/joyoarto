@@ -262,11 +262,13 @@ export function createAuth(env: AuthConfig, database: Database, hooks: AuthHooks
     },
     session: { cookieCache: { enabled: true, maxAge: 5 * 60 } },
     advanced: {
-      defaultCookieAttributes: { sameSite: "none", secure: true, httpOnly: true },
+      // Lax: the web app is served by the same Worker as the API (one origin), and the other hosts are same-site
+      // (arto.joyorogo.com) or only redirect to the app host. Google's OAuth callback is a top-level GET, which Lax allows.
+      defaultCookieAttributes: { sameSite: "lax", secure: true, httpOnly: true },
     },
     disabledPaths: ["/token"],
     // bearer(): the phone app keeps its session token (set-auth-token on sign-in) in the Keychain/Keystore and sends it as
     // `Authorization: Bearer`; apps/server/src/principal.ts tells it apart from `brk_` personal access tokens.
-    plugins: [bearer(), devLogin(Boolean(env.DEV_LOGIN)), demoLogin(hooks.demoSignIn), ...mcpPlugins(env)],
+    plugins: [bearer(), devLogin(env.DEV_LOGIN === "1" || env.DEV_LOGIN === "true"), demoLogin(hooks.demoSignIn), ...mcpPlugins(env)],
   });
 }

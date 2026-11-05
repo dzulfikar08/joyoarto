@@ -16,6 +16,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 
 import { billing } from "./billing";
+import { isProtectedPath, passesCsrfCheck } from "./csrf";
 import { handleEmail } from "./email";
 import { env } from "./env";
 import { registerMcpPublicCors, registerMcpRoutes } from "./mcp";
@@ -148,6 +149,14 @@ const files = r2Store(env.RECEIPTS);
 
 /** Typed oRPC transport for the web app. */
 const rpcHandler = new RPCHandler(appRouter, { interceptors: [onError(logError)] });
+
+const trustedOrigins = [env.BETTER_AUTH_URL, env.APP_URL ?? "", ...env.CORS_ORIGIN.split(",")].map((o) => o.trim()).filter(Boolean);
+
+// Cookie-authenticated writes from another site are refused (./csrf.ts); bearer callers are not affected.
+app.use("/*", async (c, next) => {
+  if (!isProtectedPath(c.req.path) || passesCsrfCheck(c.req.raw, trustedOrigins)) return next();
+  return c.json({ message: "Cross-site request refused." }, 403);
+});
 
 app.use("/*", async (c, next) => {
   const path = c.req.path;
