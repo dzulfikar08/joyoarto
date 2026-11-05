@@ -1,5 +1,5 @@
 // One scenario: its name, verdict, and the blocks it adds to the baseline (car loans with sale terms, a baby, one-off
-// costs, monthly costs, income changes), with Save / Duplicate / Remove. The web's ScenarioCard and editors.
+// costs, monthly costs, income changes, spending cuts), with Save / Duplicate / Remove. The web's ScenarioCard and editors.
 
 import { defaultResalePct } from "@baroka/api/lib/plan/resale";
 import { babyTemplate, carTemplate } from "@baroka/api/lib/plan/templates";
@@ -17,7 +17,9 @@ import {
   downPaymentPctHint,
   FUNDED,
   isDirty,
+  isHabitCut,
   itemWhen,
+  newCut,
   newIncomeChange,
   newOneOff,
   newRecurring,
@@ -134,6 +136,7 @@ export function ScenarioCard({
         <AddChip label="One-off" onPress={() => add(newOneOff(start))} />
         <AddChip label="Monthly cost" onPress={() => add(newRecurring(start))} />
         <AddChip label="Income change" onPress={() => add(newIncomeChange(start))} />
+        <AddChip label="Spending cut" onPress={() => add(newCut(start))} />
       </View>
       <View style={styles.actions}>
         <Button title={saving ? "Saving…" : saveLabel(s)} icon={s.savedId && !dirty ? "checkmark" : "cloud-upload-outline"} small variant="secondary" loading={saving} disabled={!!s.savedId && !dirty} onPress={onSave} />
@@ -426,6 +429,28 @@ function ItemEditor({ item, onChange, onRemove }: { item: PlainIn; onChange: (i:
             <MonthField optional label="End month" value={item.endMonth} onChange={(v) => onChange({ ...item, endMonth: v })} />
           </Cell>
         </FieldGrid>
+      </BlockShell>
+    );
+  }
+  if (item.type === "cut") {
+    return (
+      <BlockShell onRemove={onRemove} title={title}>
+        <FieldGrid>
+          <Cell label="Less spending / month" wide>
+            <MoneyField label="Monthly saving" value={item.monthly || undefined} onChange={(v) => onChange({ ...item, monthly: v ?? 0 })} />
+          </Cell>
+          <Cell label="From">
+            <MonthField label="Start month" value={item.startMonth} onChange={(v) => v && onChange({ ...item, startMonth: v })} />
+          </Cell>
+          <Cell label="Until (optional)">
+            <MonthField optional label="End month" value={item.endMonth} onChange={(v) => onChange({ ...item, endMonth: v })} />
+          </Cell>
+        </FieldGrid>
+        {isHabitCut(item) ? (
+          <Text variant="caption" tone="muted">
+            From Where to save: change the target there and add it again to update.
+          </Text>
+        ) : null}
       </BlockShell>
     );
   }

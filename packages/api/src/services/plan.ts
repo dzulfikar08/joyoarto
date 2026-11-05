@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { Principal } from "../context";
 import { DEFAULT_BASELINE_OPTIONS, existingInstallments, incomeSources, roleTotals, spendingBaseline, suggestRole } from "../lib/plan/baseline";
 import type { LoanTerms } from "../lib/plan/loan";
-import { addMonths, average, completeMonthsBefore, median } from "../lib/plan/months";
+import { addMonths, average, completeMonthsBefore, historyWindow, median, MIN_HISTORY_MONTHS } from "../lib/plan/months";
 import { ACCOUNT_ROLES, compareInput, planInput, planOverrides, scenarioItem, simulateInput } from "../lib/plan/schema";
 import type { AccountRole, Role } from "../lib/plan/schema";
 import { DEFAULT_RULES, simulate } from "../lib/plan/simulate";
@@ -34,9 +34,17 @@ function monthEnd(m: string) {
 /** Raw baseline in minor units: what the simulator starts from. */
 export async function computeBaseline(db: Database, p: Principal, input: z.infer<typeof baselineInput>) {
   const cur = await baseCurrency(db, p.householdId);
-  const window = completeMonthsBefore(currentMonth(), input.months);
-  const from = `${window[0]}-01`;
-  const to = monthEnd(window[window.length - 1]!);
+  const requested = completeMonthsBefore(currentMonth(), input.months);
+  // Only months since the household's first full month: earlier ones would count as empty and halve every median.
+  const first = await db
+    .select({ date: sql<string | null>`min(${t.date})` })
+    .from(t)
+    .where(and(eq(t.householdId, p.householdId), eq(t.currency, cur)));
+  const history = historyWindow(requested, first[0]?.date ?? null);
+  const window = history.used;
+  // With no complete month yet the queries still span the requested range; the pure functions only read `window`.
+  const from = `${(window[0] ?? requested[requested.length - 1])!}-01`;
+  const to = monthEnd(requested[requested.length - 1]!);
   const opts = {
     outlierMin: input.outlierMin ?? DEFAULT_BASELINE_OPTIONS.outlierMin,
     outlierShare: input.outlierSharePct !== undefined ? input.outlierSharePct / 100 : DEFAULT_BASELINE_OPTIONS.outlierShare,
@@ -50,7 +58,7 @@ export async function computeBaseline(db: Database, p: Principal, input: z.infer
       .select({ date: t.date, amount: t.amount, slug: c.slug })
       .from(t)
       .leftJoin(c, eq(c.id, t.categoryId))
-      .where(and(scope(`${addMonths(window[0]!, -1)}-01`), sql`${kindExpr} = 'income'`)),
+      .where(and(scope(`${addMonths(from.slice(0, 7), -1)}-01`), sql`${kindExpr} = 'income'`)),
     db
       .select({ month: mo, slug: topSlug, total: sql<number>`sum(${t.amount})`, out: sql<number>`sum(case when ${t.amount} < 0 then ${t.amount} else 0 end)` })
       .from(t)
@@ -111,7 +119,7 @@ export async function computeBaseline(db: Database, p: Principal, input: z.infer
     });
   const recurringIncome = income.sources.reduce((s, x) => s + x.recurring, 0);
   const totalsByMonth = window.map((m) => income.sources.reduce((s, x) => s + (x.byMonth.find((b) => b.month === m)?.amount ?? 0), 0));
-  return { cur, window, from, to, opts, income, spending, installments, accountRows, recurringIncome, totalsByMonth };
+  return { cur, window, history, from, to, opts, income, spending, installments, accountRows, recurringIncome, totalsByMonth };
 }
 
 export async function baseline(db: Database, p: Principal, input: z.infer<typeof baselineInput>) {
@@ -121,7 +129,15 @@ export async function baseline(db: Database, p: Principal, input: z.infer<typeof
   const oneOffs = b.spending.excluded.filter((e) => e.kind === "expense").length;
   const offsets = b.spending.excluded.filter((e) => e.kind === "refund").length;
   const balances = roleTotals(b.accountRows.map((a) => ({ role: a.suggestedRole, balance: a.balance })));
+  const h = b.history;
   const notes = [
+    !h.used.length
+      ? "No complete month of history yet: income, spending and installments are zero until a full month is in. Enter them by hand in the plan, or import older statements."
+      : h.tooLittle
+        ? `Only ${h.used.length} complete month of history (from ${h.used[0]}): at least ${MIN_HISTORY_MONTHS} are needed for a reliable baseline. Check the numbers or enter them by hand.`
+        : h.used.length < h.requested
+          ? `History starts in ${h.used[0]}: ${h.used.length} of the ${h.requested} requested months are used.`
+          : null,
     "Income and spending exclude transfers (own accounts, top-ups, card payments, loans).",
     b.income.salary.note,
     oneOffs
@@ -134,6 +150,8 @@ export async function baseline(db: Database, p: Principal, input: z.infer<typeof
   return {
     currency: b.cur,
     months: b.window,
+    /** Complete months used (only those since the household's first full month) out of the ones asked for. */
+    history: { monthsRequested: h.requested, monthsUsed: h.used.length, firstMonth: h.firstMonth, tooLittle: h.tooLittle },
     from: b.from,
     to: b.to,
     income: {

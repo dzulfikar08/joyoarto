@@ -32,3 +32,29 @@ export function median(xs: number[]): number {
 export function average(xs: number[]): number {
   return xs.length ? wholeUnits(xs.reduce((a, b) => a + b, 0) / xs.length) : 0;
 }
+
+/** The household's first full month: the month of its first transaction, or the next one if that started after the 7th. */
+export function firstFullMonth(firstDate: string | null): string | null {
+  if (!firstDate) return null;
+  const m = firstDate.slice(0, 7);
+  return Number(firstDate.slice(8, 10)) > 7 ? addMonths(m, 1) : m;
+}
+
+/** A baseline needs at least this many complete months of history; with fewer its numbers are flagged. */
+export const MIN_HISTORY_MONTHS = 2;
+
+/**
+ * The months a baseline uses: the requested complete months, without any before the household's first full month
+ * (months before it had data would count as empty and drag every median and average down).
+ */
+export function historyWindow(requested: string[], firstDate: string | null) {
+  const start = firstFullMonth(firstDate);
+  const used = start ? requested.filter((m) => m >= start) : [];
+  return {
+    requested: requested.length,
+    used,
+    firstMonth: start,
+    /** Fewer than MIN_HISTORY_MONTHS: income, spending and installments are rough or zero. */
+    tooLittle: used.length < MIN_HISTORY_MONTHS,
+  };
+}

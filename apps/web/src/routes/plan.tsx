@@ -537,14 +537,17 @@ function BaselineCard({ b, state, update }: { b: Baseline; state: PlanState; upd
   }
   const edited = state.monthlyIncome !== undefined || state.monthlySpending !== undefined || state.existingInstallments !== undefined || Object.keys(state.roles).length > 0;
   const empty = b.income.recurring.amount === 0 && b.spending.monthly.amount === 0;
-  const range = `${monthLabel(b.months[0]!, "short")} – ${monthLabel(b.months[b.months.length - 1]!)}`;
+  const range = b.months.length ? `${monthLabel(b.months[0]!, "short")} – ${monthLabel(b.months[b.months.length - 1]!)}` : "";
+  const used = b.history.monthsUsed;
+  const span = used < b.history.monthsRequested ? ` (${used} ${used === 1 ? "month" : "months"} of history)` : "";
+  const thin = !empty && b.history.tooLittle;
 
   return (
     <section className="card space-y-4">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h2 className="text-base font-bold tracking-tight">Your baseline</h2>
-          <p className="text-xs text-muted-foreground">{empty ? "Type your own numbers to start." : `From ${range}. Change any number to try something else.`}</p>
+          <p className="text-xs text-muted-foreground">{empty ? "Type your own numbers to start." : `From ${range}${span}. Change any number to try something else.`}</p>
         </div>
         {edited && (
           <Button
@@ -561,6 +564,11 @@ function BaselineCard({ b, state, update }: { b: Baseline; state: PlanState; upd
         <p className="rounded-2xl bg-warning-soft px-4 py-3 text-sm text-warning-ink">
           No complete months in your ledger yet, so there is nothing to start from. Import a few months of statements, or type your monthly income
           and spending below to try scenarios now.
+        </p>
+      )}
+      {thin && (
+        <p className="rounded-2xl bg-warning-soft px-4 py-3 text-sm text-warning-ink">
+          Only {used} complete month of history so far, so these numbers are rough. Check them, or type your usual income and spending below.
         </p>
       )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

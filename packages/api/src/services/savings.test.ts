@@ -47,7 +47,7 @@ test("spending cuts: only the household's own rows; transfers and reimbursable e
     .set({ reimburseStatus: "submitted" })
     .where(and(eq(schema.transaction.householdId, dewi.householdId), like(schema.transaction.description, "KOPI CLIENT%")));
 
-  const r = await savings(db, dewi, { baselineMonths: 3, horizonMonths: 36, effect: true } as never);
+  const r = await savings(db, dewi, { horizonMonths: 36, effect: true } as never);
   expect(r.months).toEqual(months);
   const coffee = r.habits.find((h) => h.key === "food/coffee")!;
   expect(coffee.count).toBe(36);

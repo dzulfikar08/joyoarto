@@ -21,16 +21,26 @@ export function BaselineCard({ b, state, update }: { b: Baseline; state: PlanSta
   const [details, setDetails] = useState(false);
   const e = effectiveBaseline(b, state);
   const range = b.months.length ? `${monthLabel(b.months[0]!, "short")} – ${monthLabel(b.months[b.months.length - 1]!)}` : "";
+  const used = b.history.monthsUsed;
+  const span = used < b.history.monthsRequested ? ` (${used} ${used === 1 ? "month" : "months"} of history)` : "";
+  const thin = !e.empty && b.history.tooLittle;
   return (
     <Card
       title="Your baseline"
-      subtitle={e.empty ? "Type your own numbers to start." : `From ${range}. Change any number to try something else.`}
+      subtitle={e.empty ? "Type your own numbers to start." : `From ${range}${span}. Change any number to try something else.`}
       action={e.edited ? <Button title="Reset to ledger" variant="ghost" small onPress={() => update(resetBaseline)} /> : undefined}
     >
       {e.empty ? (
         <View style={styles.warn}>
           <Text variant="caption" tone="warning">
             No complete months in your ledger yet, so there is nothing to start from. Import a few months of statements, or type your monthly income and spending below to try scenarios now.
+          </Text>
+        </View>
+      ) : null}
+      {thin ? (
+        <View style={styles.warn}>
+          <Text variant="caption" tone="warning">
+            Only {used} complete month of history so far, so these numbers are rough. Check them, or type your usual income and spending below.
           </Text>
         </View>
       ) : null}

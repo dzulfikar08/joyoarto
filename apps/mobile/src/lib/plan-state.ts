@@ -15,7 +15,9 @@ export type LoanIn = Extract<ScenarioItemInput, { type: "loan" }>;
 export type OneOffIn = Extract<ScenarioItemInput, { type: "oneOff" }>;
 export type RecurringIn = Extract<ScenarioItemInput, { type: "recurring" }>;
 export type IncomeChangeIn = Extract<ScenarioItemInput, { type: "incomeChange" }>;
-export type PlainIn = OneOffIn | RecurringIn | IncomeChangeIn;
+/** Spending the household chooses to cut; "Where to save" adds them as `cut:<habit>` with `habit` set. */
+export type CutIn = Extract<ScenarioItemInput, { type: "cut" }>;
+export type PlainIn = OneOffIn | RecurringIn | IncomeChangeIn | CutIn;
 export type SaleIn = NonNullable<LoanIn["sale"]>;
 
 export type BabyBlock = { key: string; kind: "baby"; birthMonth: string; caesar: boolean; caregiver: boolean; items: ScenarioItemInput[] };
@@ -110,6 +112,10 @@ export function shiftBaby(b: BabyBlock, birthMonth: string): BabyBlock {
 export const newOneOff = (start: string): Block => ({ key: uid(), kind: "item", item: { type: "oneOff", label: "One-off cost", month: start, amount: 0, direction: "out", fundedFrom: "spending" } });
 export const newRecurring = (start: string): Block => ({ key: uid(), kind: "item", item: { type: "recurring", label: "Monthly cost", startMonth: start, monthly: 0 } });
 export const newIncomeChange = (start: string): Block => ({ key: uid(), kind: "item", item: { type: "incomeChange", label: "Income change", startMonth: start, mode: "delta", amount: 0 } });
+export const newCut = (start: string): Block => ({ key: uid(), kind: "item", item: { type: "cut", label: "Spending cut", startMonth: start, monthly: 0 } });
+
+/** A cut added from Where to save (the web's isHabitCut): its target is changed there, not here. */
+export const isHabitCut = (i: ScenarioItemInput) => i.type === "cut" && (!!i.habit || (i.id ?? "").startsWith("cut:"));
 
 /** "Car A", "Car B"... by how many loans the scenario has. */
 export const nextCarLabel = (s: Pick<Scenario, "blocks">) => `Car ${String.fromCharCode(65 + s.blocks.filter((b) => b.kind === "loan").length)}`;
@@ -352,12 +358,33 @@ export const signedAmount = (abs: number | undefined, negative: boolean) => (neg
 
 export const flipSign = (i: IncomeChangeIn): IncomeChangeIn => ({ ...i, amount: -i.amount });
 
-/** One line under a baby cost: "once, 2027-05" or "monthly from 2027-05, rising to Rp 800.000". */
+/** One line under a cost: "once, 2027-05", "monthly from 2027-05, rising to Rp 800.000" or a cut's saving. */
 export function itemWhen(it: ScenarioItemInput, rp: (minor: number) => string): string {
   if (it.type === "oneOff") return `once, ${it.month ?? "start"}`;
   if (it.type === "recurring") return `monthly from ${it.startMonth ?? "start"}${it.endMonth ? ` to ${it.endMonth}` : ""}${it.rampTo ? `, rising to ${rp(it.rampTo)}` : ""}`;
+  if (it.type === "cut") return `${rp(it.monthly)} less a month from ${it.startMonth ?? "the start"}${it.endMonth ? ` to ${it.endMonth}` : ""}`;
   return "";
 }
+
+// ------------------------------------------------------------------------------------------------ where to save
+
+/** plan.savings' input for the read-only card: this page's baseline, numbers only (no effect simulation). */
+export function savingsInput(st: PlanState) {
+  return { ...overrides(st), effect: false };
+}
+
+type SuggestionLike = { unit: "week" | "month" | "cap"; current: number; target: number; options: { target: number; display?: string }[] };
+
+const one = (x: number) => String(Math.round(x * 10) / 10).replace(".", ",");
+
+/** A habit's suggested cut as the web words it: "2,7x → 2x a week" or "at most Rp 600.000 a month". */
+export function suggestionText(s: SuggestionLike): string {
+  if (s.unit === "cap") return `at most ${s.options.find((o) => o.target === s.target)?.display ?? "less"} a month`;
+  return `${one(s.current)}x → ${s.target}x a ${s.unit}`;
+}
+
+/** The name a habit shows: minimarket baskets get a plain one. */
+export const habitLabel = (h: { kind: string; name: string }) => (h.kind === "minimarket" ? "Minimarket snacks" : h.name);
 
 // ------------------------------------------------------------------------------------------------ results
 
