@@ -96,7 +96,7 @@ export type DemoRow = {
 const DAILY: [string, string, string, AccountKey, number, number, number][] = [
   ["Kopi Kenangan", "Gopay - Generic", "food/coffee", "gopay", 22_000, 48_000, 0.4],
   ["Janji Jiwa", "QRIS JANJI JIWA", "food/coffee", "belanja", 18_000, 35_000, 0.15],
-  ["Solaria", "QRIS SOLARIA", "food/dining", "belanja", 55_000, 160_000, 0.15],
+  ["Solaria", "QRIS SOLARIA", "food/dining", "belanja", 55_000, 160_000, 0.3],
   ["Gojek", "Gopay - Generic", "transport/ride-hailing", "gopay", 14_000, 42_000, 0.45],
   ["GoFood", "Gopay - Generic", "food/delivery", "gopay", 38_000, 95_000, 0.25],
   ["Indomaret", "QRIS INDOMARET", "food/groceries", "belanja", 18_000, 165_000, 0.35],
