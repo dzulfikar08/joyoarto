@@ -204,7 +204,7 @@ router types, `src/lib/orpc.ts`). Structure and conventions for new screens: `ap
   A headless JS task (or the open app) parses them (`src/capture/parsers`, one file per source, samples and tests in
   `samples.ts` / `parsers.test.ts`), queues them (`src/capture/queue.ts`, persisted in the app's documents directory)
   and sends **only the parsed fields** (amount text, direction, merchant, a short description, time) to the quick-add
-  endpoint with `capturedVia: notification` and `clientRef = notif:<notification key>|<posted time>`, so retries are
+  endpoint with `capturedVia: notification` and `clientRef` built from the notification key, its `Notification.when` and a hash of the text, so retries are
   idempotent. The notification text never leaves the phone. Low-confidence parses wait under **Captured** for a check;
   failed sends retry with backoff (on reconnect, on app foreground, each minute while open, and on the next capture).
   Account/category can be fixed before sending, or after (PATCH on the pending row).
