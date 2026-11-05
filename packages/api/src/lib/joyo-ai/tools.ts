@@ -7,6 +7,8 @@ import { ORPCError, call } from "@orpc/server";
 import { z } from "zod";
 
 import type { Context } from "../../context";
+import { quickAddAmount } from "../amount-text";
+import { formatMoney } from "../money";
 import { toolCatalog, toolInput } from "../../tools";
 import type { ToolDef } from "../../tools";
 import type { ToolCall, ToolSpec } from "./types";
@@ -97,9 +99,20 @@ export function describeProposal(tool: string, a: Record<string, unknown>): stri
   const s = (k: string) => (typeof a[k] === "string" ? (a[k] as string) : null);
   switch (tool) {
     case "quick_add": {
-      const amount = s("amountText") ?? idr(a.amount) ?? "?";
-      const dir = a.direction === "in" || (typeof a.amount === "number" && a.amount > 0) || s("amountText")?.startsWith("+") ? "in" : "out";
-      return [`${dir === "in" ? "+" : "−"}${amount.replace(/^[+-]/, "")}`, s("merchant") ?? s("description"), s("category"), s("occurredAt")].filter(Boolean).join(" · ");
+      // The same reading as the server's quickAdd, so "25rb CR" is shown as money in, as it is saved.
+      let shown = "?";
+      try {
+        const amount = quickAddAmount({
+          amount: typeof a.amount === "number" && Number.isFinite(a.amount) ? a.amount : undefined,
+          amountText: s("amountText") ?? undefined,
+          rawText: s("rawText") ?? undefined,
+          direction: a.direction === "in" || a.direction === "out" ? a.direction : undefined,
+        });
+        shown = `${amount > 0 ? "+" : "−"}${formatMoney(Math.abs(amount), "IDR")}`;
+      } catch {
+        // Unreadable amount: the server will refuse it too.
+      }
+      return [shown, s("merchant") ?? s("description"), s("category"), s("occurredAt")].filter(Boolean).join(" · ");
     }
     case "categorize": {
       const n = Array.isArray(a.ids) ? a.ids.length : 0;

@@ -1,6 +1,6 @@
 import { schema } from "@baroka/db";
 import type { Database } from "@baroka/db";
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Principal } from "../context";
@@ -62,6 +62,8 @@ async function computeBaseline(db: Database, p: Principal, input: z.infer<typeof
       .from(t)
       .leftJoin(c, eq(c.id, t.categoryId))
       .where(and(scope(from), sql`${kindExpr} = 'expense'`, lte(t.amount, -Math.max(1, opts.outlierMin))))
+      // Largest outflow first, so the capped list keeps the real one-offs.
+      .orderBy(asc(t.amount), asc(t.date))
       .limit(500),
     // Money back into expense categories big enough to offset a one-off (refunds, someone else's share).
     db
@@ -69,6 +71,7 @@ async function computeBaseline(db: Database, p: Principal, input: z.infer<typeof
       .from(t)
       .innerJoin(c, eq(c.id, t.categoryId))
       .where(and(scope(from), ownMoney, eq(c.kind, "expense"), gte(t.amount, Math.max(1, Math.ceil(opts.outlierMin / 2)))))
+      .orderBy(desc(t.amount), asc(t.date))
       .limit(500),
     db
       .select({

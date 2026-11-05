@@ -9,7 +9,7 @@ import type { AiConfig, Context, Principal } from "../context";
 import { runChat } from "../lib/joyo-ai/chat";
 import type { Engine } from "../lib/joyo-ai/chat";
 import { reserveSlot, wibDayStart } from "../lib/joyo-ai/limits";
-import { chatToolSpecs } from "../lib/joyo-ai/tools";
+import { chatToolSpecs, describeProposal } from "../lib/joyo-ai/tools";
 import type { Adapter, ModelReply, ModelRequest } from "../lib/joyo-ai/types";
 import { appRouter } from "../routers/index";
 import { testAccount, testDb, testPrincipal } from "../test/d1";
@@ -167,3 +167,19 @@ describe("capture", () => {
     expect(heard.text).toContain("kopi");
   });
 });
+
+test("quick_add proposals show the sign the server will save", async () => {
+  expect(describeProposal("quick_add", { amountText: "25rb CR", description: "refund" })).toBe("+Rp 25.000 · refund");
+  expect(describeProposal("quick_add", { amountText: "25rb", description: "kopi" })).toBe("−Rp 25.000 · kopi");
+  expect(describeProposal("quick_add", { amountText: "+500k", description: "gaji" })).toBe("+Rp 500.000 · gaji");
+  expect(describeProposal("quick_add", { amountText: "25rb", direction: "in", description: "x" })).toBe("+Rp 25.000 · x");
+  expect(describeProposal("quick_add", { amount: -2_500_000, description: "x" })).toBe("−Rp 25.000 · x");
+  expect(describeProposal("quick_add", { amountText: "abc", description: "x" })).toBe("? · x");
+  // The server agrees on "25rb CR".
+  const { db } = await testDb();
+  const p = await testPrincipal(db);
+  const accountId = await testAccount(db, p);
+  const saved = await call(appRouter.transactions.quickAdd, { accountId, amountText: "25rb CR", description: "refund" }, { context: { db, principal: p } as never });
+  expect(saved.transaction.amount).toBe(2_500_000);
+});
+

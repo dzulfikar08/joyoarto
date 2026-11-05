@@ -9,7 +9,7 @@ import { testAccount, testDb, testPrincipal } from "../test/d1";
 import { dashboard } from "./dashboard";
 import { importTransactions, undoImport } from "./imports";
 import type { ImportRow } from "./imports";
-import { quickAdd, quickAddInput, searchTransactions, updateTransaction } from "./transactions";
+import { parseWibInstant, quickAdd, quickAddInput, searchTransactions, updateTransaction } from "./transactions";
 
 let db: Database;
 let p: Principal;
@@ -187,4 +187,16 @@ test("statement import: two concurrent commits of the same statement save each r
   const batches = await db.select().from(schema.importBatch).where(eq(schema.importBatch.accountId, bca));
   expect(batches.reduce((s, x) => s + x.insertedCount, 0)).toBe(2);
   for (const x of batches) expect(x.insertedCount + x.duplicateCount).toBe(2);
+});
+
+test("quick add: an occurredAt without an offset is WIB wall-clock time", async () => {
+  // 20:00 WIB on the 5th is still the 5th (read as UTC it would be 03:00 WIB on the 6th).
+  const r = await quick({ accountId: bca, amount: -100000, description: "Makan malam", occurredAt: "2026-11-05T20:00:00" });
+  expect(r.transaction.date).toBe("2026-11-05");
+  const early = await quick({ accountId: bca, amount: -100000, description: "Sarapan", occurredAt: "2026-11-05 06:30" });
+  expect(early.transaction.date).toBe("2026-11-05");
+  // Independent of the machine's time zone.
+  expect(parseWibInstant("2026-11-05T20:00:00").toISOString()).toBe("2026-11-05T13:00:00.000Z");
+  expect(parseWibInstant("2026-11-05T20:00:00Z").toISOString()).toBe("2026-11-05T20:00:00.000Z");
+  expect(parseWibInstant("2026-11-05T20:00:00+09:00").toISOString()).toBe("2026-11-05T11:00:00.000Z");
 });
