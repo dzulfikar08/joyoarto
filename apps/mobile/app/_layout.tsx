@@ -64,7 +64,7 @@ function ShareRouter() {
   return null;
 }
 
-/** Screens drawn without a stack header: the tabs (floating tab bar) and sign-in. */
+/** Screens drawn without a stack header: the tabs (floating tab bar), Joyo AI (its own header) and sign-in. */
 const HEADERLESS = new Set(["/", "/transactions", "/add", "/joyo", "/more", "/login"]);
 const hasHeader = (path: string) => !HEADERLESS.has(path);
 
@@ -90,6 +90,7 @@ function Root() {
       <Stack screenOptions={header}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "Home" }} />
         <Stack.Screen name="login" options={{ title: "Sign in", headerShown: false }} />
+        <Stack.Screen name="joyo" options={{ title: "Joyo AI", headerShown: false }} />
         <Stack.Screen name="transaction/[id]" options={{ title: "Transaction" }} />
         <Stack.Screen name="captured" options={{ title: "Captured" }} />
         <Stack.Screen name="capture/[id]" options={{ title: "Capture" }} />
