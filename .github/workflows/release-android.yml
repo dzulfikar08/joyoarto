@@ -36,6 +36,8 @@ jobs:
     environment: release
     env:
       VARIANT: play
+      # EAS Update channel of the store build (apps/mobile/app.config.ts, docs/ota.md).
+      JOYOARTO_UPDATE_CHANNEL: production
       # Phones only: 64-bit and 32-bit ARM.
       ARCHS: arm64-v8a,armeabi-v7a
       HAS_KEYSTORE: "true"
@@ -130,6 +132,11 @@ jobs:
         run: |
           bunx tsc --noEmit
           bun test ./src/
+
+      # The fingerprint runtimeVersion this binary embeds (docs/ota.md): an OTA update reaches it only when published
+      # from a commit that resolves to the same value. Keep it from the job summary.
+      - name: OTA runtimeVersion
+        run: apps/mobile/scripts/ota.sh --runtime --channel "$JOYOARTO_UPDATE_CHANNEL" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Restore release keystore (optional)
         if: env.HAS_KEYSTORE == 'true'

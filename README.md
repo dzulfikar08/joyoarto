@@ -285,6 +285,13 @@ scenario (`packages/api/src/services/demo.ts`, ids and restrictions in `lib/demo
 can upload it to TestFlight, the same pipeline as JoyoRogo: `gh workflow run release-ios.yml -R dzulfikar08/joyoarto -f
 upload_testflight=true`. Secrets, signing, the privacy manifest and the App Store notes: `docs/ios-release.md`.
 
+### Over-the-air JS updates
+
+JS and asset fixes reach installed apps through EAS Update (`expo-updates`, EAS project `@dzulfikar08/joyoarto`)
+without a store review: Actions → **OTA update** (`.github/workflows/ota.yml`, environment `release`), or
+`apps/mobile/scripts/ota.sh` on the Linux box. Play and TestFlight builds listen to `production`, the sideload APK to `preview`. What
+may ship over the air, rollback and the owner's one-time setup (`EXPO_TOKEN`): `docs/ota.md`.
+
 ## Public pages and waitlist
 
 - `/` shows the landing page to visitors (Bahasa Indonesia first, English via the toggle or `?lang=en`); signed-in users
@@ -377,8 +384,10 @@ Reimbursement; several companies allowed, the last used is the default).
   open) lists draft items per company; "Buat laporan" (`POST /api/reimburse/claims`) numbers a claim (`RB-YYYY-NNNN`),
   freezes what it prints (`reimbursement_claim.snapshot`) and marks the items `submitted`. `GET
   /api/reimburse/claims/{id}/pdf` (pdf-lib: header, item table, subtotals per category, total in numbers and in words
-  via `terbilang`, signature blocks for claimant, approver and finance, then one appendix page per receipt photo; items
-  without one are marked "tanpa bukti") and `/csv` can be downloaded again at any time. Then: paid (optionally with the
+  via `terbilang`, signature blocks for claimant, approver and finance, the items without a receipt ("tanpa bukti"),
+  then the receipt photos 2 × 2 per page in table order, captioned with the row number, date, merchant and amount; a
+  receipt taller than 1:2.2 gets both rows of a column; with under 4 photos they start under the signatures when a full
+  row fits) and `/csv` can be downloaded again at any time. Then: paid (optionally with the
   payment row and the items the company refused), rejected, reopened, or withdrawn (items back to draft). JoyoArto never
   sends anything to the company. Free makes 1 claim report a month; Pro unlimited.
 
