@@ -14,10 +14,11 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { AppState } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useUnistyles } from "react-native-unistyles";
 
 import { AddSheet } from "@/components/add/add-sheet";
-import { ToastHost } from "@/components/ui";
+import { AppToaster } from "@/components/ui";
 import { NotificationCapture } from "@/modules/notification-capture";
 import { syncCaptures } from "@/src/capture/sync";
 import { loadCaptures } from "@/src/capture/store";
@@ -63,6 +64,10 @@ function ShareRouter() {
   return null;
 }
 
+/** Screens drawn without a stack header: the tabs (floating tab bar) and sign-in. */
+const HEADERLESS = new Set(["/", "/transactions", "/add", "/joyo", "/more", "/login"]);
+const hasHeader = (path: string) => !HEADERLESS.has(path);
+
 function Root() {
   const { theme, rt } = useUnistyles();
   const session = useSession();
@@ -100,7 +105,8 @@ function Root() {
         <Stack.Screen name="reimburse-profiles" options={{ title: "Reimbursement" }} />
       </Stack>
       {session ? <AddSheet /> : null}
-      <ToastHost />
+      {/* Last child so it draws above the stack; iOS: a FullWindowOverlay, above native modals and sheets too. */}
+      <AppToaster belowHeader={hasHeader(path)} />
     </>
   );
 }
@@ -116,10 +122,12 @@ export default function RootLayout() {
   }, [fonts, ready]);
   if (!fonts || !ready) return null;
   return (
-    <ShareIntentProvider>
-      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
-        <Root />
-      </PersistQueryClientProvider>
-    </ShareIntentProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ShareIntentProvider>
+        <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+          <Root />
+        </PersistQueryClientProvider>
+      </ShareIntentProvider>
+    </GestureHandlerRootView>
   );
 }

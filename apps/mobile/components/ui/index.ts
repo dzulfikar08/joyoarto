@@ -8,4 +8,4 @@ export * from "./picker";
 export * from "./sheet";
 export * from "./skeleton";
 export * from "./states";
-export * from "./toast";
+export * from "./toaster";
