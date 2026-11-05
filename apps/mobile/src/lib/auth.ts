@@ -34,12 +34,15 @@ export function currentCredentials(): RpcCredentials | null {
   return s ? { server: s.server, token: s.token } : null;
 }
 
-type Listener = () => void;
-const signInListeners = new Set<Listener>();
-const signOutListeners = new Set<Listener>();
+/** expired: the server refused the credential (not the person signing out); userId: who was signed in. */
+export type SignOutInfo = { expired: boolean; userId: string | null };
+type SignInListener = (me: Me) => void;
+type SignOutListener = (info: SignOutInfo) => void;
+const signInListeners = new Set<SignInListener>();
+const signOutListeners = new Set<SignOutListener>();
 
 /** Runs after every sign-in and sign-out (src/lib/query.ts drops the previous account's cached data). */
-export function onSessionChange(on: { signIn?: Listener; signOut?: Listener }) {
+export function onSessionChange(on: { signIn?: SignInListener; signOut?: SignOutListener }) {
   if (on.signIn) signInListeners.add(on.signIn);
   if (on.signOut) signOutListeners.add(on.signOut);
   return () => {
@@ -51,7 +54,7 @@ export function onSessionChange(on: { signIn?: Listener; signOut?: Listener }) {
 /** Stores a checked credential (`me` came from GET /api/me with it). */
 export async function signIn(creds: Credentials, me: Me, kind: CredentialKind = kindOf(creds.token)) {
   await sessions.save({ server: creds.server.replace(/\/+$/, ""), token: creds.token, kind, me });
-  for (const l of signInListeners) l();
+  for (const l of signInListeners) l(me);
 }
 
 /** Google / Apple: the platform's ID token becomes a JoyoArto session. Throws with a message to show. */
@@ -64,11 +67,16 @@ export async function signInWithIdToken(input: IdTokenSignIn) {
 
 export const updateMe = (me: Me) => sessions.updateMe(me);
 
-/** Forgets the credential on the phone at once; a session token is also revoked on the server (best effort). */
-export async function signOut() {
+/**
+ * Forgets the credential on the phone at once; a session token is also revoked on the server (best effort).
+ * `expired`: the server refused the credential (a 401), so the person did not choose to leave; on-device work for
+ * that account (queued captures) is held for when the same account signs in again instead of being deleted.
+ */
+export async function signOut(opts: { expired?: boolean } = {}) {
   const s = sessions.get();
   await sessions.clear();
-  for (const l of signOutListeners) l();
+  const info: SignOutInfo = { expired: opts.expired === true, userId: s?.me?.user.id ?? null };
+  for (const l of signOutListeners) l(info);
   if (s?.kind === "session") void revokeSession(s.server, s.token);
 }
 

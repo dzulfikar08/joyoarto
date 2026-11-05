@@ -169,6 +169,43 @@ export const SAMPLES: Sample[] = [
     expect: { ignored: "GoPay Coins" },
   },
 
+  // Finished transactions that also mention a reward, and free-text notes: still captured
+  {
+    name: "gopay payment with cashback",
+    packageName: GOJEK,
+    title: "GoPay",
+    text: "Pembayaran ke KOPI KENANGAN berhasil Rp25.000. Kamu dapat cashback Rp2.500!",
+    expect: { direction: "out", amountMinor: 2_500_000, counterparty: "KOPI KENANGAN", kind: "payment", confidence: "high" },
+  },
+  {
+    name: "gopay payment with coins",
+    packageName: GOJEK,
+    title: "Pembayaran berhasil",
+    text: "Pembayaran Rp18.000 ke Warung Bu Sri berhasil. Dapat 180 GoPay Coins",
+    expect: { direction: "out", amountMinor: 1_800_000, counterparty: "Warung Bu Sri", confidence: "high" },
+  },
+  {
+    name: "gopay received with a note",
+    packageName: GOPAY,
+    title: "Kamu menerima uang",
+    text: "Kamu menerima Rp50.000 dari Andi. Pesan: makan siang hemat",
+    expect: { direction: "in", amountMinor: 5_000_000, counterparty: "Andi", kind: "incoming", confidence: "high" },
+  },
+  {
+    name: "jago transfer in with a note that says gagal",
+    packageName: JAGO,
+    title: "Uang masuk",
+    text: "Kamu menerima Rp75.000 dari BUDI SANTOSO. Berita: ganti OTP gagal kemarin",
+    expect: { direction: "in", amountMinor: 7_500_000, counterparty: "BUDI SANTOSO", kind: "incoming", confidence: "high" },
+  },
+  {
+    name: "gopay cashback credited (reward only)",
+    packageName: GOPAY,
+    title: "Cashback masuk",
+    text: "Cashback Rp2.500 udah masuk ke GoPay kamu.",
+    expect: { ignored: "cashback" },
+  },
+
   // Low confidence: an amount and a direction but unfamiliar wording
   {
     name: "jago unfamiliar wording",

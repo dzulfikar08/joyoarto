@@ -4,6 +4,7 @@ import type { SourceParser } from "./types";
 /** GoPay inside Gojek (com.gojek.app) and the GoPay app (com.gojek.gopay). Samples in gopay.test.ts. */
 const KNOWN = [
   /\bpembayaran (?:ke|di) .+ berhasil/i,
+  /\bpembayaran (?:Rp|IDR)\s?[\d.,]+ (?:ke|di) .+ berhasil/i,
   /\bpembayaran (?:Go[A-Z][a-z]+|ke)\b.*(?:Rp|IDR)/i,
   /\bbayar (?:Rp|IDR)\s?[\d.,]+\s?(?:rb|k)? (?:ke|di) /i,
   /\b(?:kamu|anda) menerima (?:Rp|IDR)/i,
@@ -21,7 +22,6 @@ export const parseGopay: SourceParser = (n) => {
   const result = parseWith(n, "gopay", {
     known: KNOWN,
     ignore: [
-      [/\bGoPay Coins\b/i, "GoPay Coins"],
       [/\bpesanan(?:mu)? (?:sudah|udah|sedang)\b(?!.*(?:Rp|IDR))/i, "order status"],
       [/\bdriver\b(?!.*(?:Rp|IDR))/i, "trip status"],
     ],
