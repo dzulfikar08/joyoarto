@@ -21,6 +21,7 @@ import * as inbound from "../services/inbound";
 import * as plan from "../services/plan";
 import * as reports from "../services/reports";
 import * as rules from "../services/rules";
+import * as savings from "../services/savings";
 import * as scenarios from "../services/scenarios";
 import * as statements from "../services/statements";
 import * as tokens from "../services/tokens";
@@ -177,6 +178,10 @@ export const appRouter = {
       .route({ method: "GET", path: "/plan/templates", tags: ["plan"], summary: "Car loan, car upgrade path and baby templates with editable estimates" })
       .input(plan.templatesInput)
       .handler(({ input }) => plan.planTemplates(input)),
+    savings: readProcedure
+      .route({ method: "GET", path: "/plan/savings", tags: ["plan"], summary: "Where to save: everyday habits, a suggested cut for each, and what the cuts do to the plan (computes only)" })
+      .input(savings.savingsInput)
+      .handler(({ context, input }) => savings.savings(context.db, context.principal, input)),
     /** Saved scenarios, shared by everyone in the household. */
     scenarios: {
       list: readProcedure

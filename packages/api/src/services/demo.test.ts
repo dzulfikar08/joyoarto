@@ -10,6 +10,7 @@ import type { BillingConfig } from "../lib/billing/config";
 import { DEMO_HOUSEHOLD_ID, DEMO_USER_ID, demoCodeMatches } from "../lib/demo";
 import { appRouter } from "../routers/index";
 import { testAccount, testDb, testPrincipal } from "../test/d1";
+import { savings } from "./savings";
 import { userPlan } from "./billing";
 import { demoLogin, demoRows, seedDemo, wibDate } from "./demo";
 import { principalFromToken } from "./tokens";
@@ -203,4 +204,12 @@ describe("restricted actions", () => {
     const me = await call(appRouter.me, undefined, { context: ctx(dewi) });
     expect(me.demo).toBe(false);
   });
+});
+
+test("demo data has habits for Where to save", async () => {
+  const { db } = await testDb();
+  await seedDemo(db);
+  const r = await savings(db, { userId: DEMO_USER_ID, householdId: DEMO_HOUSEHOLD_ID, scopes: ["finance:read"], via: "session" }, { effect: false } as never);
+  const keys = r.habits.filter((h) => h.suggestion).map((h) => h.key);
+  expect(keys).toEqual(expect.arrayContaining(["food/coffee", "food/dining", "minimarket"]));
 });

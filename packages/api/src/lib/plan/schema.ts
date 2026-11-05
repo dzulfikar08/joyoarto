@@ -99,11 +99,23 @@ export const incomeChangeItem = z.object({
   amount: z.number().int(),
 });
 
-export const scenarioItem = z.discriminatedUnion("type", [loanItem, oneOffItem, recurringItem, incomeChangeItem]);
+/** Spending the household chooses to cut (a habit from spending_cuts): lowers the monthly outflow by `monthly`. */
+export const cutItem = z.object({
+  type: z.literal("cut"),
+  id: z.string().max(40).optional().describe('spending_cuts uses "cut:<habit key>", so adding the cuts again replaces them'),
+  label: z.string().max(80),
+  monthly: minor.describe("Monthly saving: how much less is spent each month"),
+  startMonth: month.optional().describe("Default: the plan's start month"),
+  endMonth: month.optional().describe("Last month, inclusive"),
+  habit: z.string().max(60).optional().describe("The habit key from spending_cuts (a category slug or \"minimarket\")"),
+});
+
+export const scenarioItem = z.discriminatedUnion("type", [loanItem, oneOffItem, recurringItem, incomeChangeItem, cutItem]);
 export type LoanItem = z.infer<typeof loanItem>;
 export type OneOffItem = z.infer<typeof oneOffItem>;
 export type RecurringItem = z.infer<typeof recurringItem>;
 export type IncomeChangeItem = z.infer<typeof incomeChangeItem>;
+export type CutItem = z.infer<typeof cutItem>;
 export type ScenarioItem = z.infer<typeof scenarioItem>;
 export type ScenarioItemInput = z.input<typeof scenarioItem>;
 

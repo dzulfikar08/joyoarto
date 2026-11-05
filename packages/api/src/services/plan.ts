@@ -32,7 +32,7 @@ function monthEnd(m: string) {
 }
 
 /** Raw baseline in minor units: what the simulator starts from. */
-async function computeBaseline(db: Database, p: Principal, input: z.infer<typeof baselineInput>) {
+export async function computeBaseline(db: Database, p: Principal, input: z.infer<typeof baselineInput>) {
   const cur = await baseCurrency(db, p.householdId);
   const window = completeMonthsBefore(currentMonth(), input.months);
   const from = `${window[0]}-01`;
@@ -216,7 +216,7 @@ export const comparePlanInput = compareInput.extend({
 const defined = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
 
 /** The plan to simulate: a saved scenario's, with whatever the call names on top. */
-async function resolveSimulateInput(db: Database, p: Principal, input: z.infer<typeof simulatePlanInput>) {
+export async function resolveSimulateInput(db: Database, p: Principal, input: z.infer<typeof simulatePlanInput>) {
   const { scenarioId, ...overrides } = input;
   const saved = scenarioId ? (await scenariosByIds(db, p, [scenarioId]))[0]! : null;
   return { plan: simulateInput.parse({ ...saved?.plan, ...defined(overrides) }), saved };
@@ -224,8 +224,13 @@ async function resolveSimulateInput(db: Database, p: Principal, input: z.infer<t
 
 const OVERRIDE_KEYS = ["monthlyIncome", "monthlySpending", "existingInstallments", "roles", "balances", "startingBalances", "startMonth", "horizonMonths", "baselineMonths", "rules"] as const;
 
-async function simBaseline(db: Database, p: Principal, input: z.infer<typeof planInput>): Promise<{ base: SimBaseline; accounts: { id: string; name: string; role: AccountRole; balance: number }[] }> {
-  const b = await computeBaseline(db, p, { months: input.baselineMonths });
+export async function simBaseline(
+  db: Database,
+  p: Principal,
+  input: z.infer<typeof planInput>,
+  computed?: Awaited<ReturnType<typeof computeBaseline>>,
+): Promise<{ base: SimBaseline; accounts: { id: string; name: string; role: AccountRole; balance: number }[] }> {
+  const b = computed ?? (await computeBaseline(db, p, { months: input.baselineMonths }));
   const accounts = b.accountRows.map((a) => ({
     id: a.id,
     name: a.name,
@@ -318,7 +323,7 @@ function baseOut(base: SimBaseline, accounts: { id: string; name: string; role: 
   };
 }
 
-function startOf(input: { startMonth?: string }) {
+export function startOf(input: { startMonth?: string }) {
   return input.startMonth ?? addMonths(currentMonth(), 1);
 }
 

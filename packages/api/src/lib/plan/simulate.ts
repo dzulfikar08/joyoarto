@@ -5,7 +5,7 @@ import { loanTerms, saleOutcome } from "./loan";
 import type { LoanTerms, SaleOutcome } from "./loan";
 import { addMonths, average, monthsBetween, wholeUnits } from "./months";
 import { RESALE_ASSUMPTION } from "./resale";
-import type { IncomeChangeItem, LoanItem, RecurringItem, Role, RuleOptions, ScenarioItem } from "./schema";
+import type { CutItem, IncomeChangeItem, LoanItem, RecurringItem, Role, RuleOptions, ScenarioItem } from "./schema";
 
 export type Buckets = Record<Role, number>;
 
@@ -27,7 +27,10 @@ export const DEFAULT_RULES: RuleOptions = { emergencyMonths: 6, maxDebtPct: 30, 
 export type ProjectionMonth = {
   month: string;
   income: number;
+  /** Core spending after any cuts. */
   spending: number;
+  /** Spending cut this month (cut items), already taken off `spending`. */
+  cuts: number;
   recurring: number;
   installments: number;
   carInstallments: number;
@@ -169,6 +172,15 @@ function recurringEnd(item: RecurringItem, start: string): string | null {
   return null;
 }
 
+/** What the cut items take off core spending in `month`: never more than the spending itself. */
+export function cutsFor(cuts: CutItem[], spending: number, month: string, start: string): number {
+  let total = 0;
+  for (const c of cuts) {
+    if ((c.startMonth ?? start) <= month && (!c.endMonth || month <= c.endMonth)) total += c.monthly;
+  }
+  return Math.min(Math.max(0, spending), total);
+}
+
 export function incomeFor(base: number, changes: IncomeChangeItem[], month: string, start: string): number {
   const active = changes.filter((c) => (c.startMonth ?? start) <= month && (!c.endMonth || month <= c.endMonth));
   let income = base;
@@ -186,6 +198,7 @@ export function simulate(base: SimBaseline, items: ScenarioItem[], opts: SimOpti
   const loans: LoanSummary[] = items.filter((i): i is LoanItem => i.type === "loan").map((i) => summarizeLoan(i, startMonth));
   const recurring = items.filter((i): i is RecurringItem => i.type === "recurring");
   const incomeChanges = items.filter((i): i is IncomeChangeItem => i.type === "incomeChange");
+  const cutItems = items.filter((i): i is CutItem => i.type === "cut");
   const oneOffs = items.filter((i) => i.type === "oneOff");
   const loanItems = items.filter((i): i is LoanItem => i.type === "loan");
 
@@ -255,9 +268,11 @@ export function simulate(base: SimBaseline, items: ScenarioItem[], opts: SimOpti
     }
     emergencyForUpfront += upfrontFromEmergency;
 
-    const outflow = base.monthlySpending + rec + installments + vehicle;
+    const cuts = cutsFor(cutItems, base.monthlySpending, month, startMonth);
+    const spending = base.monthlySpending - cuts;
+    const outflow = spending + rec + installments + vehicle;
     const freeCash = income - outflow;
-    const outflowForCover = base.monthlySpending + rec + installments + wholeUnits(vehicleYearlySpread);
+    const outflowForCover = spending + rec + installments + wholeUnits(vehicleYearlySpread);
     // The emergency fund is topped up to the larger of where it started and the months of outflow it should cover.
     targets.emergency = Math.max(base.balances.emergency, wholeUnits(rules.emergencyMonths * outflowForCover));
     if (freeCash >= 0) deposit(b, freeCash, targets);
@@ -266,7 +281,8 @@ export function simulate(base: SimBaseline, items: ScenarioItem[], opts: SimOpti
     projection.push({
       month,
       income,
-      spending: base.monthlySpending,
+      spending,
+      cuts,
       recurring: rec,
       installments,
       carInstallments,
@@ -388,6 +404,11 @@ export function simulate(base: SimBaseline, items: ScenarioItem[], opts: SimOpti
     `Starting balances: emergency ${money(base.balances.emergency)}, goal ${money(base.balances.goal)}, spending ${money(base.balances.spending)}.`,
     "Upfront costs come from the account they are funded from, then spending, then goal savings, and the emergency fund last.",
     `Money left over each month first tops up the emergency fund (to ${rules.emergencyMonths} months of outflow, or its starting balance if higher), then restores the goal savings to their starting level; the rest stays in spending accounts. Nothing is invested or earns interest.`,
+    ...(cutItems.length
+      ? [
+          `Spending cuts (${cutItems.map((c) => c.label).join(", ")}) lower core spending by up to ${money(cutItems.reduce((s, c) => s + c.monthly, 0))} a month from when each starts; they assume the habit really changes and the money is not spent elsewhere.`,
+        ]
+      : []),
     ...(carLoans.length ? ["Running costs start in the purchase month; insurance renewal and PKB are paid every 12 months after it (the first year's PKB is in the OTR price)."] : []),
     ...(loans.some((l) => l.sale)
       ? [
