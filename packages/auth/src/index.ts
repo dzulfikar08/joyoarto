@@ -24,6 +24,8 @@ export type AuthConfig = {
   DEV_LOGIN?: string;
   /** Comma-separated emails allowed to sign up. Empty = anyone with a Google account. */
   ALLOWED_EMAILS?: string;
+  /** "1" or "true": anyone may sign up, whatever ALLOWED_EMAILS says (the allowlist then only matters when it is off). */
+  OPEN_SIGNUP?: string;
   /**
    * Comma-separated extra Google OAuth client ids whose ID tokens are accepted (`aud`). The phone app's native Google
    * Sign-In on iOS gets tokens for the iOS client; Android's are for GOOGLE_CLIENT_ID (the web client) already.
@@ -235,8 +237,14 @@ export function parseEmails(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
+/** Whether OPEN_SIGNUP turns the invite-only check off. Only "1" and "true" count, so "0" or "false" keep it on. */
+export function signupOpen(env: Pick<AuthConfig, "OPEN_SIGNUP">): boolean {
+  return /^(1|true)$/i.test(env.OPEN_SIGNUP?.trim() ?? "");
+}
+
 export function createAuth(env: AuthConfig, database: Database, hooks: AuthHooks = {}) {
   const allowed = parseEmails(env.ALLOWED_EMAILS);
+  const open = signupOpen(env);
   return betterAuth({
     database: drizzleAdapter(database, { provider: "sqlite", schema: { ...authSchema, ...oauthSchema } }),
     secret: env.BETTER_AUTH_SECRET,
@@ -248,10 +256,10 @@ export function createAuth(env: AuthConfig, database: Database, hooks: AuthHooks
     databaseHooks: {
       user: {
         create: {
-          // Invite-only: the allowlist and people with a pending household invite may create accounts.
+          // Invite-only unless OPEN_SIGNUP: the allowlist and people with a pending household invite may create accounts.
           before: async (user) => {
             const email = user.email.toLowerCase();
-            if (!allowed.length || allowed.includes(email) || email === DEV_USER.email) return;
+            if (open || !allowed.length || allowed.includes(email) || email === DEV_USER.email) return;
             if (!(await hooks.canSignUp?.(email))) return false;
           },
           after: async (user) => {

@@ -18,6 +18,8 @@ export type Env = BillingEnv & {
   APPLE_BUNDLE_IDS?: string;
   DEV_LOGIN?: string;
   ALLOWED_EMAILS?: string;
+  /** "1"/"true" lets anyone sign up (deploy.yml passes the production environment's variable). */
+  OPEN_SIGNUP?: string;
   MCP_LIMITER?: RateLimit;
   OAUTH_REGISTER_LIMITER?: RateLimit;
   WAITLIST_LIMITER?: RateLimit;
