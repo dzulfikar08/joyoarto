@@ -152,7 +152,7 @@ describe("demo login", () => {
   });
 
   test("rate limited per IP", async () => {
-    const context: Context = { ...ctx(null), request: { ip: "1.2.3.4", ipSalt: "s", adminEmails: [], allow: async (bucket) => bucket !== "demo" } };
+    const context: Context = { ...ctx(null), request: { ip: "1.2.3.4", adminEmails: [], allow: async (bucket) => bucket !== "demo" } };
     await expect(call(appRouter.demo.token, { code: CODE }, { context })).rejects.toThrow("Too many");
   });
 

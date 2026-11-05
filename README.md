@@ -286,14 +286,16 @@ upload_testflight=true`. Secrets, signing, the privacy manifest and the App Stor
 ## Public pages and waitlist
 
 - `/` shows the landing page to visitors (Bahasa Indonesia first, English via the toggle or `?lang=en`); signed-in users
-  get the dashboard. Its `#android` section (and the More page's "Pasang di Android") gives the two steps to join the
-  Android closed test (links in `apps/web/src/lib/app-links.ts`); iOS is "segera". `/demo` reads Jago/GoPay statement PDFs in the browser with the same parsers
+  get the dashboard. Its hero links to `/login` ("Daftar gratis"; sign-up is open when `OPEN_SIGNUP` is set), the demo,
+  and the two install sections: `#android` (and the More page's "Pasang di Android") gives the steps to join the Android
+  closed test, `#iphone` the TestFlight steps. Links live in `apps/web/src/lib/app-links.ts`; while `IOS_TESTFLIGHT_URL`
+  is empty the iPhone section says the public link is coming and points to the web app. `/demo` reads Jago/GoPay statement PDFs in the browser with the same parsers
   (`lib/statements/summary.ts`; `sample.ts` is a made-up statement for "try a sample") and uploads nothing.
-- `POST /api/waitlist` (oRPC `waitlist.join`, public): email (lowercased, one row per address; the answer never says
-  whether it was already there), optional name, banks, source/utm, locale, and a `website` honeypot. Rate limited per
-  IP by `WAITLIST_LIMITER` (skipped when unbound); only a salted hash of the IP is stored. No email is sent.
-- `GET /api/waitlist` (`waitlist.list`) and the page `/admin/waitlist`: browser sessions whose email is in
-  `ADMIN_EMAILS` only (a deploy-time var, see Deploy).
+- The public waitlist is closed: there is no join endpoint or form any more. The `waitlist_signup` table and its rows
+  are kept so the owner can contact the people already on it. `GET /api/waitlist` (`waitlist.list`) and the page
+  `/admin/waitlist` show them: browser sessions whose email is in `ADMIN_EMAILS` only (a deploy-time var, see Deploy).
+  Deleting an account also deletes the waitlist row with the same email.
+- `WAITLIST_LIMITER` (the name is historical) now only rate-limits demo-code sign-in attempts per IP.
 
 ## Joyo AI and the add sheet
 

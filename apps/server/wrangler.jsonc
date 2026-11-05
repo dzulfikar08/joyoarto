@@ -44,7 +44,7 @@
   "ratelimits": [
     { "name": "MCP_LIMITER", "namespace_id": "2001", "simple": { "limit": 120, "period": 60 } },
     { "name": "OAUTH_REGISTER_LIMITER", "namespace_id": "2002", "simple": { "limit": 30, "period": 60 } },
-    // Public waitlist sign-ups, per client IP.
+    // Demo code attempts, per client IP (named for the old public waitlist; renaming the binding is not needed).
     { "name": "WAITLIST_LIMITER", "namespace_id": "2003", "simple": { "limit": 5, "period": 60 } }
   ],
   // Local dev overrides these in .dev.vars (localhost origins).
@@ -53,7 +53,7 @@
     "APP_URL": "https://app.arto.joyorogo.com",
     "CORS_ORIGIN": "https://app.arto.joyorogo.com,https://arto.joyorogo.com,https://baroka.by.dzulfikar.com",
     // ALLOWED_EMAILS (who may sign up, comma-separated; invitees always may) and ADMIN_EMAILS (who can read
-    // /admin/waitlist) are not kept here: deploy.yml passes them from the GitHub environment's variables
+    // /admin/waitlist and reset the demo) are not kept here: deploy.yml passes them from the GitHub environment's variables
     // (`--var`), and local dev sets them in .dev.vars. Self-hosting: set your own.
     // Statements by email: households get import+<token>@<this domain>. Cloudflare Email Routing on this (sub)domain
     // sends import@ (subaddressing on) or a catch-all to this Worker's email() handler (src/email.ts). Replies use

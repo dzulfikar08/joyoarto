@@ -43,7 +43,7 @@ app.use(
 
 registerMcpRoutes(app);
 
-// Demo codes are guessable only by trying: a few attempts a minute per IP (the waitlist's limiter, its own bucket).
+// Demo codes are guessable only by trying: a few attempts a minute per IP (WAITLIST_LIMITER, kept under its old name; its own bucket).
 app.post("/api/auth/sign-in/demo", async (c, next) => {
   const limiter = env.WAITLIST_LIMITER;
   if (limiter && !(await limiter.limit({ key: `demo:${c.req.header("CF-Connecting-IP") ?? "unknown"}` })).success) {
@@ -87,12 +87,11 @@ const adminEmails = (env.ADMIN_EMAILS ?? "")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
 
-/** What public endpoints need to know about the request (rate limit, hashed IP, operators). */
+/** What public endpoints need to know about the request (rate limit, IP, operators). */
 function requestInfo(request: Request): RequestInfo {
   const limiter = env.WAITLIST_LIMITER;
   return {
     ip: request.headers.get("CF-Connecting-IP"),
-    ipSalt: env.BETTER_AUTH_SECRET,
     adminEmails,
     // Unbound in local dev: no limit.
     ...(limiter ? { allow: async (bucket: string, key: string) => (await limiter.limit({ key: `${bucket}:${key}` })).success } : {}),

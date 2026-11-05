@@ -24,10 +24,8 @@ export type Principal = {
 export type RequestInfo = {
   /** CF-Connecting-IP when known. Never stored as is. */
   ip: string | null;
-  /** Server secret mixed into the IP hash, so stored hashes cannot be reversed by trying every address. */
-  ipSalt: string;
   /** Rate limit check: false means over the limit. Absent when the binding is not configured (local dev). */
-  allow?: (bucket: "waitlist" | "demo", key: string) => Promise<boolean>;
+  allow?: (bucket: "demo", key: string) => Promise<boolean>;
   /** Lowercased emails of the operators (env ADMIN_EMAILS). */
   adminEmails: string[];
 };

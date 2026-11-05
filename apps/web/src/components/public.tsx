@@ -1,18 +1,12 @@
-// Chrome shared by the public pages (landing, demo, privacy policy, terms): header, footer and the waitlist form.
+// Chrome shared by the public pages (landing, demo, privacy policy, terms): header and footer.
 
-import { Button, buttonVariants } from "@baroka/ui/components/button";
-import { Input } from "@baroka/ui/components/input";
+import { buttonVariants } from "@baroka/ui/components/button";
 import { cn } from "@baroka/ui/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { CircleCheck } from "lucide-react";
-import { useState } from "react";
-import type { FormEvent, ReactNode } from "react";
-import { toast } from "sonner";
 
 import { Wordmark } from "@/components/kit";
 import type { Lang } from "@/lib/lang";
 import { setLang, useLang } from "@/lib/lang";
-import { client, errorMessage } from "@/lib/orpc";
 
 /** Set once the repository is public with its LICENSE; until then no source links are shown. */
 export const REPO_URL: string | null = "https://github.com/dzulfikar08/joyoarto";
@@ -110,153 +104,5 @@ export function PublicFooter() {
         {en ? "JoyoArto is not affiliated with any bank or e-wallet." : "JoyoArto tidak berafiliasi dengan bank atau e-wallet mana pun."}
       </p>
     </footer>
-  );
-}
-
-/** What people can tick; slugs are what the waitlist stores. "Next" ones tell us which parser to build first. */
-const BANKS: { slug: string; label: string }[] = [
-  { slug: "jago", label: "Bank Jago" },
-  { slug: "gopay", label: "GoPay" },
-  { slug: "bca", label: "BCA" },
-  { slug: "bri", label: "BRI" },
-  { slug: "mandiri", label: "Mandiri" },
-  { slug: "bni", label: "BNI" },
-  { slug: "seabank", label: "SeaBank" },
-  { slug: "dana", label: "DANA" },
-  { slug: "ovo", label: "OVO" },
-  { slug: "shopeepay", label: "ShopeePay" },
-];
-
-function utmFromUrl(): Record<string, string> | undefined {
-  const q = new URLSearchParams(location.search);
-  const out: Record<string, string> = {};
-  for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"]) {
-    const v = q.get(k);
-    if (v) out[k] = v.slice(0, 100);
-  }
-  return Object.keys(out).length ? out : undefined;
-}
-
-export function WaitlistForm({ source, initialBanks = [], children }: { source: string; initialBanks?: string[]; children?: ReactNode }) {
-  const lang = useLang();
-  const en = lang === "en";
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [banks, setBanks] = useState<string[]>(initialBanks);
-  const [website, setWebsite] = useState("");
-  const [state, setState] = useState<{ status: "idle" | "sending" | "done" } | { status: "error"; message: string }>({ status: "idle" });
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setState({ status: "sending" });
-    try {
-      await client.waitlist.join({ email, name: name || undefined, banks, source, utm: utmFromUrl(), locale: lang, website: website || undefined });
-      setState({ status: "done" });
-    } catch (err) {
-      const code = (err as { code?: string }).code;
-      const message =
-        code === "BAD_REQUEST"
-          ? en ? "That email address does not look right." : "Alamat email-nya belum benar."
-          : code === "TOO_MANY_REQUESTS"
-            ? en ? "Too many tries. Please wait a minute." : "Terlalu banyak percobaan. Tunggu sebentar ya."
-            : errorMessage(err);
-      // A bad address is shown at the field; anything else (rate limit, network) as a toast.
-      if (code === "BAD_REQUEST") setState({ status: "error", message });
-      else {
-        setState({ status: "idle" });
-        toast.error(message);
-      }
-    }
-  };
-
-  if (state.status === "done") {
-    return (
-      <div role="status" className="flex items-start gap-3 rounded-2xl bg-positive-soft p-4 text-positive-ink">
-        <CircleCheck className="mt-0.5 size-5 shrink-0" aria-hidden />
-        <div>
-        <p className="font-semibold">{en ? "You're on the list. Thank you!" : "Kamu sudah masuk waitlist. Makasih!"}</p>
-        <p className="mt-1 text-sm">
-          {en
-            ? "We'll email you once when JoyoArto opens. No spam."
-            : "Kami kabari sekali lewat email saat JoyoArto dibuka. Nggak ada spam."}
-        </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <form onSubmit={(e) => void submit(e)} className="space-y-3">
-      {children}
-      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-        <label className="sr-only" htmlFor={`wl-email-${source}`}>
-          Email
-        </label>
-        <Input
-          id={`wl-email-${source}`}
-          type="email"
-          required
-          autoComplete="email"
-          inputMode="email"
-          placeholder={en ? "you@email.com" : "kamu@email.com"}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          aria-invalid={state.status === "error" || undefined}
-          className="bg-card"
-        />
-        <Button type="submit" disabled={state.status === "sending"}>
-          {state.status === "sending" ? (en ? "Sending…" : "Mengirim…") : en ? "Join the waitlist" : "Gabung waitlist"}
-        </Button>
-      </div>
-      <Input
-        type="text"
-        aria-label={en ? "Your name (optional)" : "Nama panggilan (opsional)"}
-        placeholder={en ? "Your name (optional)" : "Nama panggilan (opsional)"}
-        autoComplete="given-name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className="bg-card"
-        maxLength={80}
-      />
-      {/* Honeypot: hidden from people and screen readers; bots that fill every field are ignored by the server. */}
-      <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
-        <label>
-          Website
-          <input type="text" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
-        </label>
-      </div>
-      <fieldset>
-        <legend className="mb-2 text-sm font-semibold">{en ? "Which banks and e-wallets do you use?" : "Pakai bank / e-wallet apa aja?"}</legend>
-        <div className="flex flex-wrap gap-1.5">
-          {BANKS.map((b) => {
-            const on = banks.includes(b.slug);
-            return (
-              <button
-                key={b.slug}
-                type="button"
-                aria-pressed={on}
-                onClick={() => setBanks((x) => (on ? x.filter((s) => s !== b.slug) : [...x, b.slug]))}
-                className={cn(
-                  "h-9 rounded-full border px-3.5 text-sm font-semibold transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40",
-                  on ? "border-primary bg-primary text-primary-foreground" : "border-input bg-card text-foreground hover:border-foreground/30",
-                )}
-              >
-                {b.label}
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
-      {state.status === "error" && (
-        <p role="alert" className="text-sm text-destructive">
-          {state.message}
-        </p>
-      )}
-      <p className="text-xs text-muted-foreground">
-        {en
-          ? "We store only your email, name and the banks you ticked, to tell you when JoyoArto opens. Nothing else."
-          : "Kami cuma simpan email, nama dan bank yang kamu centang, buat ngabarin saat JoyoArto dibuka. Itu aja."}
-      </p>
-    </form>
   );
 }

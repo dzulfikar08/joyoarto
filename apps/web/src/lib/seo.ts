@@ -7,7 +7,15 @@
 // - scripts/og.ts draws the share cards from OG_CARDS.
 // Copy is Indonesian (the site's default language). The English toggle has no URL of its own, so there is no hreflang.
 
-import { ANDROID_SECTION_ID, ANDROID_TESTERS_GROUP_EMAIL, ANDROID_TESTERS_GROUP_URL, ANDROID_TESTING_URL } from "./app-links";
+import {
+  ANDROID_SECTION_ID,
+  ANDROID_TESTERS_GROUP_EMAIL,
+  ANDROID_TESTERS_GROUP_URL,
+  ANDROID_TESTING_URL,
+  IOS_SECTION_ID,
+  IOS_TESTFLIGHT_URL,
+  TESTFLIGHT_APP_STORE_URL,
+} from "./app-links";
 import { CONTACT_EMAIL, PRODUCT_NAME, SITE_URL } from "./brand";
 
 export const REPO = "https://github.com/dzulfikar08/joyoarto";
@@ -77,7 +85,7 @@ export const OG_SIZE = { width: 1200, height: 630 } as const;
 export const FAQ: { q: string; a: string }[] = [
   {
     q: "Bank apa aja yang bisa dibaca?",
-    a: "Sekarang Bank Jago (statement bulanan) dan GoPay (e-statement), langsung dibaca dan diverifikasi oleh JoyoArto. Berikutnya: BCA, BRI, Mandiri, DANA, SeaBank dan lainnya, urutannya ikut permintaan di waitlist. Sementara itu, bank lain bisa lewat CSV atau minta Claude membaca PDF-nya.",
+    a: "Sekarang Bank Jago (statement bulanan) dan GoPay (e-statement), langsung dibaca dan diverifikasi oleh JoyoArto. Berikutnya: BCA, BRI, Mandiri, DANA, SeaBank dan lainnya. Sementara itu, bank lain bisa lewat CSV atau minta Claude membaca PDF-nya.",
   },
   {
     q: "Berapa harganya?",
@@ -93,11 +101,13 @@ export const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Ada aplikasi HP?",
-    a: "Ada untuk Android, sudah di Google Play dalam tahap uji: catat cepat, baca notifikasi Jago dan GoPay, dan kirim PDF statement dari HP. Versi iPhone segera lewat TestFlight; sementara itu web-nya enak dipakai di HP dan ada iOS Shortcuts buat catat cepat.",
+    a: IOS_TESTFLIGHT_URL
+      ? "Ada untuk Android, sudah di Google Play dalam tahap uji: catat cepat, baca notifikasi Jago dan GoPay, dan kirim PDF statement dari HP. Versi iPhone juga ada dalam tahap uji lewat TestFlight; langkahnya ada di bagian iPhone di atas."
+      : "Ada untuk Android, sudah di Google Play dalam tahap uji: catat cepat, baca notifikasi Jago dan GoPay, dan kirim PDF statement dari HP. Versi iPhone dibagikan lewat TestFlight dan link publiknya segera; langkahnya ada di bagian iPhone di atas. Sementara itu web-nya enak dipakai di Safari dan ada iOS Shortcuts buat catat cepat.",
   },
   {
     q: "Gimana cara pasang aplikasi Android-nya?",
-    a: "Dua langkah. Pertama, gabung grup Google joyoarto-testers (groups.google.com/g/joyoarto-testers, siapa pun bisa gabung) pakai akun Google yang ada di HP-mu. Kedua, buka play.google.com/apps/testing/com.joyodigitama.joyoarto, ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store.",
+    a: "Tiga langkah. Pertama, gabung grup Google joyoarto-testers (groups.google.com/g/joyoarto-testers, siapa pun bisa gabung) pakai akun Google yang ada di HP-mu. Kedua, buka play.google.com/apps/testing/com.joyodigitama.joyoarto, ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store. Ketiga, buka aplikasinya dan masuk pakai Google; rumah tanggamu langsung dibuat.",
   },
   {
     q: "Data saya dipakai buat apa?",
@@ -342,13 +352,13 @@ function homeBody(): string {
     ["Satu buku untuk keluarga", "Undang pasangan ke rumah tangga yang sama. Rekening, kategori dan rencana dipakai bareng, tiap orang tetap login pakai akunnya sendiri."],
     ["Tanya Claude soal uangmu", "Konektor Claude (MCP) untuk claude.ai, Claude Desktop dan Claude Code: cari transaksi, rangkum pengeluaran, bantu kategorikan."],
     ["Rencana & simulasi", "Kuat nggak ambil mobil ini, padahal bayi mau lahir? Hitungan dari data asli: dana darurat, porsi cicilan, saldo bulan demi bulan."],
-    ["Aplikasi Android & baca notifikasi", "Aplikasi Android (tahap uji di Google Play) mencatat dari notifikasi Jago & GoPay dan menerima PDF statement. iPhone: segera."],
+    ["Aplikasi Android & baca notifikasi", "Aplikasi Android (tahap uji di Google Play) mencatat dari notifikasi Jago & GoPay dan menerima PDF statement. iPhone: " + (IOS_TESTFLIGHT_URL ? "tahap uji lewat TestFlight." : "lewat TestFlight, link publiknya segera; sementara itu pakai web di Safari.")],
     ["Open source (AGPL)", "Kodenya terbuka. Mau host sendiri boleh; mau praktis, pakai Joyo Pro yang kami jalankan."],
   ];
   return wrap(
     `<h1>Mampu nggak beli mobil? Lihat dulu angkanya.</h1>` +
       `<p>Cicilan di brosur dealer selalu kelihatan ringan. JoyoArto baca e-statement Jago dan GoPay-mu, hitung berapa yang benar-benar masuk dan keluar tiap bulan, lalu uji cicilannya: dana darurat masih cukup 6 bulan atau nggak, total cicilan masih di bawah 30% penghasilan atau nggak.</p>` +
-      `<p><a href="/demo">Coba demo, tanpa akun</a> · <a href="/#waitlist">Gabung waitlist</a> · <a href="/#${ANDROID_SECTION_ID}">Jadi tester Android</a></p>` +
+      `<p><a href="https://app.arto.joyorogo.com/login">Daftar gratis</a> · <a href="/demo">Coba demo, tanpa akun</a> · <a href="/#${ANDROID_SECTION_ID}">Coba di Android</a> · <a href="/#${IOS_SECTION_ID}">Coba di iPhone</a></p>` +
       `<p>Simulasinya hitungan dari transaksimu sendiri, bukan nasihat keuangan.</p>` +
       `<section id="kenapa"><h2>Nyatat pengeluaran itu membosankan kalau nggak ada tujuannya.</h2>` +
       `<p>Tujuannya biasanya datang sendiri: mau beli mobil, anak mau lahir, kontrak rumah mau habis. Saat itu kamu butuh rata-rata pengeluaran dari bulan-bulan yang sudah lewat, bukan perkiraan. JoyoArto mengumpulkannya dari statement, jadi kamu nggak perlu mengetik tiap transaksi.</p><ul>` +
@@ -361,10 +371,17 @@ function homeBody(): string {
       `<section id="fitur"><h2>Fitur</h2>${features.map(([t, b]) => `<h3>${esc(t)}</h3><p>${esc(b)}</p>`).join("")}</section>` +
       `<section id="privasi"><h2>Uang itu urusan pribadi. Kami anggap begitu juga.</h2><p>Kodenya terbuka, jadi siapa pun bisa periksa ke mana datamu pergi. Nggak dijual, nggak dipakai buat iklan.</p></section>` +
       `<section id="${ANDROID_SECTION_ID}"><h2>Jadi tester aplikasi Android JoyoArto</h2>` +
-      `<p>Aplikasinya sudah di Google Play, masih tahap uji. Dua langkah untuk memasangnya:</p><ol>` +
+      `<p>Aplikasinya sudah di Google Play, masih tahap uji. Tiga langkah untuk mulai:</p><ol>` +
       `<li><strong>Gabung grup tester.</strong> Siapa pun bisa gabung di <a href="${ANDROID_TESTERS_GROUP_URL}">Google Groups: joyoarto-testers</a> (${esc(ANDROID_TESTERS_GROUP_EMAIL)}), pakai akun Google yang sama dengan di HP-mu.</li>` +
-      `<li><strong>Daftar jadi tester, lalu pasang.</strong> Buka <a href="${ANDROID_TESTING_URL}">halaman uji JoyoArto di Google Play</a>, ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store.</li></ol>` +
-      `<p>iPhone: segera lewat TestFlight.</p></section>` +
+      `<li><strong>Daftar jadi tester, lalu pasang.</strong> Buka <a href="${ANDROID_TESTING_URL}">halaman uji JoyoArto di Google Play</a>, ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store.</li>` +
+      `<li><strong>Masuk pakai Google, rumah tanggamu langsung dibuat.</strong></li></ol></section>` +
+      `<section id="${IOS_SECTION_ID}"><h2>Coba JoyoArto di iPhone</h2>` +
+      `<p>Versi iPhone dibagikan lewat TestFlight, aplikasi resmi Apple buat versi uji. Tiga langkah untuk mulai:</p><ol>` +
+      `<li><strong>Pasang TestFlight dari App Store.</strong> <a href="${TESTFLIGHT_APP_STORE_URL}">TestFlight di App Store</a>.</li>` +
+      (IOS_TESTFLIGHT_URL
+        ? `<li><strong>Buka undangan TestFlight JoyoArto.</strong> Buka <a href="${IOS_TESTFLIGHT_URL}">link undangannya</a> di iPhone, lalu ketuk Accept, kemudian Install.</li>`
+        : `<li><strong>Buka undangan TestFlight JoyoArto.</strong> Link publiknya segera kami pasang di sini. Sementara itu, pakai <a href="https://app.arto.joyorogo.com/login">versi web</a> di Safari dengan akun yang sama.</li>`) +
+      `<li><strong>Masuk pakai Apple atau Google.</strong></li></ol></section>` +
       `<section id="faq"><h2>Yang sering ditanyain</h2>${FAQ.map(({ q, a }) => `<h3>${esc(q)}</h3><p>${esc(a)}</p>`).join("")}</section>`,
   );
 }
