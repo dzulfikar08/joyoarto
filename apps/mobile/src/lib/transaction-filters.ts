@@ -5,9 +5,12 @@
 import { addDays, currentMonthWib, daySectionTitle, isDay, monthEnd, shiftMonth, todayWib } from "./format";
 
 export type Status = "" | "pending" | "posted";
-export type Filters = { q: string; accountId: string; category: string; uncategorized: boolean; from: string; to: string; status: Status };
+/** Reimbursable ("diganti kantor") rows: any marked, the open ones (not paid back yet), or none. */
+export type ReimburseFilter = "" | "any" | "open" | "none";
+const REIMBURSE_FILTERS: readonly string[] = ["any", "open", "none"];
+export type Filters = { q: string; accountId: string; category: string; uncategorized: boolean; from: string; to: string; status: Status; reimburse: ReimburseFilter };
 
-export const EMPTY_FILTERS: Filters = { q: "", accountId: "", category: "", uncategorized: false, from: "", to: "", status: "" };
+export const EMPTY_FILTERS: Filters = { q: "", accountId: "", category: "", uncategorized: false, from: "", to: "", status: "", reimburse: "" };
 
 const str = (v: unknown): string => (Array.isArray(v) ? str(v[0]) : typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
 
@@ -25,6 +28,7 @@ export function filtersFromParams(raw: Record<string, unknown>): Filters {
     from: isDay(from) ? from : "",
     to: isDay(to) ? to : "",
     status: status === "pending" || status === "posted" ? status : "",
+    reimburse: REIMBURSE_FILTERS.includes(str(raw.reimburse)) ? (str(raw.reimburse) as ReimburseFilter) : "",
   };
 }
 
@@ -39,7 +43,7 @@ export function filtersToParams(f: Partial<Filters>): Record<string, string> {
 }
 
 export function activeFilterCount(f: Filters): number {
-  return [f.accountId, f.category, f.uncategorized, f.from || f.to, f.status].filter(Boolean).length;
+  return [f.accountId, f.category, f.uncategorized, f.from || f.to, f.status, f.reimburse].filter(Boolean).length;
 }
 
 export function isFiltered(f: Filters): boolean {
@@ -55,6 +59,7 @@ export type SearchInput = {
   from?: string;
   to?: string;
   status?: "pending" | "posted";
+  reimburse?: "any" | "open" | "none";
 };
 
 export function searchInput(f: Filters, limit = 50): SearchInput {
@@ -67,6 +72,7 @@ export function searchInput(f: Filters, limit = 50): SearchInput {
     ...(f.from ? { from: f.from } : {}),
     ...(f.to ? { to: f.to } : {}),
     ...(f.status ? { status: f.status } : {}),
+    ...(f.reimburse ? { reimburse: f.reimburse } : {}),
   };
 }
 

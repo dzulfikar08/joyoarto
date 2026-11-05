@@ -94,6 +94,8 @@ function Root() {
         <Stack.Screen name="household" options={{ title: "Household" }} />
         <Stack.Screen name="settings" options={{ title: "Settings" }} />
         <Stack.Screen name="data-privacy" options={{ title: "Data & privacy" }} />
+        <Stack.Screen name="reimburse" options={{ title: "Reimburse" }} />
+        <Stack.Screen name="reimburse-profiles" options={{ title: "Reimbursement" }} />
       </Stack>
       {session ? <AddSheet /> : null}
       <ToastHost />

@@ -18,17 +18,39 @@ export type Review = {
   category: string;
   accountId: string;
   date: string;
-  via: "voice" | "manual";
+  via: "voice" | "manual" | "receipt";
   heard: string | null;
   source: CaptureDraft["source"] | "hand";
+  /** The receipt photo, uploaded already (capture.receipt) and attached on Save; `uri` is the local preview. */
+  photo: { id: string; uri: string } | null;
+  /** Why the photo could not be read (no AI, today's cap, unreadable); the draft is then empty to type in. */
+  ocrNote: string | null;
+  /** Reimburse / Diganti kantor: profileId "" = the most recently used company. */
+  reimburse: { on: boolean; profileId: string };
 };
 
 export function emptyReview(accountId = "", today = todayWib()): Review {
-  return { amountText: "", direction: "out", description: "", merchant: "", note: "", category: "", accountId, date: today, via: "manual", heard: null, source: "hand" };
+  return {
+    amountText: "",
+    direction: "out",
+    description: "",
+    merchant: "",
+    note: "",
+    category: "",
+    accountId,
+    date: today,
+    via: "manual",
+    heard: null,
+    source: "hand",
+    photo: null,
+    ocrNote: null,
+    reimburse: { on: false, profileId: "" },
+  };
 }
 
-export function reviewFromDraft(draft: CaptureDraft, via: Review["via"], heard: string | null, fallbackAccount = ""): Review {
+export function reviewFromDraft(draft: CaptureDraft, via: Review["via"], heard: string | null, fallbackAccount = "", extra: Partial<Review> = {}): Review {
   return {
+    ...emptyReview(fallbackAccount, draft.date),
     amountText: amountInputText(draft.amount),
     direction: draft.direction,
     description: draft.description,
@@ -40,6 +62,7 @@ export function reviewFromDraft(draft: CaptureDraft, via: Review["via"], heard: 
     via,
     heard,
     source: draft.source,
+    ...extra,
   };
 }
 
@@ -62,8 +85,11 @@ export type QuickAddPayload = {
   accountId?: string;
   category?: string;
   occurredAt: string;
-  capturedVia: "voice" | "manual";
+  capturedVia: "voice" | "manual" | "receipt";
   clientRef: string;
+  attachmentIds?: string[];
+  reimbursable?: boolean;
+  reimburseProfileId?: string;
 };
 
 /** The quickAdd input for a reviewed draft, or a reason it can't be saved yet. */
@@ -84,6 +110,11 @@ export function quickAddPayload(review: Review, clientRef: string, currency = "I
       occurredAt: review.date,
       capturedVia: review.via,
       clientRef,
+      ...(review.photo ? { attachmentIds: [review.photo.id] } : {}),
+      // Only money out can be reimbursable.
+      ...(review.reimburse.on && review.direction === "out"
+        ? { reimbursable: true, ...(review.reimburse.profileId ? { reimburseProfileId: review.reimburse.profileId } : {}) }
+        : {}),
     },
   };
 }

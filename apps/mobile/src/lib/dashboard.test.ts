@@ -60,6 +60,13 @@ test("attention items link to filtered transactions", () => {
   expect(items.map((i) => i.key)).toEqual(["unc", "unc-all", "pending", "stale", "a", "b"]);
   expect(items[0]!.link).toEqual({ uncategorized: true, from: "2026-11-01", to: "2026-11-30" });
   expect(items[3]!.link).toEqual({ status: "pending", to: "2026-10-05" });
+  const withReimburse = attentionItems({
+    month: "2026-11",
+    today: "2026-11-20",
+    spendingByDay: [] as never,
+    attention: { uncategorizedThisMonth: 0, uncategorizedAll: 0, pending: 0, pendingStale: 0, pendingStaleDays: 45, staleAccounts: [], reimburse: { draft: 2, submitted: 1, owed: { amount: 46_000_000, display: "Rp 460.000" } } } as never,
+  });
+  expect(withReimburse).toEqual([{ key: "reimburse", text: "Rp 460.000 to be reimbursed (diganti kantor): 2 not claimed yet, 1 waiting for the company", link: "reimburse" }]);
   expect(items[5]!.link).toBe("import");
   expect(monthRange({ month: "2026-02", spendingByDay: Array.from({ length: 28 }) as never })).toEqual({ from: "2026-02-01", to: "2026-02-28" });
 });

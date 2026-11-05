@@ -319,7 +319,7 @@ function Attention({ d, openTransactions }: { d: Dashboard; openTransactions: (l
           <Pressable
             key={it.key}
             accessibilityRole="button"
-            onPress={() => (it.link === "import" ? router.push("/import") : openTransactions(it.link))}
+            onPress={() => (it.link === "import" ? router.push("/import") : it.link === "reimburse" ? router.push("/reimburse") : openTransactions(it.link))}
             style={({ pressed }) => [styles.attention, pressed && { backgroundColor: theme.colors.muted }]}
           >
             <View style={[styles.dot, { backgroundColor: theme.viz.warning }]} />

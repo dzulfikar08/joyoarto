@@ -58,6 +58,7 @@ export default function SettingsScreen() {
       <ListSection>
         <ListRow icon="people-outline" title="Household" subtitle="Members, invites, switch household" onPress={() => router.push("/household")} />
         <ListRow icon="document-text-outline" title="Import by email" subtitle="Your household's private address" onPress={() => router.push("/import")} />
+        <ListRow icon="briefcase-outline" title="Reimbursement" subtitle="Companies that pay work expenses back" onPress={() => router.push("/reimburse-profiles")} />
         {Platform.OS === "android" ? <ListRow icon="notifications-outline" title="Notification capture" subtitle="Jago and GoPay payment notifications" onPress={() => router.push("/capture-setup")} /> : null}
         <ListRow icon="shield-checkmark-outline" title="Data & privacy" subtitle="Download your data, delete your account" onPress={() => router.push("/data-privacy")} />
       </ListSection>

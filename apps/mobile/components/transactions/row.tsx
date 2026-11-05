@@ -2,7 +2,8 @@ import { memo } from "react";
 import { Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-import { Money, Pill, PickerButton, Text } from "@/components/ui";
+import { Icon, Money, Pill, PickerButton, Text } from "@/components/ui";
+import { REIMBURSE_LABEL, REIMBURSE_TONE } from "@/src/lib/receipt";
 import type { Tx } from "@/src/lib/tx-cache";
 
 export type { Tx };
@@ -15,7 +16,7 @@ export const TransactionRow = memo(function TransactionRow({ t, onPress, onCateg
     <Pressable
       onPress={() => onPress(t)}
       accessibilityRole="button"
-      accessibilityLabel={`${title}, ${t.display}, ${t.account}${t.status === "pending" ? ", pending" : ""}, ${t.categoryName ?? "uncategorized"}`}
+      accessibilityLabel={`${title}, ${t.display}, ${t.account}${t.status === "pending" ? ", pending" : ""}${t.reimburse ? `, ${REIMBURSE_LABEL[t.reimburse.status]}` : ""}${t.attachments?.length ? ", has a receipt photo" : ""}, ${t.categoryName ?? "uncategorized"}`}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: theme.colors.muted }]}
     >
       <View style={styles.top}>
@@ -25,6 +26,8 @@ export const TransactionRow = memo(function TransactionRow({ t, onPress, onCateg
               {title}
             </Text>
             {t.status === "pending" ? <Pill tone="warning" label="pending" /> : null}
+            {t.reimburse ? <Pill tone={REIMBURSE_TONE[t.reimburse.status]} label={REIMBURSE_LABEL[t.reimburse.status]} /> : null}
+            {t.attachments?.length ? <Icon name="camera-outline" size={14} tone="muted" /> : null}
           </View>
           <Text variant="caption" tone="muted" numberOfLines={1}>
             {t.account} · {t.description}

@@ -49,3 +49,11 @@ test("categorize with and without a rule", () => {
   expect(ruleSavedText({ rule: { when: "merchant = Kopi" }, category: "food", ruleAppliedToExisting: 3 })).toBe("merchant = Kopi → food (also applied to 3 more)");
   expect(ruleSavedText({ rule: null, category: "food", ruleAppliedToExisting: 0 })).toBeNull();
 });
+
+test("reimburse filter from route params to the search input", () => {
+  const f = filtersFromParams({ reimburse: "open" });
+  expect(f.reimburse).toBe("open");
+  expect(searchInput(f, 10)).toEqual({ limit: 10, reimburse: "open" });
+  expect(activeFilterCount(f)).toBe(1);
+  expect(filtersFromParams({ reimburse: "bogus" }).reimburse).toBe("");
+});

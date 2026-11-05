@@ -2,7 +2,7 @@ import { View } from "react-native";
 
 import { useAccountGroups, useCategoryGroups } from "@/components/data";
 import { Button, DateField, FieldLabel, Picker, Pill, Row, Segmented, Sheet, SwitchRow } from "@/components/ui";
-import { datePresets, EMPTY_FILTERS, presetOf, type Filters, type Status } from "@/src/lib/transaction-filters";
+import { datePresets, EMPTY_FILTERS, presetOf, type Filters, type ReimburseFilter, type Status } from "@/src/lib/transaction-filters";
 
 /** Account, category (or uncategorized), status and date range. Changes apply as they are made. */
 export function FilterSheet({ open, onClose, filters, onChange }: { open: boolean; onClose: () => void; filters: Filters; onChange: (patch: Partial<Filters>) => void }) {
@@ -35,6 +35,19 @@ export function FilterSheet({ open, onClose, filters, onChange }: { open: boolea
             { value: "", label: "Any" },
             { value: "pending", label: "Pending" },
             { value: "posted", label: "Posted" },
+          ]}
+        />
+      </FieldLabel>
+      <FieldLabel label="Reimburse · Diganti kantor">
+        <Segmented<ReimburseFilter>
+          label="Reimburse"
+          value={filters.reimburse}
+          onChange={(reimburse) => onChange({ reimburse })}
+          options={[
+            { value: "", label: "All" },
+            { value: "any", label: "Reimbursable" },
+            { value: "open", label: "Open" },
+            { value: "none", label: "Own" },
           ]}
         />
       </FieldLabel>
