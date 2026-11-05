@@ -63,9 +63,12 @@ export function categoryOptions(categories: readonly Category[]): SelectGroup[] 
   return [...parents.values(), ...byKind];
 }
 
-/** Accounts for a picker: the last digits as a hint; search also matches institution and type. */
+/**
+ * Accounts for a picker: the last digits as a hint; search also matches institution and type. Receivable accounts
+ * (what an employer owes for reimbursable expenses) never pay for anything, so they are left out.
+ */
 export function accountOptions(accounts: readonly Account[]): SelectOption[] {
-  return accounts.map((a) => ({
+  return accounts.filter((a) => a.type !== "receivable").map((a) => ({
     value: a.id,
     label: a.name,
     hint: a.last4 ? `··${a.last4}` : undefined,

@@ -9,6 +9,12 @@ import type {
   Transaction,
   TransactionPatch,
 } from "./types";
+import type { AppRouterClient } from "@baroka/api/routers/index";
+
+type Output<F> = F extends (...args: never[]) => Promise<infer R> ? R : never;
+/** capture.receipt's answer: the stored photo, the draft, and whether the AI could read it. */
+export type ReceiptResult = Output<AppRouterClient["capture"]["receipt"]>;
+export type AttachmentUpload = Output<AppRouterClient["attachments"]["upload"]>;
 
 /** The hosted service (app host: app, REST API, MCP). The old baroka.by.dzulfikar.com only redirects. */
 export const DEFAULT_SERVER = "https://app.arto.joyorogo.com";
@@ -129,6 +135,25 @@ export function createApi(creds: Credentials, fetchImpl: FetchLike = fetch, opti
       form.append("audio", file as unknown as Blob);
       return request<{ text: string }>("POST", "/capture/transcribe", { form, timeoutMs: 45_000, signal });
     },
+    /**
+     * POST /api/capture/receipt: multipart `image` (a JPEG the app shrank to ~1600 px). The server keeps the photo
+     * (unattached until a quick add names it in attachmentIds) and reads it into a draft; nothing else is saved.
+     */
+    receipt: (file: UploadFile, signal?: AbortSignal) => {
+      const form = new FormData();
+      form.append("image", file as unknown as Blob);
+      return request<ReceiptResult>("POST", "/capture/receipt", { form, timeoutMs: 60_000, signal });
+    },
+    /** POST /api/attachments: a photo for an existing transaction; `replace` removes its other photos. */
+    uploadAttachment: (file: UploadFile, transactionId: string, replace: boolean) => {
+      const form = new FormData();
+      form.append("file", file as unknown as Blob);
+      form.append("transactionId", transactionId);
+      form.append("replace", replace ? "true" : "false");
+      return request<AttachmentUpload>("POST", "/attachments", { form, timeoutMs: 60_000 });
+    },
+    /** GET this with `Authorization: Bearer <token>` to show or save a photo or a claim report. */
+    url: (path: string) => `${base}${path.startsWith("/api/") ? path : `/api${path}`}`,
   };
 }
 

@@ -114,6 +114,10 @@ async function seedEverything(p: Principal) {
   await db.insert(schema.inboundEmail).values({ id: crypto.randomUUID(), householdId: p.householdId, fromAddress: "a@b.com", userId: p.userId, subject: "Statement", status: "no_pdf", detail: {} });
   await db.insert(schema.joyoProStatus).values({ userId: p.userId, pro: true, until: new Date(Date.now() + 86_400_000), plan: "monthly", source: "doku", checkedAt: new Date(), expiresAt: new Date(), lastProUntil: new Date(Date.now() + 86_400_000) });
   await db.insert(schema.usageCounter).values({ userId: p.userId, metric: "statement_import", period: "2026-11", count: 1 });
+  const profileId = crypto.randomUUID();
+  await db.insert(schema.reimbursementProfile).values({ id: profileId, householdId: p.householdId, companyName: "PT Maju", claimantName: "Dewi" });
+  await db.insert(schema.reimbursementClaim).values({ id: crypto.randomUUID(), householdId: p.householdId, profileId, number: "RB-2026-0001", periodFrom: "2026-01-01", periodTo: "2026-01-31", total: 100, currency: "IDR", itemCount: 1, snapshot: "{}" });
+  await db.insert(schema.attachment).values({ id: crypto.randomUUID(), householdId: p.householdId, transactionId: ids[0]!, r2Key: `h/${p.householdId}/r/x`, mime: "image/jpeg", size: 10 });
   await oauthConnection(p.userId);
   return { accountId, ids };
 }

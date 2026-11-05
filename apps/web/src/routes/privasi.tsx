@@ -75,8 +75,18 @@ const sections: Section[] = [
               yang diusulkan serta statusnya). Percakapan hanya terlihat olehmu, tidak oleh anggota rumah tangga lain, dan tersimpan sampai kamu menghapusnya.
             </li>
             <li>
-              <b>Pemakaian AI:</b> untuk tiap panggilan AI (Joyo AI, catatan suara, membaca catatan teks): jenis, model, waktu, jumlah token dan berhasil atau
-              tidak. Bukan isi pertanyaan, jawaban atau catatanmu. Dipakai untuk batas harian dan biaya.
+              <b>Foto struk</b> (kalau kamu memotret atau memilih foto struk): gambarnya (diperkecil di perangkatmu, sekitar 1600 piksel) beserta jenis, ukuran dan
+              transaksi yang memakainya. Disimpan di Cloudflare R2, hanya bisa dibuka anggota rumah tanggamu lewat aplikasi (tidak ada tautan publik), dan
+              dipakai sebagai bukti di laporan klaim reimburse yang kamu buat sendiri.
+            </li>
+            <li>
+              <b>Reimburse (diganti kantor)</b>, kalau kamu pakai: nama perusahaan, nama pemohon, NIK/ID karyawan dan departemen (opsional), nama dan email
+              penyetuju (opsional), status tiap pengeluaran, dan laporan klaim yang kamu buat (nomor, periode, isi yang dicetak). {N} tidak pernah mengirim apa pun
+              ke perusahaanmu; laporannya kamu unduh dan kirim sendiri.
+            </li>
+            <li>
+              <b>Pemakaian AI:</b> untuk tiap panggilan AI (Joyo AI, catatan suara, membaca catatan teks atau foto struk): jenis, model, waktu, jumlah token dan
+              berhasil atau tidak. Bukan isi pertanyaan, jawaban, catatan atau fotomu. Dipakai untuk batas harian dan biaya.
             </li>
             <li>
               <b>Waitlist</b> (kalau kamu daftar): email, nama panggilan, bank yang kamu centang, sumber dan bahasa, serta hash alamat IP (bukan IP-nya).
@@ -123,8 +133,18 @@ const sections: Section[] = [
               changes it proposed with their status). Only you see them, not other household members, and they are kept until you delete them.
             </li>
             <li>
-              <b>AI usage:</b> for each AI call (Joyo AI, voice notes, reading a typed note): its kind, model, time, token counts and whether it worked. Never what you
-              asked, said or were answered. Used for the daily limits and costs.
+              <b>Receipt photos</b> (if you take or pick one): the image (shrunk on your device to about 1600 pixels) with its type, size and the transaction it
+              belongs to. Stored in Cloudflare R2, opened only by members of your household through the app (there are no public links), and used as proof in the
+              reimbursement claim reports you make yourself.
+            </li>
+            <li>
+              <b>Reimbursement (paid back by your employer)</b>, if you use it: the company's name, the claimant's name, employee ID and department (optional), the
+              approver's name and email (optional), each expense's status, and the claim reports you make (number, period, what was printed). {N} never sends
+              anything to your company; you download the report and send it yourself.
+            </li>
+            <li>
+              <b>AI usage:</b> for each AI call (Joyo AI, voice notes, reading a typed note or a receipt photo): its kind, model, time, token counts and whether it
+              worked. Never what you asked, said, wrote or photographed. Used for the daily limits and costs.
             </li>
             <li>
               <b>Waitlist</b> (if you join it): email, nickname, the banks you ticked, source and language, and a hash of your IP address (never the IP itself).
@@ -164,7 +184,7 @@ const sections: Section[] = [
               kapan saja.
             </li>
             <li>
-              <b>Joyo AI dan catatan suara/teks</b> di tombol Tambah: hanya saat kamu memakainya. Dasarnya: pemenuhan perjanjian (fitur yang kamu minta). Joyo
+              <b>Joyo AI, catatan suara/teks dan foto struk</b> di tombol Tambah: hanya saat kamu memakainya. Dasarnya: pemenuhan perjanjian (fitur yang kamu minta). Joyo
               hanya mengusulkan perubahan; tidak ada yang disimpan sebelum kamu menekan Konfirmasi atau Simpan.
             </li>
             <li>
@@ -195,7 +215,7 @@ const sections: Section[] = [
               <b>Connecting AI</b> such as Claude: only when you connect it and approve it yourself. Basis: your consent, which you can withdraw at any time.
             </li>
             <li>
-              <b>Joyo AI and voice/typed notes</b> in the Add button: only when you use them. Basis: performing our agreement (a feature you asked for). Joyo only
+              <b>Joyo AI, voice/typed notes and receipt photos</b> in the Add button: only when you use them. Basis: performing our agreement (a feature you asked for). Joyo only
               proposes changes; nothing is saved until you tap Confirm or Save.
             </li>
             <li>
@@ -266,12 +286,13 @@ const sections: Section[] = [
             <b>Anthropic (Claude) untuk Joyo AI dan membaca catatan</b>, sebagai pemroses atas nama kami, <b>hanya saat kamu memakainya</b>. Yang dikirim:
             pertanyaanmu dan potongan percakapan sebelumnya, nama depanmu, nama rumah tangga, tanggal hari ini, dan data buku besar yang dibaca Joyo untuk menjawab
             (misalnya saldo, transaksi, ringkasan pengeluaran, baseline rencana). Untuk catatan di tombol Tambah: teks catatan, serta nama rekening dan kategori
-            rumah tanggamu. Anthropic tidak memakai data API untuk melatih modelnya dan menyimpannya sementara menurut kebijakan retensinya (umumnya 30 hari) untuk
+            rumah tanggamu. Untuk foto struk: gambarnya, nama rekening dan kategori rumah tanggamu, hanya untuk membaca isinya (foto tetap disimpan di {N},
+            bukan di Anthropic). Anthropic tidak memakai data API untuk melatih modelnya dan menyimpannya sementara menurut kebijakan retensinya (umumnya 30 hari) untuk
             keamanan. Bisa lewat Cloudflare AI Gateway.
           </li>
           <li>
             <b>Cloudflare Workers AI</b>: mengubah catatan suara menjadi teks (Whisper). Rekamannya diproses lalu dibuang. Kalau Claude sedang tidak tersedia,
-            Joyo AI bisa memakai model di Workers AI dengan data yang sama seperti di atas.
+            Joyo AI dan pembacaan foto struk bisa memakai model di Workers AI dengan data yang sama seperti di atas. <b>Cloudflare R2</b> menyimpan foto struk.
           </li>
           <li>
             <b>Penyedia AI pilihanmu</b> (Anthropic, OpenRouter atau OpenAI), <b>hanya kalau kamu memasukkan API key sendiri</b> di Joyo AI: data yang sama seperti
@@ -307,12 +328,13 @@ const sections: Section[] = [
             <b>Anthropic (Claude) for Joyo AI and reading notes</b>, as a processor on our behalf, <b>only when you use them</b>. What is sent: your question and
             recent turns of the conversation, your first name, the household's name, today's date, and the ledger data Joyo reads to answer (for example balances,
             transactions, spending summaries, the plan baseline). For a note in the Add button: the note's text and your household's account and category names.
-            Anthropic does not train its models on API data and keeps it briefly under its retention policy (typically 30 days) for safety. It may pass through
+            For a receipt photo: the image and your household's account and category names, only to read it (the photo itself is stored by {N}, not by
+            Anthropic). Anthropic does not train its models on API data and keeps it briefly under its retention policy (typically 30 days) for safety. It may pass through
             Cloudflare AI Gateway.
           </li>
           <li>
-            <b>Cloudflare Workers AI</b>: turns voice notes into text (Whisper). The recording is processed and discarded. When Claude is unavailable, Joyo AI may
-            use a Workers AI model with the same data as above.
+            <b>Cloudflare Workers AI</b>: turns voice notes into text (Whisper). The recording is processed and discarded. When Claude is unavailable, Joyo AI and
+            reading receipt photos may use a Workers AI model with the same data as above. <b>Cloudflare R2</b> stores receipt photos.
           </li>
           <li>
             <b>The AI provider you choose</b> (Anthropic, OpenRouter or OpenAI), <b>only if you enter your own API key</b> in Joyo AI: the same data as above goes
@@ -346,6 +368,10 @@ const sections: Section[] = [
           <li>Saat kamu menghapus: data langsung hilang dari database. Cadangan otomatis Cloudflare (fitur pemulihan D1) bisa menyimpannya paling lama 30 hari lagi, lalu terhapus.</li>
           <li>Log MCP: 90 hari, lalu dihapus otomatis.</li>
           <li>Percakapan Joyo AI: sampai kamu menghapusnya (paling banyak 50 percakapan terbaru per rumah tangga; yang lebih lama terhapus otomatis), atau bersama akun/rumah tangga.</li>
+          <li>
+            Foto struk: selama transaksinya ada. Ikut terhapus saat transaksinya dihapus (atau import-nya dibatalkan), saat rumah tangga atau akunmu dihapus, atau
+            saat kamu menghapus fotonya. Foto yang diunggah tapi tidak jadi disimpan dihapus otomatis setelah sehari.
+          </li>
           <li>Catatan pemakaian AI: selama akunmu aktif.</li>
           <li>Sesi masuk: sampai kedaluwarsa atau kamu keluar.</li>
           <li>
@@ -361,6 +387,10 @@ const sections: Section[] = [
           <li>When you delete: data is removed from the database at once. Cloudflare's automatic backups (D1 point-in-time recovery) may hold it for up to 30 more days, then it is gone.</li>
           <li>MCP log: 90 days, then deleted automatically.</li>
           <li>Joyo AI conversations: until you delete them (at most the 50 newest per household; older ones are deleted automatically), or with your account or household.</li>
+          <li>
+            Receipt photos: as long as their transaction exists. They go when the transaction is deleted (or its import undone), when the household or your
+            account is deleted, or when you remove the photo. Photos uploaded but never saved are deleted automatically after a day.
+          </li>
           <li>AI usage records: while your account is active.</li>
           <li>Sign-in sessions: until they expire or you sign out.</li>
           <li>

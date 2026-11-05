@@ -60,6 +60,14 @@
             "NSPrivacyCollectedDataTypePurposes": [
               "NSPrivacyCollectedDataTypePurposeAppFunctionality"
             ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePhotosorVideos",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
           }
         ],
         "NSPrivacyAccessedAPITypes": [
@@ -105,7 +113,10 @@
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
       ]
     },
     "web": {
@@ -121,6 +132,14 @@
         }
       ],
       "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "JoyoArto membuka foto hanya saat kamu memilih foto struk untuk transaksi. / JoyoArto opens your photos only when you pick a receipt photo for a transaction.",
+          "cameraPermission": "JoyoArto memakai kamera hanya saat kamu memotret struk untuk transaksi; fotonya disimpan sebagai bukti di rumah tanggamu. / JoyoArto uses the camera only when you photograph a receipt for a transaction; the photo is kept as proof in your household.",
+          "microphonePermission": false
+        }
+      ],
       [
         "expo-audio",
         {

@@ -8,6 +8,7 @@ import { useEffect, useMemo, useReducer, useState } from "react";
 import { Alert, View } from "react-native";
 
 import { invalidateLedger, useAccountGroups, useAccounts } from "@/components/data";
+import { TransactionReceipts } from "@/components/receipts/receipts";
 import { CategorySheet } from "@/components/transactions/category-sheet";
 import { Button, Card, DateField, EmptyState, Field, FieldLabel, Input, ListRow, ListSection, Money, Pill, Picker, PickerButton, Row, Screen, Segmented, Text } from "@/components/ui";
 import { errorMessage } from "@/src/lib/errors";
@@ -16,6 +17,7 @@ import { client, orpc } from "@/src/lib/orpc";
 import { storeSafe } from "@/src/lib/platform";
 import { parseReviewAmount } from "@/src/lib/quick-add";
 import { toast } from "@/src/lib/toast";
+import { REIMBURSE_LABEL, REIMBURSE_TONE } from "@/src/lib/receipt";
 import { findTransaction, rememberTransaction, type Tx } from "@/src/lib/tx-cache";
 
 export default function TransactionScreen() {
@@ -51,7 +53,10 @@ export default function TransactionScreen() {
             <Text variant="heading" numberOfLines={2}>{t.merchant ?? t.description}</Text>
             <Text variant="caption" tone="muted">{dayLabel(t.date)} · {t.account}</Text>
           </View>
-          {t.status === "pending" ? <Pill tone="warning" label="pending" /> : null}
+          <View style={{ gap: 4, alignItems: "flex-end" }}>
+            {t.status === "pending" ? <Pill tone="warning" label="pending" /> : null}
+            {t.reimburse ? <Pill tone={REIMBURSE_TONE[t.reimburse.status]} label={REIMBURSE_LABEL[t.reimburse.status]} /> : null}
+          </View>
         </Row>
         <Money amount={t.amount} display={t.display} currency={t.currency} signed variant="title" />
         {t.status === "pending" ? (
@@ -64,6 +69,10 @@ export default function TransactionScreen() {
       <FieldLabel label="Category" hint={t.categorySource === "rule" ? "Set by a rule" : t.categorySource === "import" ? "Suggested at import" : undefined}>
         <PickerButton label="Category" text={t.categoryName ?? "Uncategorized"} muted={!t.category} onPress={() => setCategoryOpen(true)} />
       </FieldLabel>
+
+      <Card title="Receipt & reimbursement" subtitle="Photo as proof; Diganti kantor keeps it out of household spending">
+        <TransactionReceipts t={t} onChanged={() => setLocal(null)} onAddProfile={() => router.push("/reimburse-profiles")} />
+      </Card>
 
       <DetailsForm key={`${t.id}:${t.merchant}:${t.note}`} t={t} onSaved={update} />
       {t.status === "pending" ? <PendingForm key={`p:${t.id}:${t.amount}:${t.date}:${t.description}:${t.accountId}`} t={t} onSaved={update} onDeleted={() => router.back()} /> : null}

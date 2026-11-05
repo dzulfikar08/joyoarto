@@ -39,6 +39,10 @@ export type Env = BillingEnv & {
   JOYO_AI_EFFORT?: string;
   /** Workers AI chat model when there is no Anthropic key. */
   JOYO_WORKERS_AI_MODEL?: string;
+  /** Workers AI vision model for receipt photos when there is no Anthropic key (default: JOYO_WORKERS_AI_MODEL). */
+  JOYO_VISION_WORKERS_AI_MODEL?: string;
+  /** R2 bucket for receipt photos. Unset = photos are off. */
+  RECEIPTS?: R2Bucket;
   /** Hosted Joyo AI questions per member per WIB day (default 30; "0" turns the hosted chat off). */
   JOYO_AI_DAILY_CAP?: string;
   /** Voice notes plus AI parses per member per day (default 60). */

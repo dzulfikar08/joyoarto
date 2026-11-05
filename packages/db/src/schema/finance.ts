@@ -70,7 +70,11 @@ export const householdInvite = sqliteTable(
   (t) => [index("household_invite_household_idx").on(t.householdId), index("household_invite_email_idx").on(t.email)],
 );
 
-export const ACCOUNT_TYPES = ["bank", "credit_card", "ewallet", "cash", "investment", "loan", "other"] as const;
+/**
+ * receivable: money an employer owes the household for reimbursable expenses (one per reimbursement profile). Its
+ * balance is derived from the reimbursable items and their payments (services/reimburse.ts), never typed in.
+ */
+export const ACCOUNT_TYPES = ["bank", "credit_card", "ewallet", "cash", "investment", "loan", "other", "receivable"] as const;
 export type AccountType = (typeof ACCOUNT_TYPES)[number];
 
 export const finAccount = sqliteTable(
@@ -120,8 +124,19 @@ export const CATEGORY_SOURCES = ["manual", "rule", "import"] as const;
 /** posted: from a statement or entered as final. pending: quick capture (phone, Shortcut, voice) a statement confirms. */
 export const TRANSACTION_STATUSES = ["posted", "pending"] as const;
 export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number];
-export const CAPTURE_SOURCES = ["manual", "shortcut", "notification", "voice", "mcp", "api", "joyo"] as const;
+export const CAPTURE_SOURCES = ["manual", "shortcut", "notification", "voice", "mcp", "api", "joyo", "receipt"] as const;
 export type CaptureSource = (typeof CAPTURE_SOURCES)[number];
+
+/**
+ * Reimbursement ("Diganti kantor"): an expense paid personally that an employer pays back.
+ * draft: marked, not in a claim yet. submitted: in a generated claim report. paid: the employer paid it.
+ * rejected: the employer refused it; it counts as the household's own spending again.
+ * payment: the employer's incoming payment that settles a claim (on the money-in row).
+ * Every value but rejected makes the row a transfer into (or out of) the profile's receivable, so it is neither
+ * spending nor income (services/reports.ts kindExpr).
+ */
+export const REIMBURSE_STATUSES = ["draft", "submitted", "paid", "rejected", "payment"] as const;
+export type ReimburseStatus = (typeof REIMBURSE_STATUSES)[number];
 
 export const importBatch = sqliteTable(
   "import_batch",
@@ -190,6 +205,12 @@ export const transaction = sqliteTable(
     capturedAt: integer("captured_at", { mode: "timestamp_ms" }),
     /** Client-chosen id of a quick add, unique per household, so a phone retrying a request adds nothing twice. */
     clientRef: text("client_ref"),
+    /** Reimbursement status (REIMBURSE_STATUSES); null = an ordinary transaction. */
+    reimburseStatus: text("reimburse_status", { enum: REIMBURSE_STATUSES }),
+    /** The reimbursement profile (employer) that pays it back. Set with reimburseStatus. */
+    reimburseProfileId: text("reimburse_profile_id"),
+    /** The claim report it was submitted in (items), or the claim it pays (payment rows). */
+    reimburseClaimId: text("reimburse_claim_id"),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" })
@@ -207,7 +228,94 @@ export const transaction = sqliteTable(
     index("transaction_household_payment_ref_idx").on(t.householdId, t.paymentRef),
     index("transaction_account_status_date_idx").on(t.accountId, t.status, t.date),
     uniqueIndex("transaction_household_client_ref_uidx").on(t.householdId, t.clientRef).where(sql`client_ref is not null`),
+    index("transaction_household_reimburse_idx").on(t.householdId, t.reimburseStatus, t.date).where(sql`reimburse_status is not null`),
+    index("transaction_reimburse_claim_idx").on(t.reimburseClaimId).where(sql`reimburse_claim_id is not null`),
   ],
+);
+
+/**
+ * A photo kept as proof (a receipt), stored in R2 under `h/<householdId>/<id>`. transactionId is null between the
+ * upload and Save in the add sheet; the daily cron removes uploads never attached. Served only through the
+ * household-scoped /api/attachments/{id}; never a public URL.
+ */
+export const attachment = sqliteTable(
+  "attachment",
+  {
+    id: text("id").primaryKey(),
+    householdId: text("household_id")
+      .notNull()
+      .references(() => household.id, { onDelete: "cascade" }),
+    transactionId: text("transaction_id").references(() => transaction.id, { onDelete: "cascade" }),
+    r2Key: text("r2_key").notNull(),
+    mime: text("mime").notNull(),
+    size: integer("size").notNull(),
+    width: integer("width"),
+    height: integer("height"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("attachment_transaction_idx").on(t.transactionId), index("attachment_household_idx").on(t.householdId, t.createdAt)],
+);
+
+/** Who pays reimbursable expenses back (an employer), and what its claim reports say about the claimant. */
+export const reimbursementProfile = sqliteTable(
+  "reimbursement_profile",
+  {
+    id: text("id").primaryKey(),
+    householdId: text("household_id")
+      .notNull()
+      .references(() => household.id, { onDelete: "cascade" }),
+    companyName: text("company_name").notNull(),
+    claimantName: text("claimant_name").notNull(),
+    employeeId: text("employee_id"),
+    department: text("department"),
+    approverName: text("approver_name"),
+    approverEmail: text("approver_email"),
+    currency: text("currency").notNull().default("IDR"),
+    /** The receivable account (type receivable) that holds what this employer owes. */
+    accountId: text("account_id").references(() => finAccount.id, { onDelete: "set null" }),
+    /** Set when an item is marked for it: the add sheet defaults to the most recently used profile. */
+    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+    archivedAt: integer("archived_at", { mode: "timestamp_ms" }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("reimbursement_profile_household_idx").on(t.householdId)],
+);
+
+export const CLAIM_STATUSES = ["submitted", "paid", "rejected"] as const;
+
+/**
+ * A generated claim report: the items (transactions with reimburse_claim_id = id) and a snapshot of the header and
+ * rows as they were printed, so the same PDF can be downloaded again.
+ */
+export const reimbursementClaim = sqliteTable(
+  "reimbursement_claim",
+  {
+    id: text("id").primaryKey(),
+    householdId: text("household_id")
+      .notNull()
+      .references(() => household.id, { onDelete: "cascade" }),
+    profileId: text("profile_id")
+      .notNull()
+      .references(() => reimbursementProfile.id, { onDelete: "cascade" }),
+    /** RB-2026-0001: per household and year. */
+    number: text("number").notNull(),
+    status: text("status", { enum: CLAIM_STATUSES }).notNull().default("submitted"),
+    periodFrom: text("period_from").notNull(),
+    periodTo: text("period_to").notNull(),
+    /** Positive minor units. */
+    total: integer("total").notNull(),
+    currency: text("currency").notNull(),
+    itemCount: integer("item_count").notNull(),
+    notes: text("notes"),
+    /** JSON: header and rows as printed (lib/reimburse.ts ClaimSnapshot). */
+    snapshot: text("snapshot").notNull(),
+    paidAt: integer("paid_at", { mode: "timestamp_ms" }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("reimbursement_claim_number_uidx").on(t.householdId, t.number), index("reimbursement_claim_profile_idx").on(t.profileId, t.createdAt)],
 );
 
 /**

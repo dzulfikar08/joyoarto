@@ -45,7 +45,8 @@ export function accountOptions(accounts: readonly Account[], includeArchived = f
     {
       label: null,
       options: accounts
-        .filter((a) => includeArchived || !a.archived)
+        // Receivable accounts (what an employer owes for reimbursable expenses) never pay for anything.
+        .filter((a) => (includeArchived || !a.archived) && a.type !== "receivable")
         .map((a) => ({
           value: a.id,
           label: a.name,

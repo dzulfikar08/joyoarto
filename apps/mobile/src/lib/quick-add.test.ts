@@ -36,3 +36,21 @@ test("payload refuses what can't be saved", () => {
   expect(quickAddPayload({ ...emptyReview(), amountText: "x" }, "r").ok).toBe(false);
   expect(quickAddPayload({ ...emptyReview(), amountText: "5rb" }, "r")).toEqual({ ok: false, reason: "Say what it was." });
 });
+
+test("receipt: the photo is attached and reimbursement sent only for money out", () => {
+  const r = reviewFromDraft(
+    { amount: 8750000, direction: "out", merchant: "Bakmi GM", description: "Makan siang tim", note: "Rincian: Bakmi ayam Rp 45.000", category: "food/dining", accountId: "gopay", date: "2026-11-04", source: "ai" },
+    "receipt",
+    null,
+    "acc1",
+    { photo: { id: "att1", uri: "file:///struk.jpg" }, reimburse: { on: true, profileId: "" } },
+  );
+  const p = quickAddPayload(r, "ref1");
+  expect(p.ok && p.input).toMatchObject({ amount: -8750000, capturedVia: "receipt", attachmentIds: ["att1"], reimbursable: true, accountId: "gopay" });
+  expect(p.ok && "reimburseProfileId" in p.input).toBe(false);
+  const picked = quickAddPayload({ ...r, reimburse: { on: true, profileId: "pt1" } }, "ref1");
+  expect(picked.ok && picked.input.reimburseProfileId).toBe("pt1");
+  const income = quickAddPayload({ ...r, direction: "in" }, "ref1");
+  expect(income.ok && "reimbursable" in income.input).toBe(false);
+  expect(emptyReview().photo).toBeNull();
+});

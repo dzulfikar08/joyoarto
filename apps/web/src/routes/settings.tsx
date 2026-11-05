@@ -18,6 +18,7 @@ import { BillingSettings } from "./-billing";
 import { DataPrivacySettings } from "./-data-privacy";
 import { EmailImportSettings } from "./-email-import";
 import { HouseholdSettings } from "./-household";
+import { ReimburseSettings } from "./-reimburse-settings";
 
 export const Route = createFileRoute("/settings")({ beforeLoad: requireSession, component: Settings });
 
@@ -68,6 +69,8 @@ function Settings() {
       <BillingSettings />
 
       <EmailImportSettings />
+
+      <ReimburseSettings />
 
       <section className="card flex flex-wrap items-center justify-between gap-3 text-sm">
         <div>

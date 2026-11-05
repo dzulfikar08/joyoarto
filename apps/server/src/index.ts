@@ -3,6 +3,8 @@ import { DEFAULT_CHAT_MODEL, DEFAULT_WORKERS_AI_MODEL } from "@baroka/api/lib/jo
 import { capFrom } from "@baroka/api/lib/joyo-ai/limits";
 import { appRouter } from "@baroka/api/routers/index";
 import { seedDemo } from "@baroka/api/services/demo";
+import { sweepOrphanAttachments } from "@baroka/api/services/attachments";
+import type { FileStore } from "@baroka/api/context";
 import { SmartCoercionPlugin } from "@orpc/json-schema";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
@@ -113,12 +115,36 @@ function aiConfig(waitUntil: (p: Promise<unknown>) => void): AiConfig {
     effort: effort === "low" || effort === "high" ? effort : "medium",
     workersAi: env.AI ?? null,
     workersAiModel: env.JOYO_WORKERS_AI_MODEL?.trim() || DEFAULT_WORKERS_AI_MODEL,
+    visionWorkersAiModel: env.JOYO_VISION_WORKERS_AI_MODEL?.trim() || env.JOYO_WORKERS_AI_MODEL?.trim() || DEFAULT_WORKERS_AI_MODEL,
     dailyCap: capFrom(env.JOYO_AI_DAILY_CAP, 30),
     captureCap: capFrom(env.JOYO_CAPTURE_DAILY_CAP, 60),
     fakeTranscript: env.DEV_LOGIN === "1" || env.DEV_LOGIN === "true",
     waitUntil,
   };
 }
+
+/** The RECEIPTS bucket as the API's FileStore; undefined when it is not bound (photos off). */
+function r2Store(bucket: R2Bucket | undefined): FileStore | undefined {
+  if (!bucket) return undefined;
+  return {
+    put: async (key, body, contentType) => {
+      await bucket.put(key, body, { httpMetadata: { contentType } });
+    },
+    get: async (key) => {
+      const obj = await bucket.get(key);
+      return obj ? { body: new Uint8Array(await obj.arrayBuffer()), contentType: obj.httpMetadata?.contentType ?? "application/octet-stream" } : null;
+    },
+    delete: async (keys) => {
+      for (let i = 0; i < keys.length; i += 1000) await bucket.delete(keys.slice(i, i + 1000));
+    },
+    list: async (prefix, cursor) => {
+      const page = await bucket.list({ prefix, cursor, limit: 1000 });
+      return { keys: page.objects.map((o) => o.key), cursor: page.truncated ? page.cursor : null };
+    },
+  };
+}
+
+const files = r2Store(env.RECEIPTS);
 
 /** Typed oRPC transport for the web app. */
 const rpcHandler = new RPCHandler(appRouter, { interceptors: [onError(logError)] });
@@ -135,7 +161,7 @@ app.use("/*", async (c, next) => {
       void p;
     }
   };
-  const context = { db: getDb(), principal: isDocs ? null : await resolvePrincipal(c.req.raw), request: requestInfo(c.req.raw), config: serverConfig, ai: aiConfig(waitUntil), billing };
+  const context = { db: getDb(), principal: isDocs ? null : await resolvePrincipal(c.req.raw), request: requestInfo(c.req.raw), config: serverConfig, ai: aiConfig(waitUntil), billing, files };
   if (path.startsWith("/rpc")) {
     const { matched, response } = await rpcHandler.handle(c.req.raw, { prefix: "/rpc", context });
     if (matched) return c.newResponse(response.body, response);
@@ -159,5 +185,6 @@ export default {
   // Daily (wrangler.jsonc triggers): the demo account's made-up data starts over, when demo login is on.
   scheduled: async (_controller: ScheduledController, _env: unknown, ctx: ExecutionContext) => {
     if (env.DEMO_LOGIN_CODE?.trim()) ctx.waitUntil(seedDemo(getDb()).then((r) => console.log("demo reset", r)));
+    ctx.waitUntil(sweepOrphanAttachments(getDb(), files).then((n) => console.log("orphan receipts removed", n)));
   },
 } satisfies ExportedHandler;

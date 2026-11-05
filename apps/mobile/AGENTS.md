@@ -28,6 +28,7 @@ iOS compiles and ships through TestFlight. Read the repo's README.md "Mobile app
 | `components/session-only.tsx` | `useHasSession()` / `SessionOnlyNote`: tokens, invites, email-in, export and deletion need a Google/Apple sign-in. |
 | `app/plan.tsx`, `components/plan/` | Plan & simulate: baseline, scenario editors (loans with sale terms, baby, one-offs, monthly costs, income changes), projection chart, side by side, saved scenarios. State and form mapping: `src/lib/plan-state.ts` (same block shape as the web's `view`); draft per household on the phone: `src/lib/plan-draft.ts`. |
 | `app/(tabs)/joyo.tsx`, `components/joyo/` | Joyo AI chat: streamed answers (`src/lib/joyo-stream.ts`), markdown from the shared parser, tool chips, proposal cards, history, own API key (`src/lib/joyo-byok.ts`, secure store). |
+| `app/reimburse.tsx`, `app/reimburse-profiles.tsx`, `components/receipts/` | Reimburse (claims, PDF/CSV share), company profiles, receipt photos (`src/lib/receipt-photo.ts` camera/gallery + resize, `src/lib/receipt.ts` pure) and the Diganti kantor switch. |
 | `components/ui/` | The UI kit. Import from `@/components/ui`. |
 | `components/nav/floating-tab-bar.tsx` | The tab bar (port of JoyoRogo's). |
 | `components/charts/` | react-native-svg charts (donut, cash flow, pace). |
@@ -92,6 +93,6 @@ tested) holds `{ server, token, kind, me }`.
 Each replaces a placeholder or a "coming" note; the web page is the spec.
 
 - Done: **Import**, **Accounts**, **Household / Settings / Billing / Data & privacy**, **Budgets editing**, **Plan &
-  simulate**, **Joyo AI chat**, **Voice quick add** (Nov 2026).
+  simulate**, **Joyo AI chat**, **Voice quick add** (Nov 2026), **Receipt photos and Reimburse** (Nov 2026).
 - **OTA updates** (expo-updates + EAS Update like
   JoyoRogo's docs/ota.md; needs an EAS project id from the owner).

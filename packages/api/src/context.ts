@@ -62,6 +62,8 @@ export type AiConfig = {
   workersAi: AiBinding | null;
   /** JOYO_WORKERS_AI_MODEL: chat model on Workers AI when there is no Anthropic key. */
   workersAiModel: string;
+  /** JOYO_VISION_WORKERS_AI_MODEL: reads receipt photos on Workers AI when there is no Anthropic key (default: workersAiModel). */
+  visionWorkersAiModel?: string;
   /** Hosted chat messages per member per WIB day (JOYO_AI_DAILY_CAP; 0 = off). */
   dailyCap: number;
   /** Voice notes and parses per member per day (JOYO_CAPTURE_DAILY_CAP). */
@@ -72,6 +74,18 @@ export type AiConfig = {
   waitUntil?: (promise: Promise<unknown>) => void;
 };
 
+/**
+ * Private file storage (Cloudflare R2: the RECEIPTS bucket) for receipt photos. Keys start with h/<householdId>/, so a
+ * household's files can be listed and deleted together. Absent = photos are off on this server.
+ */
+export type FileStore = {
+  put(key: string, body: Uint8Array, contentType: string): Promise<void>;
+  get(key: string): Promise<{ body: Uint8Array; contentType: string } | null>;
+  /** Missing keys are ignored. */
+  delete(keys: string[]): Promise<void>;
+  list(prefix: string, cursor?: string): Promise<{ keys: string[]; cursor: string | null }>;
+};
+
 export type Context = {
   db: Database;
   principal: Principal | null;
@@ -80,4 +94,6 @@ export type Context = {
   ai?: AiConfig;
   /** JoyoArto Pro billing (apps/server/src/env.ts). Absent = no limits, every household gets Pro (tests, self-hosts). */
   billing?: BillingConfig;
+  /** Receipt photos (R2). Absent in most tests and on servers without the bucket. */
+  files?: FileStore;
 };

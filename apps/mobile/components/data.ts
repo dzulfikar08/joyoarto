@@ -40,9 +40,9 @@ export function useCategoryOptions(): PickerOption[] {
   return useMemo(() => groups.flatMap((g) => g.options.map((o) => ({ ...o, hint: g.label ?? undefined }))), [groups]);
 }
 
-/** After any write to transactions: lists, the dashboard, balances and budgets refetch. */
+/** After any write to transactions: lists, the dashboard, balances, budgets and reimbursements refetch. */
 export function invalidateLedger() {
-  for (const key of [orpc.transactions.key(), orpc.reports.key(), orpc.accounts.key(), orpc.budgets.key()]) {
+  for (const key of [orpc.transactions.key(), orpc.reports.key(), orpc.accounts.key(), orpc.budgets.key(), orpc.reimburse.key()]) {
     void queryClient.invalidateQueries({ queryKey: key });
   }
 }

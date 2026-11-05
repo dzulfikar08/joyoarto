@@ -564,6 +564,14 @@ function Attention({ d, range }: { d: Dashboard; range: { from: string; to: stri
       </Link>,
     );
   }
+  const rb = a.reimburse;
+  if (rb.draft + rb.submitted > 0)
+    items.push(
+      <Link key="reimburse" to="/reimburse" className="hover:underline">
+        <b className="tabular-nums">{rb.owed.display}</b> to be reimbursed (diganti kantor):{" "}
+        {[rb.draft && `${rb.draft} not claimed yet`, rb.submitted && `${rb.submitted} waiting for the company`].filter(Boolean).join(", ")}
+      </Link>,
+    );
   for (const s of a.staleAccounts)
     items.push(
       s.lastDate ? (

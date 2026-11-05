@@ -2,7 +2,7 @@
 # remote D1 migrations first, then `wrangler deploy`. Same steps as `bun run db:migrate:remote && bun run deploy`
 # on a laptop, which is no longer how production is updated.
 #
-# Secrets (environment `production`): CLOUDFLARE_API_TOKEN with Workers Scripts:Edit, D1:Edit,
+# Secrets (environment `production`): CLOUDFLARE_API_TOKEN with Workers Scripts:Edit, D1:Edit, Workers R2 Storage:Edit,
 # Workers Routes:Edit and Zone DNS:Edit on joyorogo.com/dzulfikar.com (custom domains). Account id is in wrangler.jsonc.
 name: Deploy
 
@@ -36,6 +36,16 @@ jobs:
       - name: Build web app
         working-directory: apps/web
         run: bunx vite build
+      # The receipt photos bucket (RECEIPTS in wrangler.jsonc) must exist before a deploy that binds it. Idempotent.
+      - name: Ensure R2 bucket
+        working-directory: apps/server
+        run: |
+          out=$(bunx wrangler r2 bucket create joyoarto-receipts 2>&1) && echo "$out" || {
+            echo "$out"
+            echo "$out" | grep -qiE "already exists|already own" || exit 1
+          }
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - name: Apply D1 migrations
         working-directory: apps/server
         run: bunx wrangler d1 migrations apply DB --remote

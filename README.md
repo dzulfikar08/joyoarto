@@ -190,6 +190,9 @@ router types, `src/lib/orpc.ts`). Structure and conventions for new screens: `ap
   `expo/fetch`; oRPC's own stream decoder needs web streams Hermes lacks), markdown answers, "reading …" tool chips,
   proposals with Confirm/Dismiss, history, starter prompts, the off and daily-cap states, and an optional own API key in
   the phone's secure storage (removed at sign-out). On iOS nothing points to buying more.
+- **Receipts and Reimburse**: Foto struk in the add sheet (camera permission asked the first time; the gallery uses
+  the system photo picker), photos and the Diganti kantor switch on the transaction screen, More → Reimburse (claim
+  PDF/CSV saved and shared with expo-sharing), Settings → Reimbursement.
 - **Plan & simulate** (More → Plan): the web's planner with the same templates, editors, verdicts, projection chart,
   side by side and household saved scenarios (a scenario saved on the phone opens with the same blocks on the web). The
   unsaved draft stays on the phone, per household.
@@ -316,6 +319,49 @@ editable draft, then Save, which is `transactions.quickAdd` (pending, as before)
   (`start`, `round`, `text`, `toolStart`, `toolDone`, `proposal`, `done`); the web page renders markdown with JoyoRogo's
   parser (`lib/joyo-ai/markdown/parse.ts`).
 
+## Receipt photos and reimbursement (Diganti kantor)
+
+**Receipt photos.** The add sheet (web and phone) has **Foto struk**: the camera (`capture=environment` on the web,
+expo-image-picker on the phone) or the gallery. The client shrinks the photo to about 1600 px on the long side (JPEG
+0.7) and sends it to `POST /api/capture/receipt` (oRPC `capture.receipt`, multipart `image`). The server stores it
+first (`attachment` row, R2 key `h/<householdId>/r/<id>` in the `RECEIPTS` bucket, `joyoarto-receipts`), then reads it
+into the same draft as voice and text: Claude vision (`JOYO_PARSE_MODEL`) with a strict JSON schema when
+`ANTHROPIC_API_KEY` is set, else the Workers AI vision model `JOYO_VISION_WORKERS_AI_MODEL` (Gemma 4 reads images).
+`lib/receipt.ts` checks the answer (positive total, a real date not in the future nor over a year back, the household's
+own category and account, the printed payment method matched to an account, line items into the note). The member
+reviews the draft and Save is `transactions.quickAdd` with `attachmentIds`. When nothing can be read (no AI, today's
+cap, a failure) the photo is still kept and the draft comes back empty.
+
+- Photos are served only by `GET /api/attachments/{id}` to members of the household (session or bearer token): no
+  public URLs, and never to Claude (tools see attachment ids only). `POST /api/attachments` adds or replaces
+  (`replace=true`) a photo on an existing transaction (Transactions → Details on the web, the transaction screen on the
+  phone); `DELETE /api/attachments/{id}` removes one.
+- Deleting a transaction or undoing its import deletes its files; a statement row that confirms a quick add takes over
+  its photos (and reimbursement); deleting a household (or the account that was its only member) deletes every object
+  under the household's prefix. The daily cron removes uploads never attached after a day.
+- Limits: receipts have their own daily slot in `ai_usage` (kind `receipt`): Free 3 a day, Pro up to
+  `JOYO_CAPTURE_DAILY_CAP`.
+
+**Reimbursable expenses.** An expense paid personally for work can be marked **Reimburse / Diganti kantor** (add sheet,
+transaction details, `POST /api/reimburse/mark`, MCP `mark_reimbursable`) for a **reimbursement profile**: the company
+that pays it back, with the claimant's name, employee ID, department and approver printed on reports (Settings →
+Reimbursement; several companies allowed, the last used is the default).
+
+- *Accounting.* The expense stays on the account that paid it (balances and statement reconciliation are untouched), but
+  while it is `draft`, `submitted` or `paid` it is a **transfer into the company's receivable**: `kindExpr` in
+  `services/reports.ts` treats it as `transfer`, so the dashboard, spending summaries, cash flow, budgets and the Plan
+  baseline leave it out. Each profile has an account of type `receivable` ("Reimburse PT …") whose balance is what the
+  company still owes (draft + submitted items). The company's money-in row can be marked as the claim's `payment`; it is
+  a transfer out of the receivable, so it is not income. A `rejected` item is household spending again.
+- *Claims.* The Reimburse page (web `/reimburse`, phone More → Reimburse; the dashboard links to it while items are
+  open) lists draft items per company; "Buat laporan" (`POST /api/reimburse/claims`) numbers a claim (`RB-YYYY-NNNN`),
+  freezes what it prints (`reimbursement_claim.snapshot`) and marks the items `submitted`. `GET
+  /api/reimburse/claims/{id}/pdf` (pdf-lib: header, item table, subtotals per category, total in numbers and in words
+  via `terbilang`, signature blocks for claimant, approver and finance, then one appendix page per receipt photo; items
+  without one are marked "tanpa bukti") and `/csv` can be downloaded again at any time. Then: paid (optionally with the
+  payment row and the items the company refused), rejected, reopened, or withdrawn (items back to draft). JoyoArto never
+  sends anything to the company. Free makes 1 claim report a month; Pro unlimited.
+
 ## JoyoArto Pro (billing)
 
 JoyoArto is AGPL and free to self-host. On the hosted service the paid plan is **Joyo Pro**: one subscription per
@@ -402,7 +448,8 @@ bun run db:migrate:remote   # after a schema change
 bun run deploy              # builds apps/web, deploys the worker
 ```
 
-Secrets (`wrangler secret put`, in apps/server): `BETTER_AUTH_SECRET` (set), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+Receipt photos need the R2 bucket `joyoarto-receipts` (binding `RECEIPTS`); `deploy.yml` creates it when missing, so the
+deploy token needs Workers R2 Storage:Edit. Secrets (`wrangler secret put`, in apps/server): `BETTER_AUTH_SECRET` (set), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
 `ANTHROPIC_API_KEY` (optional), and for Joyo Pro `JOYO_INTERNAL_KEY` (the same value as on JoyoRogo's server; unset = billing
 off). `DEMO_LOGIN_CODE` (optional) turns on the store reviewers' demo account. No payment secrets: JoyoRogo sells Joyo Pro.
 `ALLOWED_EMAILS` and `ADMIN_EMAILS` (comma-separated) are not in wrangler.jsonc: `deploy.yml` passes them with

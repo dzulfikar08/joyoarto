@@ -111,6 +111,12 @@ export function PricingPlans({ t, action, freeAction }: { t: T; action?: (p: Pri
     },
     { label: t("Banyak statement sekaligus, kirim lewat email, share dari HP", "Bulk import, email-in, share-to-app"), free: false, pro: true },
     { label: t("Pertanyaan Joyo AI per hari", "Joyo AI questions a day"), free: String(free.aiDailyCap ?? 0), pro: String(pro.aiDailyCap ?? 0) },
+    { label: t("Foto struk dibaca AI per hari", "Receipt photos read by AI a day"), free: String(free.receiptScansPerDay ?? 0), pro: pro.receiptScansPerDay === null ? t("Sampai batas harian server", "Up to the daily limit") : String(pro.receiptScansPerDay) },
+    {
+      label: t("Laporan klaim reimburse (PDF + foto struk)", "Reimbursement claim reports (PDF + receipts)"),
+      free: t(`${free.claimReportsPerMonth ?? 0} per bulan`, `${free.claimReportsPerMonth ?? 0} a month`),
+      pro: t("Tanpa batas", "Unlimited"),
+    },
     { label: t("Anggota rumah tangga yang kamu undang", "Household members you invite"), free: String(free.members), pro: String(pro.members) },
     { label: t("Simpan skenario Rencana & simulasi", "Saved Plan & simulate scenarios"), free: false, pro: true },
     { label: t("Konektor Claude (claude.ai, Desktop, Code)", "Claude connector (claude.ai, Desktop, Code)"), free: false, pro: true },

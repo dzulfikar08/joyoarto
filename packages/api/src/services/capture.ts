@@ -7,7 +7,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
-import type { AiConfig, Principal } from "../context";
+import type { AiConfig, FileStore, Principal } from "../context";
+import type { BillingConfig } from "../lib/billing/config";
+import { MAX_RECEIPT_BYTES, emptyReceiptDraft, normalizeReceipt, receiptPrompt, receiptSchema } from "../lib/receipt";
+import type { AiReceipt, ReceiptLine } from "../lib/receipt";
+import { requireFiles, storeImage } from "./attachments";
+import type { AttachmentView } from "./attachments";
+import { userPlan } from "./billing";
 import type { Database } from "@baroka/db";
 import { parseCaptureRules } from "../lib/capture-parse";
 import type { CaptureDraft, DraftAccount, DraftCategory } from "../lib/capture-parse";
@@ -21,6 +27,7 @@ export const TRANSCRIBE_MODEL = "@cf/openai/whisper-large-v3-turbo";
 export const MAX_AUDIO_BYTES = 3_000_000;
 const TRANSCRIBE_DEADLINE_MS = 25_000;
 const PARSE_DEADLINE_MS = 20_000;
+const RECEIPT_DEADLINE_MS = 30_000;
 /** What local dev answers for a voice note when there is no AI binding (DEV_LOGIN only). */
 export const DEV_TRANSCRIPT = "beli kopi kenangan dua puluh lima ribu pakai gopay";
 
@@ -135,7 +142,7 @@ Note: """${text}"""`;
 export async function parseCapture(db: Database, p: Principal, ai: AiConfig | undefined, input: z.infer<typeof parseInput>): Promise<{ draft: CaptureDraft; currency: string }> {
   const today = todayWib();
   const [{ accounts: accs }, { categories: cats }, currency] = await Promise.all([listAccounts(db, p), listCategories(db, p), baseCurrency(db, p.householdId)]);
-  const accounts: DraftAccount[] = accs.map((a) => ({ id: a.id, name: a.name, institution: a.institution, type: a.type }));
+  const accounts: DraftAccount[] = accs.filter((a) => a.type !== "receivable").map((a) => ({ id: a.id, name: a.name, institution: a.institution, type: a.type }));
   const categories: DraftCategory[] = cats.map((c) => ({ slug: c.slug, name: c.name, kind: c.kind }));
   const rules = parseCaptureRules(input.text, { today, accounts, categories, currency });
   if (!ai?.anthropicKey && !ai?.workersAi) return { draft: rules, currency };
@@ -198,6 +205,123 @@ export async function parseCapture(db: Database, p: Principal, ai: AiConfig | un
   } catch (error) {
     console.error("[capture] parse failed; using rules", error instanceof Error ? error.name : typeof error);
     return { draft: rules, currency };
+  } finally {
+    const settle = settleSlot(db, slot, { outcome, calls: 1, ...usage, latencyMs: Date.now() - started }).catch(() => {});
+    if (ai.waitUntil) ai.waitUntil(settle);
+    else await settle;
+  }
+}
+
+// ------------------------------------------------------------------------------------------------ receipt photos
+
+export const receiptInput = z.object({
+  image: z.file().max(MAX_RECEIPT_BYTES).describe("A photo of the receipt (JPEG or PNG; the apps send a JPEG about 1600 px on the long side)"),
+});
+
+export type ReceiptOcr = { status: "ok" | "off" | "cap" | "failed"; message: string | null; upgrade: boolean };
+
+/**
+ * A receipt photo to a draft. The photo is stored first (R2, household-scoped; it becomes the transaction's when the
+ * member saves the draft with attachmentIds), then read by Claude (vision) when JoyoArto has a key, else a Workers AI
+ * vision model. Nothing is saved as a transaction here. When the photo cannot be read (no model, today's cap used, the
+ * model failed) the photo is still kept and the draft comes back empty to type in.
+ */
+export async function receiptCapture(
+  db: Database,
+  p: Principal,
+  ai: AiConfig | undefined,
+  files: FileStore | undefined,
+  billing: BillingConfig | undefined,
+  input: z.infer<typeof receiptInput>,
+): Promise<{ attachment: AttachmentView; draft: CaptureDraft; lineItems: ReceiptLine[]; paymentMethod: string | null; currency: string; ocr: ReceiptOcr }> {
+  const store = requireFiles(files);
+  const bytes = new Uint8Array(await input.image.arrayBuffer());
+  const attachment = await storeImage(db, store, p, bytes, null);
+  const today = todayWib();
+  const [{ accounts: accs }, { categories: cats }, currency] = await Promise.all([listAccounts(db, p), listCategories(db, p), baseCurrency(db, p.householdId)]);
+  const accounts: DraftAccount[] = accs.filter((a) => a.type !== "receivable").map((a) => ({ id: a.id, name: a.name, institution: a.institution, type: a.type }));
+  const categories: DraftCategory[] = cats.filter((c) => c.kind !== "income").map((c) => ({ slug: c.slug, name: c.name, kind: c.kind }));
+  const empty = (status: ReceiptOcr["status"], message: string, upgrade = false) => ({ attachment, ...emptyReceiptDraft(today), currency, ocr: { status, message, upgrade } });
+
+  const visionModel = ai?.anthropicKey ? ai.parseModel : ai?.workersAi ? (ai.visionWorkersAiModel ?? ai.workersAiModel) : null;
+  if (!ai || !visionModel) return empty("off", "Reading receipts is not available on this server. The photo is kept; type the details.");
+
+  const { limits, entitlement } = await userPlan(db, p.userId, billing);
+  const cap = limits.receiptScansPerDay === null ? ai.captureCap : Math.min(limits.receiptScansPerDay, ai.captureCap);
+  const slot = await reserveSlot(db, { userId: p.userId, householdId: p.householdId, kind: "receipt", engine: "hosted", model: visionModel, cap });
+  if (!slot) {
+    const free = entitlement.plan === "free" && cap < ai.captureCap;
+    return empty(
+      "cap",
+      free
+        ? `Free reads ${cap} receipts a day and today's are used; the photo is kept, so type the details. Joyo Pro reads more.`
+        : "That's all the receipts for today. The photo is kept; type the details.",
+      free,
+    );
+  }
+  const started = Date.now();
+  let outcome = "error";
+  let usage = { inputTokens: 0, outputTokens: 0 };
+  try {
+    const schema = receiptSchema(accounts.map((a) => a.id), categories.map((c) => c.slug));
+    const prompt = receiptPrompt(today, accounts, categories);
+    const b64 = toBase64(bytes);
+    let raw: Partial<AiReceipt>;
+    if (ai.anthropicKey) {
+      const client = new Anthropic({ apiKey: ai.anthropicKey, baseURL: ai.anthropicBaseUrl, maxRetries: 1, timeout: RECEIPT_DEADLINE_MS });
+      const message = await client.messages.create({
+        model: ai.parseModel,
+        max_tokens: 4_000,
+        output_config: { effort: "low", format: { type: "json_schema", schema } },
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: attachment.mime as "image/jpeg" | "image/png", data: b64 } },
+              { type: "text", text: prompt },
+            ],
+          },
+        ],
+      });
+      usage = { inputTokens: message.usage.input_tokens, outputTokens: message.usage.output_tokens };
+      if (message.stop_reason === "refusal") throw new Error("refusal");
+      const block = message.content.find((b) => b.type === "text");
+      raw = JSON.parse(block?.type === "text" ? block.text : "") as Partial<AiReceipt>;
+    } else {
+      // Workers AI vision (OpenAI-style image_url content part with a data URI), JSON mode.
+      const result = (await withDeadline(
+        ai.workersAi!.run(visionModel, {
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: `${prompt}\n\nAnswer with only a JSON object with these keys: ${schema.required.join(", ")}.` },
+                { type: "image_url", image_url: { url: `data:${attachment.mime};base64,${b64}` } },
+              ],
+            },
+          ],
+          response_format: { type: "json_schema", json_schema: schema },
+          max_tokens: 1_200,
+          temperature: 0,
+        }),
+        RECEIPT_DEADLINE_MS,
+      )) as { response?: unknown; usage?: { prompt_tokens?: number; completion_tokens?: number }; choices?: { message?: { content?: unknown } }[] } | null;
+      usage = { inputTokens: result?.usage?.prompt_tokens ?? 0, outputTokens: result?.usage?.completion_tokens ?? 0 };
+      const answer = result?.response ?? result?.choices?.[0]?.message?.content;
+      raw = (typeof answer === "string" ? JSON.parse(answer.replace(/^```(?:json)?\s*|\s*```$/g, "")) : answer) as Partial<AiReceipt>;
+      if (!raw || typeof raw !== "object") throw new Error("no draft");
+    }
+    const read = normalizeReceipt(raw, { today, accounts, categories, currency });
+    outcome = read.draft.amount ? "ok" : "empty";
+    return {
+      attachment,
+      ...read,
+      currency,
+      ocr: read.draft.amount ? { status: "ok", message: null, upgrade: false } : { status: "failed", message: "Couldn't find the total on this photo. Check the details.", upgrade: false },
+    };
+  } catch (error) {
+    console.error("[capture] receipt failed", error instanceof Error ? error.name : typeof error);
+    return empty("failed", "Couldn't read this receipt. The photo is kept; type the details.");
   } finally {
     const settle = settleSlot(db, slot, { outcome, calls: 1, ...usage, latencyMs: Date.now() - started }).catch(() => {});
     if (ai.waitUntil) ai.waitUntil(settle);

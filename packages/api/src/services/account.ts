@@ -9,7 +9,8 @@ import { and, asc, count, desc, eq, gt, inArray, isNull, lt, or } from "drizzle-
 import type { SQL } from "drizzle-orm";
 import { z } from "zod";
 
-import type { Principal } from "../context";
+import type { FileStore, Principal } from "../context";
+import { purgeHouseholdFiles } from "./attachments";
 import { exponentOf } from "../lib/money";
 import { normalizeEmail } from "../lib/members";
 import { badRequest, notFound } from "./common";
@@ -65,6 +66,9 @@ export const EXPORT_COVERAGE: Record<string, string> = {
   waitlist_signup: "not exported: not linked to accounts; deleted with the account when the email matches",
   joyo_pro_status: "billing.joyoPro (JoyoRogo's last answer about your Joyo Pro: plan, until, when it was checked)",
   usage_counter: "billing.usage (your statement imports per month)",
+  attachment: "attachments (receipt photo metadata: transaction, type, size; the images themselves stay in the app, GET /api/attachments/{id})",
+  reimbursement_profile: "reimbursementProfiles",
+  reimbursement_claim: "reimbursementClaims (with the printed snapshot)",
 };
 
 // ------------------------------------------------------------------------------------------------ export
@@ -94,6 +98,9 @@ async function* transactionPages(db: Database, householdId: string) {
         capturedVia: t.capturedVia,
         capturedAt: t.capturedAt,
         clientRef: t.clientRef,
+        reimburseStatus: t.reimburseStatus,
+        reimburseProfileId: t.reimburseProfileId,
+        reimburseClaimId: t.reimburseClaimId,
         createdBy: t.createdBy,
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
@@ -277,6 +284,26 @@ export async function* exportJsonChunks(db: Database, p: Principal, now = new Da
   yield field("planScenarios", scenarios);
   yield field("emailImport", { enabled: emailImport.length > 0, since: emailImport[0]?.createdAt ?? null });
   yield field("inboundEmails", inbound);
+
+  const [attachments, reimbursementProfiles, claims] = await db.batch([
+    db
+      .select({
+        id: schema.attachment.id,
+        transactionId: schema.attachment.transactionId,
+        mime: schema.attachment.mime,
+        size: schema.attachment.size,
+        width: schema.attachment.width,
+        height: schema.attachment.height,
+        createdAt: schema.attachment.createdAt,
+      })
+      .from(schema.attachment)
+      .where(eq(schema.attachment.householdId, h)),
+    db.select().from(schema.reimbursementProfile).where(eq(schema.reimbursementProfile.householdId, h)),
+    db.select().from(schema.reimbursementClaim).where(eq(schema.reimbursementClaim.householdId, h)),
+  ]);
+  yield field("attachments", attachments);
+  yield field("reimbursementProfiles", reimbursementProfiles);
+  yield field("reimbursementClaims", claims.map((c) => ({ ...c, snapshot: safeJson(c.snapshot) })));
 
   // Joyo Pro is sold by JoyoRogo; JoyoArto keeps only its last answer and this user's usage counts.
   const [joyoPro, usage] = await db.batch([
@@ -469,7 +496,7 @@ export async function disconnectApp(db: Database, p: Pick<Principal, "userId">, 
 // ------------------------------------------------------------------------------------------------ deletion
 
 /** Deletes a household and everything in it. Transactions first, in pages, so no single statement runs long. */
-export async function purgeHousehold(db: Database, householdId: string): Promise<{ transactions: number }> {
+export async function purgeHousehold(db: Database, householdId: string, files?: FileStore): Promise<{ transactions: number }> {
   let transactions = 0;
   for (;;) {
     const page = db.select({ id: t.id }).from(t).where(eq(t.householdId, householdId)).limit(DELETE_PAGE);
@@ -479,6 +506,8 @@ export async function purgeHousehold(db: Database, householdId: string): Promise
   }
   // Everything else hangs off household with ON DELETE CASCADE.
   await db.delete(schema.household).where(eq(schema.household.id, householdId));
+  // Receipt photos live in R2 under the household's prefix; the rows went with the household.
+  await purgeHouseholdFiles(files, householdId);
   return { transactions };
 }
 
@@ -487,7 +516,7 @@ export const deleteHouseholdInput = z.object({
 });
 
 /** An owner deletes the active household with all its finance data; every member loses access to it. */
-export async function deleteHousehold(db: Database, p: Principal, input: z.infer<typeof deleteHouseholdInput>) {
+export async function deleteHousehold(db: Database, p: Principal, input: z.infer<typeof deleteHouseholdInput>, files?: FileStore) {
   const [[h], [mine], [others]] = await db.batch([
     db.select({ id: schema.household.id, name: schema.household.name }).from(schema.household).where(eq(schema.household.id, p.householdId)),
     db
@@ -499,7 +528,7 @@ export async function deleteHousehold(db: Database, p: Principal, input: z.infer
   if (!h || !mine) notFound("Household");
   if (mine.role !== "owner") throw new ORPCError("FORBIDDEN", { message: "Only an owner can delete a household. Members can leave it." });
   if (input.confirmName.trim() !== h.name.trim()) badRequest(`Type the household's name exactly ("${h.name}") to confirm.`);
-  const { transactions } = await purgeHousehold(db, h.id);
+  const { transactions } = await purgeHousehold(db, h.id, files);
   // Every former member (you included) falls back to another household, or a fresh one, on the next request.
   return { deleted: h.id, name: h.name, transactionsDeleted: transactions, membersRemoved: others?.n ?? 0 };
 }
@@ -549,7 +578,7 @@ export async function accountDeletionPreview(db: Database, p: Pick<Principal, "u
  * AI connections, memberships and the MCP audit go with the user row (ON DELETE CASCADE); rows they created in
  * shared households stay, without their name (created_by is set to null).
  */
-export async function deleteAccount(db: Database, p: Pick<Principal, "userId">, input: z.infer<typeof deleteAccountInput>) {
+export async function deleteAccount(db: Database, p: Pick<Principal, "userId">, input: z.infer<typeof deleteAccountInput>, files?: FileStore) {
   const [user] = await db.select({ email: schema.user.email }).from(schema.user).where(eq(schema.user.id, p.userId));
   if (!user) notFound("User");
   if (normalizeEmail(input.confirmEmail) !== normalizeEmail(user.email)) badRequest("Type your account's email exactly to confirm.");
@@ -563,7 +592,7 @@ export async function deleteAccount(db: Database, p: Pick<Principal, "userId">, 
     });
   }
   let transactions = 0;
-  for (const h of plan.purge) transactions += (await purgeHousehold(db, h.householdId)).transactions;
+  for (const h of plan.purge) transactions += (await purgeHousehold(db, h.householdId, files)).transactions;
 
   // OAuth tokens first: access tokens point at refresh tokens without a cascade, and clients this user registered
   // may be referenced by tokens.

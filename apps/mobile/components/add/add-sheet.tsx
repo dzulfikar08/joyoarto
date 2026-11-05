@@ -2,15 +2,20 @@
 // type it ("kopi 25rb gopay"), the server reads it (capture.parse: AI with a rules fallback), review the editable draft,
 // Save = transactions.quickAdd as a pending row. Nothing is saved before Save. Voice ("Say it", when the server has
 // transcription on: joyo.status.voice): src/lib/voice.ts records up to 60 s, the server turns it into text, and the
-// text runs through the same parse → review → save.
+// text runs through the same parse → review → save. "Foto struk" (camera or gallery, shrunk to ~1600 px JPEG on the
+// phone) goes to capture.receipt: the photo is kept and attached on Save, and the receipt is read into the same draft.
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Linking, Pressable, View } from "react-native";
+import { Image, Linking, Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 import { invalidateLedger, useAccountGroups, useAccounts, useCategoryGroups } from "@/components/data";
+import { PhotoButtons, ReimburseSwitch, restApi } from "@/components/receipts/receipts";
+import { receiptUpload } from "@/src/lib/receipt";
+import type { ReceiptPhoto } from "@/src/lib/receipt-photo";
+import { useRouter } from "expo-router";
 import { Button, DateField, Field, FieldLabel, Icon, Input, Loading, Picker, Row, Segmented, Sheet, Text } from "@/components/ui";
 import { closeAddSheet, useAddSheet } from "@/src/lib/add-sheet";
 import { errorMessage } from "@/src/lib/errors";
@@ -25,7 +30,7 @@ import { clockLabel, MAX_RECORD_MS, VOICE_MESSAGES, voiceNotice } from "@/src/li
 
 const EXAMPLES = ["kopi kenangan 25rb gopay", "gaji masuk 16 juta", "kemarin parkir 5rb cash"];
 
-type Phase = "input" | "reading" | "review";
+type Phase = "input" | "reading" | "scanning" | "review";
 
 export function AddSheet() {
   const { open, prefill, session } = useAddSheet();
@@ -56,6 +61,28 @@ function AddFlow({ prefill, onDone }: { prefill?: string; onDone: () => void }) 
       const res = await client.capture.parse({ text: input }, { signal: controller.signal });
       if (controller.signal.aborted) return;
       setReview(reviewFromDraft(res.draft, via, heard, lastAccountId()));
+      setPhase("review");
+    } catch (e) {
+      if (controller.signal.aborted) return;
+      setError(errorMessage(e, { storeSafe }));
+      setPhase("input");
+    }
+  };
+
+  const scan = async (photo: ReceiptPhoto) => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setError(null);
+    setPhase("scanning");
+    try {
+      const res = await restApi().receipt(receiptUpload(photo.uri), controller.signal);
+      if (controller.signal.aborted) return;
+      setReview(
+        reviewFromDraft(res.draft, "receipt", null, lastAccountId(), {
+          photo: { id: res.attachment.id, uri: photo.uri },
+          ocrNote: res.ocr.status === "ok" ? null : res.ocr.message,
+        }),
+      );
       setPhase("review");
     } catch (e) {
       if (controller.signal.aborted) return;
@@ -112,10 +139,10 @@ function AddFlow({ prefill, onDone }: { prefill?: string; onDone: () => void }) 
     );
   }
 
-  if (phase === "reading") {
+  if (phase === "reading" || phase === "scanning") {
     return (
       <View style={{ alignItems: "center", gap: 8 }}>
-        <Loading label="Reading it…" />
+        <Loading label={phase === "scanning" ? "Reading the receipt…" : "Reading it…"} />
         {text ? <Text tone="muted" style={{ textAlign: "center" }}>“{text}”</Text> : null}
         <Button
           title="Cancel"
@@ -162,6 +189,16 @@ function AddFlow({ prefill, onDone }: { prefill?: string; onDone: () => void }) 
           ) : null}
         </View>
       ) : null}
+      <View style={styles.photo}>
+        <Row gap={10}>
+          <Icon name="receipt-outline" size={24} />
+          <View style={{ flex: 1 }}>
+            <Text variant="label">Foto struk · Photo receipt</Text>
+            <Text variant="caption" tone="muted">Read by AI, kept as proof (for reimbursement claims too).</Text>
+          </View>
+        </Row>
+        <PhotoButtons takeTitle="Foto" chooseTitle="Galeri" onPicked={(p) => void scan(p)} />
+      </View>
       <FieldLabel label={voiceOn ? "Or type it" : "Type it"} error={error}>
         <Input
           value={text}
@@ -202,6 +239,7 @@ function ReviewForm({ review, setReview, onBack, onDone }: { review: Review; set
   const accountGroups = useAccountGroups();
   const categoryGroups = useCategoryGroups();
   const clientRef = useRef(`app:${Crypto.randomUUID()}`);
+  const router = useRouter();
   const list = accounts.data?.accounts ?? [];
   const currency = list.find((a) => a.id === review.accountId)?.currency ?? "IDR";
   const set = (patch: Partial<Review>) => setReview({ ...review, ...patch });
@@ -225,12 +263,20 @@ function ReviewForm({ review, setReview, onBack, onDone }: { review: Review; set
 
   return (
     <>
+      {review.photo ? (
+        <Row gap={12} style={{ alignItems: "flex-start" }}>
+          <Image source={{ uri: review.photo.uri }} style={styles.preview} accessibilityLabel="Receipt photo" />
+          <Text variant="caption" tone="muted" style={{ flex: 1 }}>
+            {review.ocrNote ?? "Read from the photo. Check the total, date and merchant."} The photo is saved with the transaction.
+          </Text>
+        </Row>
+      ) : null}
       {review.heard ? (
         <View style={styles.note}>
           <Text variant="caption" tone="muted">Heard: <Text variant="caption">“{review.heard}”</Text></Text>
         </View>
       ) : null}
-      {review.source === "rules" && !review.heard ? <Text variant="caption" tone="muted">Read without AI. Check every field.</Text> : null}
+      {review.source === "rules" && !review.heard && !review.photo ? <Text variant="caption" tone="muted">Read without AI. Check every field.</Text> : null}
       <Segmented
         label="Direction"
         value={review.direction}
@@ -253,6 +299,16 @@ function ReviewForm({ review, setReview, onBack, onDone }: { review: Review; set
       <DateField label="Date" value={review.date} onChange={(date) => set({ date })} />
       <Field label="Merchant" hint="Optional" value={review.merchant} maxLength={80} onChangeText={(merchant) => set({ merchant })} />
       <Field label="Note" hint="Optional" value={review.note} maxLength={500} onChangeText={(note) => set({ note })} />
+      {review.direction === "out" ? (
+        <ReimburseSwitch
+          value={review.reimburse}
+          onChange={(reimburse) => set({ reimburse })}
+          onAddProfile={() => {
+            onDone();
+            router.push("/reimburse-profiles");
+          }}
+        />
+      ) : null}
       <Text variant="caption" tone="muted">Saved as pending: the next statement import of that account confirms it.</Text>
       {save.error ? <Text tone="destructive">{errorMessage(save.error, { storeSafe })}</Text> : null}
       <Row>
@@ -269,5 +325,7 @@ const styles = StyleSheet.create((theme) => ({
   voiceIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: theme.colors.primary, alignItems: "center", justifyContent: "center" },
   example: { backgroundColor: theme.colors.muted, borderRadius: theme.radius.pill, paddingHorizontal: 12, paddingVertical: 8 },
   note: { backgroundColor: theme.colors.muted, borderRadius: theme.radius.tile, padding: 12 },
+  photo: { backgroundColor: theme.colors.muted, borderRadius: 24, padding: 14, gap: 12 },
+  preview: { width: 72, height: 96, borderRadius: theme.radius.tile, backgroundColor: theme.colors.muted },
   amount: { fontFamily: theme.fonts.bold, fontSize: theme.fontSize.xl },
 }));

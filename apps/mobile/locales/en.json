@@ -1,5 +1,7 @@
 {
   "ios": {
-    "NSMicrophoneUsageDescription": "JoyoArto uses the microphone only while you record a voice note to add a transaction (up to 60 seconds). The recording is sent to JoyoArto's server to turn it into text and is then deleted, never stored."
+    "NSMicrophoneUsageDescription": "JoyoArto uses the microphone only while you record a voice note to add a transaction (up to 60 seconds). The recording is sent to JoyoArto's server to turn it into text and is then deleted, never stored.",
+    "NSCameraUsageDescription": "JoyoArto uses the camera only when you photograph a receipt to add a transaction. The photo is shrunk, read on JoyoArto's server and kept as proof in your household (you can delete it any time).",
+    "NSPhotoLibraryUsageDescription": "JoyoArto opens your photos only when you pick a receipt photo to add a transaction. Only the photo you pick is sent."
   }
 }

@@ -23,6 +23,10 @@ export type PlanLimits = {
   savedScenarios: number;
   /** The Claude connector (MCP: claude.ai, Claude Desktop, Claude Code). The REST API and phone app work on Free too. */
   mcpConnector: boolean;
+  /** Receipt photos read by AI per user per WIB day; null = the server's JOYO_CAPTURE_DAILY_CAP. Keeping a photo is never limited. */
+  receiptScansPerDay: number | null;
+  /** Reimbursement claim reports (PDF/CSV) generated per user per WIB month; null = unlimited. Downloading one again is free. */
+  claimReportsPerMonth: number | null;
 };
 
 export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
@@ -34,6 +38,8 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     members: 2,
     savedScenarios: 0,
     mcpConnector: false,
+    receiptScansPerDay: 3,
+    claimReportsPerMonth: 1,
   },
   pro: {
     statementImportsPerMonth: null,
@@ -43,12 +49,17 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     members: 6,
     savedScenarios: 50,
     mcpConnector: true,
+    receiptScansPerDay: null,
+    claimReportsPerMonth: null,
   },
 };
 
 /** Features that can ask for an upgrade; the web app keys its prompt copy on these. */
-export const UPGRADE_FEATURES = ["statementImports", "bulkImport", "emailImport", "joyoAi", "members", "savedScenarios", "mcpConnector"] as const;
+export const UPGRADE_FEATURES = ["statementImports", "bulkImport", "emailImport", "joyoAi", "members", "savedScenarios", "mcpConnector", "receiptScans", "claimReports"] as const;
 export type UpgradeFeature = (typeof UPGRADE_FEATURES)[number];
 
 /** Usage counter metric for statement imports (usage_counter.metric, per user). */
 export const STATEMENT_IMPORT_METRIC = "statement_import";
+
+/** Usage counter metric for generated claim reports (usage_counter.metric, per user). */
+export const CLAIM_REPORT_METRIC = "claim_report";

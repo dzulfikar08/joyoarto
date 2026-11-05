@@ -238,6 +238,14 @@ function Features({ t }: { t: T }) {
       ),
     },
     {
+      icon: <Icon d="M3 7h3l2-3h8l2 3h3v13H3zM12 17a4 4 0 100-8 4 4 0 000 8z" />,
+      title: t("Foto struk & klaim reimburse", "Receipt photos & reimbursement claims"),
+      body: t(
+        "Foto struknya, AI yang mengisi. Tandai “Diganti kantor” supaya tidak terhitung pengeluaran rumah tangga, lalu buat laporan klaim PDF lengkap dengan foto struk untuk disetujui atasan.",
+        "Snap the receipt and AI fills it in. Mark it “paid back by work” so it is not household spending, then make a PDF claim report with the receipts for approval.",
+      ),
+    },
+    {
       icon: <Icon d="M16 18l6-6-6-6M8 6l-6 6 6 6" />,
       title: t("Open source (AGPL)", "Open source (AGPL)"),
       body: t(

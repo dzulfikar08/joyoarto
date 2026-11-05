@@ -51,7 +51,7 @@ export const householdRouter = {
     .input(account.deleteHouseholdInput)
     .handler(({ context, input }) => {
       refuseDemo(context.principal.userId, "deleteHousehold");
-      return account.deleteHousehold(context.db, context.principal, input);
+      return account.deleteHousehold(context.db, context.principal, input, context.files);
     }),
   leave: writeProcedure
     .route({

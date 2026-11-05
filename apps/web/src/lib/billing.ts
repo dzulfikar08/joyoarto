@@ -4,7 +4,7 @@
 import { ORPCError } from "@orpc/client";
 import { useSyncExternalStore } from "react";
 
-export type UpgradeFeature = "statementImports" | "bulkImport" | "emailImport" | "joyoAi" | "members" | "savedScenarios" | "mcpConnector";
+export type UpgradeFeature = "statementImports" | "bulkImport" | "emailImport" | "joyoAi" | "members" | "savedScenarios" | "mcpConnector" | "receiptScans" | "claimReports";
 
 /** A Free limit: FORBIDDEN with `data.upgrade` (Joyo AI's cap too). */
 export function isUpgradeError(error: unknown): error is ORPCError<string, { upgrade: true; feature: UpgradeFeature; limit?: number }> {
@@ -83,6 +83,22 @@ export function upgradeCopy(feature: UpgradeFeature, t: T): { title: string; bod
       return {
         title: t("Konektor Claude itu fitur Pro", "The Claude connector is Pro"),
         body: t("Tanya Claude soal uangmu dari claude.ai, Claude Desktop atau Claude Code.", "Ask Claude about your money from claude.ai, Claude Desktop or Claude Code."),
+      };
+    case "receiptScans":
+      return {
+        title: t("Baca struk hari ini habis", "That's today's receipt reads"),
+        body: t(
+          "Free membaca 3 foto struk sehari dengan AI. Fotonya tetap tersimpan; isi detailnya sendiri, atau pakai Joyo Pro untuk membaca lebih banyak.",
+          "Free reads 3 receipt photos a day with AI. The photo is still kept; type the details, or get Joyo Pro to read more.",
+        ),
+      };
+    case "claimReports":
+      return {
+        title: t("Laporan klaim bulan ini sudah terpakai", "This month's claim report is used"),
+        body: t(
+          "Free membuat 1 laporan klaim reimburse per bulan. Laporan yang sudah dibuat tetap bisa diunduh. Joyo Pro: tanpa batas.",
+          "Free makes 1 reimbursement claim report a month. Reports you made can still be downloaded. Joyo Pro: unlimited.",
+        ),
       };
   }
 }

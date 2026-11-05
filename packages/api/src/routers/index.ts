@@ -8,6 +8,8 @@ import { authedProcedure, publicProcedure, readProcedure, sessionProcedure, writ
 import { DEMO_TOKEN_DAYS, isDemoUser, refuseDemo } from "../lib/demo";
 import * as account from "../services/account";
 import * as accounts from "../services/accounts";
+import * as attachments from "../services/attachments";
+import * as reimburse from "../services/reimburse";
 import * as dashboard from "../services/dashboard";
 import * as demo from "../services/demo";
 import { billingRouter } from "./billing";
@@ -95,7 +97,7 @@ export const appRouter = {
     delete: writeProcedure
       .route({ method: "DELETE", path: "/transactions/{id}", tags: ["transactions"] })
       .input(byId)
-      .handler(({ context, input }) => tx.deleteTransaction(context.db, context.principal, input.id)),
+      .handler(({ context, input }) => tx.deleteTransaction(context.db, context.principal, input.id, context.files)),
     categorize: writeProcedure
       .route({ method: "POST", path: "/transactions/categorize", tags: ["transactions"], summary: "Set a category on transactions, optionally as a rule" })
       .input(tx.categorizeInput)
@@ -239,7 +241,7 @@ export const appRouter = {
     undo: writeProcedure
       .route({ method: "DELETE", path: "/imports/{id}", tags: ["imports"], summary: "Delete every transaction an import added" })
       .input(byId)
-      .handler(({ context, input }) => imports.undoImport(context.db, context.principal, input.id)),
+      .handler(({ context, input }) => imports.undoImport(context.db, context.principal, input.id, context.files)),
     mappings: readProcedure
       .route({ method: "GET", path: "/imports/mappings", tags: ["imports"] })
       .handler(({ context }) => imports.listMappings(context.db, context.principal)),
@@ -305,11 +307,95 @@ export const appRouter = {
       .input(account.deleteAccountInput)
       .handler(({ context, input }) => {
         refuseDemo(context.principal.userId, "deleteAccount");
-        return account.deleteAccount(context.db, context.principal, input);
+        return account.deleteAccount(context.db, context.principal, input, context.files);
       }),
   },
 
   household: householdRouter,
+
+  /** Receipt photos: private to the household, served only through these routes (no public URLs). */
+  attachments: {
+    upload: writeProcedure
+      .route({
+        method: "POST",
+        path: "/attachments",
+        tags: ["attachments"],
+        summary: "Upload a receipt photo (multipart/form-data: file, transactionId?, replace?)",
+      })
+      .input(attachments.uploadInput)
+      .handler(({ context, input }) => attachments.uploadAttachment(context.db, context.files, context.principal, input)),
+    get: readProcedure
+      .route({ method: "GET", path: "/attachments/{id}", tags: ["attachments"], summary: "The photo itself (image/jpeg or image/png), for members of its household" })
+      .input(byId)
+      .handler(({ context, input }) => attachments.getAttachmentFile(context.db, context.files, context.principal, input.id)),
+    delete: writeProcedure
+      .route({ method: "DELETE", path: "/attachments/{id}", tags: ["attachments"] })
+      .input(byId)
+      .handler(({ context, input }) => attachments.deleteAttachment(context.db, context.files, context.principal, input.id)),
+  },
+
+  /**
+   * Reimbursable expenses ("Diganti kantor"): employer profiles, marking items, and claim reports (PDF/CSV) to email
+   * or print for approval. Open items are transfers into the employer's receivable, not household spending.
+   */
+  reimburse: {
+    profiles: {
+      list: readProcedure
+        .route({ method: "GET", path: "/reimburse/profiles", tags: ["reimburse"], summary: "Who pays expenses back (employers), with what each still owes" })
+        .input(z.object({ includeArchived: z.boolean().optional() }))
+        .handler(({ context, input }) => reimburse.listProfiles(context.db, context.principal, input)),
+      create: writeProcedure
+        .route({ method: "POST", path: "/reimburse/profiles", tags: ["reimburse"], summary: "Add an employer profile (and its receivable account)" })
+        .input(reimburse.profileInput)
+        .handler(({ context, input }) => reimburse.createProfile(context.db, context.principal, input)),
+      update: writeProcedure
+        .route({ method: "PATCH", path: "/reimburse/profiles/{id}", tags: ["reimburse"] })
+        .input(reimburse.profileUpdate)
+        .handler(({ context, input }) => reimburse.updateProfile(context.db, context.principal, input)),
+      delete: writeProcedure
+        .route({ method: "DELETE", path: "/reimburse/profiles/{id}", tags: ["reimburse"], summary: "Delete an unused profile, or archive a used one" })
+        .input(byId)
+        .handler(({ context, input }) => reimburse.deleteProfile(context.db, context.principal, input.id)),
+    },
+    mark: writeProcedure
+      .route({ method: "POST", path: "/reimburse/mark", tags: ["reimburse"], summary: "Mark expenses reimbursable for a profile (draft), or unmark them" })
+      .input(reimburse.markInput)
+      .handler(({ context, input }) => reimburse.markReimbursable(context.db, context.principal, input)),
+    items: readProcedure
+      .route({ method: "GET", path: "/reimburse/items", tags: ["reimburse"], summary: "Reimbursable expenses, oldest first (default: open = draft and submitted)" })
+      .input(reimburse.itemsInput)
+      .handler(({ context, input }) => reimburse.listItems(context.db, context.principal, input)),
+    claims: {
+      list: readProcedure
+        .route({ method: "GET", path: "/reimburse/claims", tags: ["reimburse"], summary: "Claim reports, newest first" })
+        .input(reimburse.claimsInput)
+        .handler(({ context, input }) => reimburse.listClaims(context.db, context.principal, input)),
+      get: readProcedure
+        .route({ method: "GET", path: "/reimburse/claims/{id}", tags: ["reimburse"] })
+        .input(byId)
+        .handler(({ context, input }) => reimburse.getClaim(context.db, context.principal, input.id)),
+      create: writeProcedure
+        .route({ method: "POST", path: "/reimburse/claims", tags: ["reimburse"], summary: "Generate a claim report from draft items (marks them submitted); then GET its pdf or csv" })
+        .input(reimburse.createClaimInput)
+        .handler(({ context, input }) => reimburse.createClaim(context.db, context.principal, input, context.billing)),
+      setStatus: writeProcedure
+        .route({ method: "POST", path: "/reimburse/claims/{id}/status", tags: ["reimburse"], summary: "Mark a claim paid (optionally with the employer's payment), rejected, or submitted again" })
+        .input(reimburse.claimStatusInput)
+        .handler(({ context, input }) => reimburse.setClaimStatus(context.db, context.principal, input)),
+      delete: writeProcedure
+        .route({ method: "DELETE", path: "/reimburse/claims/{id}", tags: ["reimburse"], summary: "Withdraw a submitted claim: its items go back to draft" })
+        .input(byId)
+        .handler(({ context, input }) => reimburse.deleteClaim(context.db, context.principal, input.id)),
+      pdf: readProcedure
+        .route({ method: "GET", path: "/reimburse/claims/{id}/pdf", tags: ["reimburse"], summary: "The claim report as PDF, receipt photos in the appendix" })
+        .input(byId)
+        .handler(({ context, input }) => reimburse.claimPdfFile(context.db, context.files, context.principal, input.id)),
+      csv: readProcedure
+        .route({ method: "GET", path: "/reimburse/claims/{id}/csv", tags: ["reimburse"], summary: "The claim report as CSV" })
+        .input(byId)
+        .handler(({ context, input }) => reimburse.claimCsvFile(context.db, context.principal, input.id)),
+    },
+  },
 
   /** JoyoArto Pro for the household: prices, plan and usage, checkout (DOKU, Polar), orders. */
   billing: billingRouter,

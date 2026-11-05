@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { Badge } from "@baroka/ui/components/badge";
 import { Button } from "@baroka/ui/components/button";
 import { Card } from "@baroka/ui/components/card";
@@ -66,7 +66,7 @@ function Accounts() {
   });
   const names = new Map(accounts.data?.accounts.map((a) => [a.id, a.name]));
 
-  const typeLabel = new Map<string, string>(TYPES);
+  const typeLabel = new Map<string, string>([...TYPES, ["receivable", "Owed by a company (reimburse)"]]);
   const instLabel = new Map<string, string>(INSTITUTIONS);
   const list = accounts.data?.accounts ?? [];
 
@@ -122,14 +122,20 @@ function Accounts() {
                   ""
                 )}
               </div>
-              <button
-                type="button"
-                className="py-1 text-xs font-semibold text-primary hover:underline disabled:opacity-50"
-                disabled={archive.isPending}
-                onClick={() => archive.mutate({ id: a.id, archived: !a.archived })}
-              >
-                {a.archived ? "Unarchive" : "Archive"}
-              </button>
+              {a.type === "receivable" ? (
+                <Link to="/reimburse" className="inline-block py-1 text-xs font-semibold text-primary hover:underline">
+                  Open items and claims
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="py-1 text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                  disabled={archive.isPending}
+                  onClick={() => archive.mutate({ id: a.id, archived: !a.archived })}
+                >
+                  {a.archived ? "Unarchive" : "Archive"}
+                </button>
+              )}
             </Card>
           ))}
         </div>

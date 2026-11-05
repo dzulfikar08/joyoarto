@@ -1,5 +1,7 @@
 {
   "ios": {
-    "NSMicrophoneUsageDescription": "JoyoArto memakai mikrofon hanya saat kamu merekam catatan suara untuk mencatat transaksi (maks. 60 detik). Rekaman dikirim ke server JoyoArto untuk diubah jadi teks lalu dihapus, tidak disimpan."
+    "NSMicrophoneUsageDescription": "JoyoArto memakai mikrofon hanya saat kamu merekam catatan suara untuk mencatat transaksi (maks. 60 detik). Rekaman dikirim ke server JoyoArto untuk diubah jadi teks lalu dihapus, tidak disimpan.",
+    "NSCameraUsageDescription": "JoyoArto memakai kamera hanya saat kamu memotret struk untuk mencatat transaksi. Fotonya diperkecil, dibaca di server JoyoArto, dan disimpan sebagai bukti di rumah tanggamu (bisa dihapus kapan saja).",
+    "NSPhotoLibraryUsageDescription": "JoyoArto membuka foto hanya saat kamu memilih foto struk untuk mencatat transaksi. Hanya foto yang kamu pilih yang dikirim."
   }
 }

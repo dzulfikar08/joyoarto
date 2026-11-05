@@ -1,0 +1,198 @@
+// Receipt photos kept as proof. The bytes live in R2 (context.files) under h/<householdId>/r/<id>; the attachment
+// row says which household and transaction they belong to. Photos are only ever served through
+// GET /api/attachments/{id} to members of that household: there are no public URLs. Deleting a transaction, undoing
+// the import that added it, or deleting the household removes the files too.
+
+import { schema } from "@baroka/db";
+import type { Database } from "@baroka/db";
+import { ORPCError } from "@orpc/server";
+import { and, asc, eq, inArray, isNull, lt } from "drizzle-orm";
+import { z } from "zod";
+
+import type { FileStore, Principal } from "../context";
+import { chunk } from "../lib/d1";
+import { MAX_RECEIPT_BYTES, imageSize } from "../lib/receipt";
+import { badRequest, notFound } from "./common";
+
+const at = schema.attachment;
+const t = schema.transaction;
+
+/** Photos per transaction (a long receipt in two shots, an invoice and its payment proof). */
+export const MAX_ATTACHMENTS_PER_TRANSACTION = 5;
+/** Uploads never attached to a transaction (the add sheet was closed) are removed after this. */
+export const ORPHAN_AFTER_MS = 24 * 3_600_000;
+
+export function householdPrefix(householdId: string): string {
+  return `h/${householdId}/`;
+}
+
+export function receiptKey(householdId: string, id: string): string {
+  return `${householdPrefix(householdId)}r/${id}`;
+}
+
+export function requireFiles(files: FileStore | undefined): FileStore {
+  if (!files) throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Receipt photos are not set up on this server.", data: { reason: "off" } });
+  return files;
+}
+
+export type AttachmentView = { id: string; transactionId: string | null; mime: string; size: number; width: number | null; height: number | null; createdAt: string };
+
+function view(r: typeof at.$inferSelect): AttachmentView {
+  return { id: r.id, transactionId: r.transactionId, mime: r.mime, size: r.size, width: r.width, height: r.height, createdAt: r.createdAt.toISOString() };
+}
+
+/** Checks and stores one image. The bytes must really be a JPEG or PNG (the header is read, the client's type is not trusted). */
+export async function storeImage(db: Database, files: FileStore, p: Principal, bytes: Uint8Array, transactionId: string | null): Promise<AttachmentView> {
+  if (bytes.byteLength > MAX_RECEIPT_BYTES) badRequest("The photo is too large (at most 5 MB).");
+  const info = imageSize(bytes);
+  if (!info) badRequest("Send a JPEG or PNG photo.");
+  const id = crypto.randomUUID();
+  const key = receiptKey(p.householdId, id);
+  await files.put(key, bytes, info.mime);
+  const row = { id, householdId: p.householdId, transactionId, r2Key: key, mime: info.mime, size: bytes.byteLength, width: info.width || null, height: info.height || null, createdBy: p.userId };
+  try {
+    await db.insert(at).values(row);
+  } catch (error) {
+    await files.delete([key]).catch(() => {});
+    throw error;
+  }
+  const [saved] = await db.select().from(at).where(eq(at.id, id));
+  return view(saved!);
+}
+
+export const uploadInput = z.object({
+  file: z.file().max(MAX_RECEIPT_BYTES).describe("The photo (JPEG or PNG, at most 5 MB; the apps send a JPEG about 1600 px on the long side)"),
+  transactionId: z.string().optional().describe("Attach to this transaction; absent = keep it unattached until a quick add saves it (attachmentIds)"),
+  replace: z
+    .union([z.boolean(), z.enum(["true", "false"])])
+    .optional()
+    .transform((v) => v === true || v === "true")
+    .describe("Remove the transaction's other photos"),
+});
+
+async function ownTransaction(db: Database, householdId: string, id: string) {
+  const [row] = await db
+    .select({ id: t.id })
+    .from(t)
+    .where(and(eq(t.id, id), eq(t.householdId, householdId)));
+  return row ?? notFound(`Transaction ${id}`);
+}
+
+/** A photo for a transaction (or for the add sheet before Save). */
+export async function uploadAttachment(db: Database, files: FileStore | undefined, p: Principal, input: z.infer<typeof uploadInput>) {
+  const store = requireFiles(files);
+  if (input.transactionId) {
+    await ownTransaction(db, p.householdId, input.transactionId);
+    if (input.replace) await purgeTransactionFiles(db, store, p.householdId, [input.transactionId]);
+    else {
+      const existing = await db.select({ id: at.id }).from(at).where(eq(at.transactionId, input.transactionId));
+      if (existing.length >= MAX_ATTACHMENTS_PER_TRANSACTION) badRequest(`A transaction can keep at most ${MAX_ATTACHMENTS_PER_TRANSACTION} photos.`);
+    }
+  }
+  const bytes = new Uint8Array(await input.file.arrayBuffer());
+  return { attachment: await storeImage(db, store, p, bytes, input.transactionId ?? null) };
+}
+
+async function ownAttachment(db: Database, householdId: string, id: string) {
+  const [row] = await db
+    .select()
+    .from(at)
+    .where(and(eq(at.id, id), eq(at.householdId, householdId)));
+  return row ?? notFound(`Photo ${id}`);
+}
+
+/** The image itself, for members of its household only. */
+export async function getAttachmentFile(db: Database, files: FileStore | undefined, p: Principal, id: string): Promise<File> {
+  const store = requireFiles(files);
+  const row = await ownAttachment(db, p.householdId, id);
+  const obj = await store.get(row.r2Key);
+  if (!obj) notFound(`Photo ${id}`);
+  return new File([obj.body as unknown as ArrayBuffer], `${row.id}.${row.mime === "image/png" ? "png" : "jpg"}`, { type: row.mime });
+}
+
+export async function deleteAttachment(db: Database, files: FileStore | undefined, p: Principal, id: string) {
+  const row = await ownAttachment(db, p.householdId, id);
+  await db.delete(at).where(eq(at.id, row.id));
+  if (files) await files.delete([row.r2Key]);
+  return { deleted: row.id };
+}
+
+/** Uploaded photos (unattached, same household) become the transaction's. Returns how many were attached. */
+export async function attachToTransaction(db: Database, householdId: string, ids: readonly string[], transactionId: string): Promise<number> {
+  if (!ids.length) return 0;
+  const res = await db
+    .update(at)
+    .set({ transactionId })
+    .where(and(eq(at.householdId, householdId), isNull(at.transactionId), inArray(at.id, ids.slice(0, MAX_ATTACHMENTS_PER_TRANSACTION))))
+    .returning({ id: at.id });
+  return res.length;
+}
+
+/** Photo ids per transaction, oldest first. */
+export async function attachmentsByTransaction(db: Database, householdId: string, txIds: readonly string[]): Promise<Map<string, AttachmentView[]>> {
+  const out = new Map<string, AttachmentView[]>();
+  for (const part of chunk([...new Set(txIds)], 90)) {
+    const rows = await db
+      .select()
+      .from(at)
+      .where(and(eq(at.householdId, householdId), inArray(at.transactionId, part)))
+      .orderBy(asc(at.createdAt));
+    for (const r of rows) {
+      const list = out.get(r.transactionId!) ?? [];
+      list.push(view(r));
+      out.set(r.transactionId!, list);
+    }
+  }
+  return out;
+}
+
+/** Before transactions are deleted: their photos' rows and files go first (the row cascade alone would leave the files). */
+export async function purgeTransactionFiles(db: Database, files: FileStore | undefined, householdId: string, txIds: readonly string[]): Promise<number> {
+  let removed = 0;
+  for (const part of chunk([...new Set(txIds)], 90)) {
+    const gone = await db
+      .delete(at)
+      .where(and(eq(at.householdId, householdId), inArray(at.transactionId, part)))
+      .returning({ key: at.r2Key });
+    removed += gone.length;
+    if (files && gone.length) await files.delete(gone.map((g) => g.key));
+  }
+  return removed;
+}
+
+/** Every file of a household (after the household itself is deleted). */
+export async function purgeHouseholdFiles(files: FileStore | undefined, householdId: string): Promise<number> {
+  if (!files) return 0;
+  let removed = 0;
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await files.list(householdPrefix(householdId), cursor);
+    if (page.keys.length) await files.delete(page.keys);
+    removed += page.keys.length;
+    if (!page.cursor) break;
+    cursor = page.cursor;
+  }
+  return removed;
+}
+
+/** Daily: uploads the add sheet never saved. */
+export async function sweepOrphanAttachments(db: Database, files: FileStore | undefined, now = Date.now()): Promise<number> {
+  const gone = await db
+    .delete(at)
+    .where(inArray(at.id, db.select({ id: at.id }).from(at).where(and(isNull(at.transactionId), lt(at.createdAt, new Date(now - ORPHAN_AFTER_MS)))).limit(500)))
+    .returning({ key: at.r2Key });
+  if (files && gone.length) for (const part of chunk(gone.map((g) => g.key), 1000)) await files.delete(part);
+  return gone.length;
+}
+
+/** An in-memory FileStore (tests, local dev without R2). */
+export function memoryFileStore(): FileStore & { objects: Map<string, { body: Uint8Array; contentType: string }> } {
+  const objects = new Map<string, { body: Uint8Array; contentType: string }>();
+  return {
+    objects,
+    put: async (key, body, contentType) => void objects.set(key, { body, contentType }),
+    get: async (key) => objects.get(key) ?? null,
+    delete: async (keys) => keys.forEach((k) => objects.delete(k)),
+    list: async (prefix) => ({ keys: [...objects.keys()].filter((k) => k.startsWith(prefix)), cursor: null }),
+  };
+}

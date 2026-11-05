@@ -76,7 +76,7 @@ export function monthRange(d: Pick<Dashboard, "month" | "spendingByDay">): { fro
 /** Filters the Transactions tab takes (src/lib/transaction-filters.ts) for a tapped item. */
 export type FilterLink = { category?: string; uncategorized?: boolean; accountId?: string; status?: "pending"; q?: string; from?: string; to?: string };
 
-export type AttentionItem = { key: string; text: string; link: FilterLink | "import" };
+export type AttentionItem = { key: string; text: string; link: FilterLink | "import" | "reimburse" };
 
 export function attentionItems(d: Pick<Dashboard, "attention" | "month" | "today" | "spendingByDay">): AttentionItem[] {
   const a = d.attention;
@@ -95,6 +95,12 @@ export function attentionItems(d: Pick<Dashboard, "attention" | "month" | "today
       text: `${plural(a.pendingStale, "pending quick add")} older than ${a.pendingStaleDays} days: no statement confirmed ${them}. Import the statement, or fix or delete ${them}`,
       link: { status: "pending", to: cutoff },
     });
+  }
+  // Absent in a dashboard cached before the server had reimbursements.
+  const rb = a.reimburse;
+  if (rb && rb.draft + rb.submitted > 0) {
+    const parts = [rb.draft ? `${rb.draft} not claimed yet` : null, rb.submitted ? `${rb.submitted} waiting for the company` : null].filter(Boolean).join(", ");
+    items.push({ key: "reimburse", text: `${rb.owed.display} to be reimbursed (diganti kantor): ${parts}`, link: "reimburse" });
   }
   for (const s of a.staleAccounts) {
     items.push(
