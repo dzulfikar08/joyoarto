@@ -11,8 +11,8 @@ import { Sheet } from "@baroka/ui/components/sheet";
 import { Textarea } from "@baroka/ui/components/textarea";
 import { cn } from "@baroka/ui/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { ArrowDown, ArrowUp, History, KeyRound, MessageSquarePlus, Sparkles, Square, Trash2 } from "lucide-react";
+import { Link, useCanGoBack, useRouter } from "@tanstack/react-router";
+import { ArrowDown, ArrowLeft, ArrowUp, History, KeyRound, MessageSquarePlus, Sparkles, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -182,11 +182,17 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
   };
 
   const empty = messages.length === 0 && !streaming && !pendingQuestion;
+  const router = useRouter();
+  const canGoBack = useCanGoBack();
+  const back = () => (canGoBack ? router.history.back() : void router.navigate({ to: "/" }));
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-3xl flex-col px-4">
       <header className="sticky top-0 z-20 -mx-4 flex items-center gap-2 border-b border-border/60 bg-background/90 px-4 py-2.5 pt-[calc(0.625rem+env(safe-area-inset-top))] backdrop-blur sm:top-16 sm:pt-2.5">
-        <span aria-hidden className="flex size-9 items-center justify-center rounded-full bg-primary-soft text-primary-ink">
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="Back" title="Back" className="sm:hidden" onClick={back}>
+          <ArrowLeft aria-hidden />
+        </Button>
+        <span aria-hidden className="hidden size-9 items-center justify-center rounded-full bg-primary-soft text-primary-ink sm:flex">
           <Sparkles className="size-[1.125rem]" />
         </span>
         <div className="min-w-0 flex-1">
@@ -206,7 +212,7 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
         </Button>
       </header>
 
-      <div className="flex-1 space-y-5 py-5 pb-[calc(13rem+env(safe-area-inset-bottom))] sm:pb-40">
+      <div className="flex-1 space-y-5 py-5 pb-[calc(8rem+env(safe-area-inset-bottom))] sm:pb-40">
         {empty && (
           <div className="space-y-5 pt-4">
             <div>
@@ -253,7 +259,7 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
         )}
       </div>
 
-      <div className="fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-30 px-3 sm:bottom-0 sm:pb-4">
+      <div className="fixed inset-x-0 bottom-0 z-30 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-4">
         <div className="mx-auto max-w-3xl">
           {away && (
             <div className="mb-2 flex justify-center">

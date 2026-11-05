@@ -2,8 +2,10 @@
 // and household; one answer streams at a time (src/lib/joyo-stream.ts: POST /api/joyo/chat as server-sent events,
 // because oRPC's own stream decoding needs web streams Hermes lacks). Proposed changes are cards with Confirm/Dismiss;
 // confirming runs the stored proposal on the server. The member's own API key is optional (secure store).
+// A detail page pushed on the root stack (the Joyo AI tab opens it), so the tab bar never covers the composer.
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import { fetch as expoFetch } from "expo/fetch";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Alert, FlatList, Keyboard, Linking, Platform, Pressable, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
@@ -12,7 +14,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 import { invalidateLedger } from "@/components/data";
 import { AssistantTurn, UserBubble } from "@/components/joyo/message";
-import { Button, EmptyState, ErrorState, FieldLabel, Icon, IconButton, Input, ListRow, Segmented, Sheet, SkeletonRows, Text, useTabContentInset } from "@/components/ui";
+import { Button, EmptyState, ErrorState, FieldLabel, Icon, IconButton, Input, ListRow, Segmented, Sheet, SkeletonRows, Text } from "@/components/ui";
 import type { FetchLike } from "@/src/lib/api";
 import { currentCredentials } from "@/src/lib/auth";
 import { errorMessage } from "@/src/lib/errors";
@@ -32,13 +34,12 @@ type Item =
 /** Under this many dp from the end, the list follows new text. */
 const FOLLOW_PX = 160;
 
-/** Bottom space for the composer: above the floating tab bar, or above the keyboard while it is up. */
+/** Bottom space for the composer: above the home indicator, or above the keyboard while it is up. */
 function useComposerOffset(): number {
-  const tabInset = useTabContentInset();
   const insets = useSafeAreaInsets();
   const [keyboard, setKeyboard] = useState(0);
   useEffect(() => {
-    // iOS: the window keeps its size and the keyboard covers it. Android: the window shrinks and the tab bar hides.
+    // iOS: the window keeps its size and the keyboard covers it. Android: the window shrinks with it.
     const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
     const show = Keyboard.addListener(showEvt, (e) => setKeyboard(Platform.OS === "ios" ? e.endCoordinates.height - insets.bottom : 1));
@@ -49,11 +50,12 @@ function useComposerOffset(): number {
     };
   }, [insets.bottom]);
   if (keyboard > 0) return Platform.OS === "ios" ? keyboard + 8 : 8;
-  return Math.max(8, tabInset - 8);
+  return Math.max(8, insets.bottom);
 }
 
-export default function JoyoTab() {
+export default function JoyoScreen() {
   const qc = useQueryClient();
+  const router = useRouter();
   const { theme } = useUnistyles();
   const status = useQuery(orpc.joyo.status.queryOptions());
   const byok = useByok();
@@ -200,9 +202,7 @@ export default function JoyoTab() {
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={styles.safe}>
       <View style={styles.header}>
-        <View style={styles.headerIcon}>
-          <Icon name="sparkles" size={18} tone="primary" />
-        </View>
+        <IconButton name={Platform.OS === "ios" ? "chevron-back" : "arrow-back"} label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text variant="heading" numberOfLines={1} accessibilityRole="header">
             {title}
@@ -437,7 +437,6 @@ function KeySheet({ open, onClose, settings, providers, hostedModel }: { open: b
 const styles = StyleSheet.create((theme) => ({
   safe: { flex: 1, backgroundColor: theme.colors.background },
   header: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: theme.spacing.lg, paddingVertical: 8 },
-  headerIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.primarySoft, alignItems: "center", justifyContent: "center", marginRight: 4 },
   list: { padding: theme.spacing.lg, gap: 18, flexGrow: 1 },
   starter: { backgroundColor: theme.colors.card, borderRadius: theme.radius.tile, paddingHorizontal: 16, paddingVertical: 12, gap: 2, marginBottom: 8 },
   error: { backgroundColor: theme.colors.destructiveSoft, borderRadius: theme.radius.tile, padding: 14, gap: 4, alignItems: "flex-start" },

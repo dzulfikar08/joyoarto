@@ -20,7 +20,7 @@ function Shell() {
   const bare =
     ["/login", "/connect", "/demo", "/privasi", "/syarat"].some((p) => path.startsWith(p)) || ((path === "/" || path === "/pricing") && !session);
   const nav = !bare && !!session;
-  // The chat keeps its composer at the bottom of the screen and manages its own spacing.
+  // The chat is a detail page on phones: no bottom nav, its own header with a back button, the composer at the bottom.
   const chat = path === "/joyo";
   // Title, description, canonical and share tags follow client-side navigation (first loads are prerendered).
   useEffect(() => syncHead(path), [path]);
@@ -41,7 +41,7 @@ function Shell() {
       </main>
       {nav && (
         <>
-          <BottomNav />
+          {!chat && <BottomNav />}
           <Suspense fallback={null}>
             <AddSheet />
             <UpgradeSheet />

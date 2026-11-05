@@ -19,7 +19,7 @@ iOS compiles and ships through TestFlight. Read the repo's README.md "Mobile app
 | Path | What |
 | --- | --- |
 | `app/_layout.tsx` | Root stack: fonts, session gate (signed out → `/login`), query persistence, add sheet, toasts, capture sync, PDF share routing. Register every new pushed screen here with its title. |
-| `app/(tabs)/` | The floating tab bar: `index` (Home), `transactions`, `add` (centre button, never a screen), `joyo`, `more`. |
+| `app/(tabs)/` | The floating tab bar: `index` (Home), `transactions`, `add` (centre button, never a screen), `joyo-tab` (pushes `app/joyo.tsx`, never a screen), `more`. |
 | `app/transaction/[id].tsx` | Transaction detail and edit (opened from a list row, handed over through `src/lib/tx-cache.ts`). |
 | `app/import.tsx`, `captured.tsx`, `capture/[id].tsx`, `capture-setup.tsx` | Statement PDFs and Android notification capture. |
 | `app/import.tsx` + `components/import/` | Statement PDF batch (preview, GoPay-first save, combined result), CSV with column mapping, email-in card, import log with Undo. |
@@ -27,7 +27,7 @@ iOS compiles and ships through TestFlight. Read the repo's README.md "Mobile app
 | `app/household.tsx`, `settings.tsx`, `data-privacy.tsx` + `components/settings/` | Members, invites (share sheet), switch; billing (`src/lib/billing.ts`), Claude, API tokens, theme; export and deletion. |
 | `components/session-only.tsx` | `useHasSession()` / `SessionOnlyNote`: tokens, invites, email-in, export and deletion need a Google/Apple sign-in. |
 | `app/plan.tsx`, `components/plan/` | Plan & simulate: baseline, scenario editors (loans with sale terms, baby, one-offs, monthly costs, income changes, spending cuts), a read-only Where to save summary (`savings-card.tsx`, `plan.savings`), projection chart, side by side, saved scenarios. State and form mapping: `src/lib/plan-state.ts` (same block shape as the web's `view`); draft per household on the phone: `src/lib/plan-draft.ts`. |
-| `app/(tabs)/joyo.tsx`, `components/joyo/` | Joyo AI chat: streamed answers (`src/lib/joyo-stream.ts`), markdown from the shared parser, tool chips, proposal cards, history, own API key (`src/lib/joyo-byok.ts`, secure store). |
+| `app/joyo.tsx`, `components/joyo/` | Joyo AI chat (a detail page without the tab bar): streamed answers (`src/lib/joyo-stream.ts`), markdown from the shared parser, tool chips, proposal cards, history, own API key (`src/lib/joyo-byok.ts`, secure store). |
 | `app/reimburse.tsx`, `app/reimburse-profiles.tsx`, `components/receipts/` | Reimburse (claims, PDF/CSV share), company profiles, receipt photos (`src/lib/receipt-photo.ts` camera/gallery + resize, `src/lib/receipt.ts` pure) and the Diganti kantor switch. |
 | `components/ui/` | The UI kit. Import from `@/components/ui`. |
 | `components/nav/floating-tab-bar.tsx` | The tab bar (port of JoyoRogo's). |
