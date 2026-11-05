@@ -61,6 +61,22 @@ pure in `packages/api/src/lib/plan/`.
   next car as another loan in the sale month (template `carUpgrade`: Wuling Aira EV LR now, Geely EX2 Max after 18
   months). The default resale is an assumption for battery EVs in Indonesia (`lib/plan/resale.ts`): 35% of the OTR
   price lost in year one, 10% a year after, at least 15% left (65% after 12 months, 60% after 18).
+- **Where to save** ("Bisa hemat di mana", `GET /api/plan/savings`, oRPC `plan.savings`, MCP `spending_cuts`; rules in
+  `lib/plan/savings.ts`): everyday habits from the same complete months as the baseline, starting at the household's
+  first full month. Habits are `food/coffee`, `food/snacks`, `food/dining`, `food/delivery`, `transport/ride-hailing`
+  and `shopping/online` with their children (by slug, so a renamed category keeps working; slugs the household lacks
+  are listed as missing), plus minimarket snacks: Indomaret, Alfamart, Alfamidi, Lawson, FamilyMart and Circle K
+  baskets up to Rp 100.000 (`minimarketMax`) in any other category. A row counts once (habit category first). Only
+  expenses count: no transfers, no reimbursable rows until rejected, no one-offs the baseline leaves out. Per habit:
+  purchases per week and month, average ticket, monthly spend, share of recurring income, trend (last month, or the last
+  three with six months, against the earlier ones; ±15% is up/down) and top merchants. With at least 2 months and 4
+  purchases a month it suggests a cut: a frequency (per week from 1.5 a week, else per month; one less, a third less
+  from four on), saving = purchases dropped a month × average ticket; shopping gets a monthly cap (75/50/25% of the
+  average, tidied). Members pick a target per habit (`targets`, `null` keeps a habit). The chosen cuts become `cut`
+  scenario items (`cut:<habit>`) that lower core spending in the simulator; the response's `effect` runs the plan with
+  and without them and reports months sooner for the emergency fund target, a `goalAmount` and rebuilt goal savings,
+  plus rules that turn from failing to passing. Only the household's own history and income are compared. On `/plan`
+  the block adds the cuts to a scenario (or a new one); the dashboard shows the top two.
 - **Saved scenarios** (`plan_scenario`, `plan.scenarios.*`, MCP `list_scenarios` / `save_scenario` /
   `delete_scenario`) belong to the household, so both partners see and edit the same list. A row keeps the planner
   input (items plus baseline overrides, validated by `savedPlan`) and, from the web page, its block layout (`view`,

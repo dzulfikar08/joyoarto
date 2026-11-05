@@ -15,6 +15,7 @@ import { toast } from "sonner";
 
 import { CashflowChart, CumulativeChart, DonutChart, Legend, LineKey, SwatchKey } from "@/components/charts";
 import { QuickAdd } from "@/components/quick-add";
+import { habitName, targetText, useCopy } from "@/components/savings";
 import { currentMonthWib, formatMoney, monthLabel, rupiahToMinor, shiftMonth } from "@/lib/format";
 import { categoryOptions } from "@/lib/options";
 import { client, errorMessage, orpc } from "@/lib/orpc";
@@ -109,6 +110,7 @@ function Body({ d, onMonth }: { d: Dashboard; onMonth: (m: string) => void }) {
         <Cashflow d={d} onMonth={onMonth} />
         <Merchants d={d} range={range} />
         <Budgets d={d} />
+        <Savings />
         <Attention d={d} range={range} />
         <Accounts d={d} />
       </div>
@@ -435,6 +437,47 @@ function Merchants({ d, range }: { d: Dashboard; range: { from: string; to: stri
           </li>
         ))}
       </ol>
+    </Card>
+  );
+}
+
+/** The top habits from "Where to save" and what cutting them could save; the details and choices are on /plan. */
+function Savings() {
+  const { en, t } = useCopy();
+  const q = useQuery({ ...orpc.plan.savings.queryOptions({ input: { effect: false } }), staleTime: 5 * 60_000 });
+  const top = q.data?.habits.filter((h) => h.included && h.suggestion).slice(0, 2) ?? [];
+  if (!q.data || !top.length) return null;
+  return (
+    <Card
+      title={t("Bisa hemat di mana", "Where to save")}
+      sub={t(`Dari kebiasaan kamu ${q.data.months.length} bulan terakhir`, `From your habits over the last ${q.data.months.length} months`)}
+      action={
+        <Link to="/plan" hash="savings-title" className="text-xs font-semibold text-primary hover:underline">
+          {t("Atur di Plan", "Choose in Plan")}
+        </Link>
+      }
+    >
+      <ul className="divide-y divide-border">
+        {top.map((h) => {
+          const s = h.suggestion!;
+          const cap = s.options.find((o) => o.target === s.target)?.display;
+          return (
+            <li key={h.key} className="flex items-baseline justify-between gap-3 py-2 text-sm">
+              <span className="min-w-0">
+                <span className="block truncate font-medium">{habitName(h, en)}</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {targetText(s, s.target, en, cap)} · {t("rata-rata", "average")} {h.averageTicket.display}
+                </span>
+              </span>
+              <span className="shrink-0 font-semibold tabular-nums text-positive-ink">+{s.saving.display}</span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="text-sm">
+        {t("Kalau semua saran dipakai, kira-kira", "With every suggestion, about")} <span className="font-semibold tabular-nums">{q.data.totalSaving.display}</span>{" "}
+        {t("lebih hemat tiap bulan. Kamu yang pilih mana yang mau diubah.", "less spent each month. You choose which ones to change.")}
+      </p>
     </Card>
   );
 }

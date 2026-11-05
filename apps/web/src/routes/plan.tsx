@@ -18,11 +18,14 @@ import { toast } from "sonner";
 
 import { Field as KitField, PageHeader } from "@/components/kit";
 import { Legend, LineKey, ProjectionChart } from "@/components/charts";
+import { SavingsBlock } from "@/components/savings";
 import { requireSession } from "@/lib/auth";
+import { useLang } from "@/lib/lang";
 import { currentMonthWib, formatMoney, monthLabel, shiftMonth } from "@/lib/format";
 import { client, errorMessage, orpc } from "@/lib/orpc";
 import {
   EMPTY,
+  applyCuts,
   babyBlock,
   carBlock,
   decodeShare,
@@ -41,7 +44,7 @@ import {
   uid,
   upgradeBlocks,
 } from "@/lib/plan-state";
-import type { Block, LoanIn, PlainIn, PlanState, Scenario } from "@/lib/plan-state";
+import type { Block, CutIn, LoanIn, PlainIn, PlanState, Scenario } from "@/lib/plan-state";
 
 type Baseline = Awaited<ReturnType<AppRouterClient["plan"]["baseline"]>>;
 type Compare = Awaited<ReturnType<AppRouterClient["plan"]["compare"]>>;
@@ -152,6 +155,14 @@ function Plan() {
     placeholderData: keepPreviousData,
   });
   const [copied, setCopied] = useState(false);
+  const en = useLang() === "en";
+  const addCuts = (cuts: CutIn[], target: string | null) => {
+    const r = applyCuts(state, cuts, target, en ? "With savings" : "Dengan hemat");
+    if (!r.scenarioId) return void toast.error(en ? "Six scenarios at most on the page; remove one first." : "Maksimal enam skenario; hapus satu dulu.");
+    setState(r.state);
+    const name = r.state.scenarios.find((s) => s.id === r.scenarioId)?.name ?? "";
+    toast.success(cuts.length ? (en ? `Cuts added to "${name}"` : `Hemat dimasukkan ke "${name}"`) : en ? `Cuts removed from "${name}"` : `Hemat dihapus dari "${name}"`);
+  };
 
   const update = (fn: (s: PlanState) => PlanState) => setState((s) => fn(s));
   const setScenario = (id: string, fn: (s: Scenario) => Scenario) => update((st) => ({ ...st, scenarios: st.scenarios.map((x) => (x.id === id ? fn(x) : x)) }));
@@ -249,6 +260,7 @@ function Plan() {
       {baseline.isError && <p className="text-sm text-destructive">{errorMessage(baseline.error)}</p>}
       {baseline.isPending && <p className="text-sm text-muted-foreground">Reading your ledger…</p>}
       {baseline.data && <BaselineCard b={baseline.data} state={state} update={update} />}
+      {baseline.data && !pending && <SavingsBlock state={state} onApply={addCuts} />}
       <SavedScenarios
         list={saved.data}
         error={saved.error}
@@ -711,6 +723,7 @@ function ScenarioCard({
         <AddButton onClick={() => add({ key: uid(), kind: "item", item: { type: "oneOff", label: "One-off cost", month: start, amount: 0, direction: "out", fundedFrom: "spending" } })}>One-off</AddButton>
         <AddButton onClick={() => add({ key: uid(), kind: "item", item: { type: "recurring", label: "Monthly cost", startMonth: start, monthly: 0 } })}>Monthly cost</AddButton>
         <AddButton onClick={() => add({ key: uid(), kind: "item", item: { type: "incomeChange", label: "Income change", startMonth: start, mode: "delta", amount: 0 } })}>Income change</AddButton>
+        <AddButton onClick={() => add({ key: uid(), kind: "item", item: { type: "cut", label: "Spending cut", startMonth: start, monthly: 0 } })}>Spending cut</AddButton>
         <span className="ml-auto flex items-center gap-3 text-xs">
           <Button variant="link" size="xs" disabled={saving || (!!s.savedId && !dirty)} onClick={onSave}>
             {saving ? "Saving…" : !s.savedId ? "Save" : dirty ? "Save changes" : "Saved ✓"}
@@ -1020,6 +1033,24 @@ function ItemEditor({ item, onChange, onRemove }: { item: PlainIn; onChange: (i:
             <NumInput label="Yearly increase" value={item.annualIncreasePct} step={0.5} onChange={(v) => onChange({ ...item, annualIncreasePct: v })} />
           </Field>
         </div>
+      </BlockShell>
+    );
+  }
+  if (item.type === "cut") {
+    return (
+      <BlockShell onRemove={onRemove} title={title}>
+        <div className={EDITOR_GRID}>
+          <Field label="Less spending / month">
+            <MoneyInput label="Monthly saving" value={item.monthly || undefined} onChange={(v) => onChange({ ...item, monthly: v ?? 0 })} />
+          </Field>
+          <Field label="From">
+            <MonthInput label="Start month" value={item.startMonth} onChange={(v) => onChange({ ...item, startMonth: v })} />
+          </Field>
+          <Field label="Until (optional)">
+            <MonthInput optional label="End month" value={item.endMonth} onChange={(v) => onChange({ ...item, endMonth: v })} />
+          </Field>
+        </div>
+        {item.habit && <p className="text-[11px] text-muted-foreground">From Where to save: change the target there and add it again to update.</p>}
       </BlockShell>
     );
   }
