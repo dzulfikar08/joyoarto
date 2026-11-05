@@ -12,3 +12,15 @@ export const ANDROID_TESTERS_GROUP_EMAIL = "joyoarto-testers@googlegroups.com";
 export const ANDROID_TESTING_URL = "https://play.google.com/apps/testing/com.joyodigitama.joyoarto";
 /** The landing page section with the steps. */
 export const ANDROID_SECTION_ID = "android";
+
+// The iPhone app is in Apple's TestFlight beta. Installing: get the TestFlight app, open the invite link, sign in.
+
+/** The TestFlight app on the App Store (step 1). */
+export const TESTFLIGHT_APP_STORE_URL = "https://apps.apple.com/app/testflight/id899247664";
+/**
+ * The public TestFlight invite link (https://testflight.apple.com/join/...). Not created yet: while it is "", the
+ * iPhone section says the link is coming and points to the web app in Safari instead. Paste the link here when it exists.
+ */
+export const IOS_TESTFLIGHT_URL = "";
+/** The landing page section with the iPhone steps. */
+export const IOS_SECTION_ID = "iphone";

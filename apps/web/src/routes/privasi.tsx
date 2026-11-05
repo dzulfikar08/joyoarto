@@ -89,7 +89,7 @@ const sections: Section[] = [
               berhasil atau tidak. Bukan isi pertanyaan, jawaban, catatan atau fotomu. Dipakai untuk batas harian dan biaya.
             </li>
             <li>
-              <b>Waitlist</b> (kalau kamu daftar): email, nama panggilan, bank yang kamu centang, sumber dan bahasa, serta hash alamat IP (bukan IP-nya).
+              <b>Waitlist</b> (kalau dulu kamu sempat daftar): email, nama panggilan, bank yang kamu centang, sumber dan bahasa, serta hash alamat IP (bukan IP-nya). Waitlist-nya sudah ditutup karena pendaftaran sekarang terbuka; data yang sudah ada kami simpan supaya pemilik {N} bisa menghubungimu.
             </li>
             <li>
               <b>Joyo Pro</b> (per akun): jawaban terakhir JoyoRogo soal Joyo Pro-mu (Pro atau tidak, sampai kapan, jenis paket, dari mana dibeli) dan kapan
@@ -147,7 +147,7 @@ const sections: Section[] = [
               worked. Never what you asked, said, wrote or photographed. Used for the daily limits and costs.
             </li>
             <li>
-              <b>Waitlist</b> (if you join it): email, nickname, the banks you ticked, source and language, and a hash of your IP address (never the IP itself).
+              <b>Waitlist</b> (if you joined it earlier): email, nickname, the banks you ticked, source and language, and a hash of your IP address (never the IP itself). The waitlist is closed now that sign-up is open; existing entries are kept so the owner of {N} can contact you.
             </li>
             <li>
               <b>Joyo Pro</b> (per account): JoyoRogo's last answer about your Joyo Pro (Pro or not, until when, the kind of plan, where it was bought) and when it
@@ -192,7 +192,7 @@ const sections: Section[] = [
               penyalahgunaan bisa dilacak. Dasarnya: perjanjian dan kepentingan yang sah untuk menjaga layanan tetap aman.
             </li>
             <li>
-              <b>Waitlist:</b> mengabari kamu sekali saat {N} Pro dibuka. Dasarnya: persetujuanmu.
+              <b>Waitlist:</b> menghubungi orang yang sudah ada di daftar, misalnya untuk mengabari bahwa {N} sudah bisa dipakai. Dasarnya: persetujuanmu saat dulu mendaftar.
             </li>
             <li>
               <b>Joyo Pro:</b> memeriksa ke JoyoRogo apakah akunmu punya Joyo Pro, supaya fitur dan batas yang benar berlaku. Dasarnya: pemenuhan perjanjian.
@@ -223,7 +223,7 @@ const sections: Section[] = [
               agreement and our legitimate interest in keeping the service safe.
             </li>
             <li>
-              <b>Waitlist:</b> telling you once when {N} Pro opens. Basis: your consent.
+              <b>Waitlist:</b> contacting the people already on the list, for example to tell them {N} is open. Basis: the consent you gave when you joined.
             </li>
             <li>
               <b>Joyo Pro:</b> checking with JoyoRogo whether your account has Joyo Pro, so the right features and limits apply. Basis: performing our agreement.
@@ -378,7 +378,7 @@ const sections: Section[] = [
             Jawaban JoyoRogo soal Joyo Pro dan hitungan import-mu: sampai akunmu dihapus. {N} tidak menyimpan catatan pembayaran; JoyoRogo yang menyimpannya.
           </li>
           <li>Token API yang sudah dicabut: datanya (bukan token-nya) tetap tercatat sampai akunmu dihapus, supaya kamu bisa melihat riwayatnya.</li>
-          <li>Waitlist: sampai kami mengabari peluncuran, atau lebih cepat kalau kamu minta dihapus (atau saat akunmu dengan email yang sama dihapus).</li>
+          <li>Waitlist: data yang sudah ada disimpan sampai pemiliknya selesai menghubungi orang di daftar, atau lebih cepat kalau kamu minta dihapus (atau saat akunmu dengan email yang sama dihapus).</li>
         </UL>
       ),
       en: (
@@ -397,7 +397,7 @@ const sections: Section[] = [
             JoyoRogo's Joyo Pro answer and your import counts: until your account is deleted. {N} keeps no payment records; JoyoRogo does.
           </li>
           <li>Revoked API tokens: their details (never the token) stay until your account is deleted, so you can see the history.</li>
-          <li>Waitlist: until we announce the launch, or sooner if you ask (or when your account with the same email is deleted).</li>
+          <li>Waitlist: existing entries are kept until the owner has contacted the people on the list, or sooner if you ask (or when your account with the same email is deleted).</li>
         </UL>
       ),
     },

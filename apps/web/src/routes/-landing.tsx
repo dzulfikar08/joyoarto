@@ -5,12 +5,21 @@ import { Badge } from "@baroka/ui/components/badge";
 import { buttonVariants } from "@baroka/ui/components/button";
 import { cn } from "@baroka/ui/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Check, Plus, Smartphone, Users } from "lucide-react";
+import { ArrowRight, Check, LogIn, Plus, Users } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { PricingPlans } from "@/components/pricing";
-import { PublicFooter, PublicHeader, REPO_URL, WaitlistForm } from "@/components/public";
-import { ANDROID_SECTION_ID, ANDROID_TESTERS_GROUP_EMAIL, ANDROID_TESTERS_GROUP_URL, ANDROID_TESTING_URL } from "@/lib/app-links";
+import { AndroidLogo, AppleLogo } from "@/components/brand-icons";
+import { PublicFooter, PublicHeader, REPO_URL } from "@/components/public";
+import {
+  ANDROID_SECTION_ID,
+  ANDROID_TESTERS_GROUP_EMAIL,
+  ANDROID_TESTERS_GROUP_URL,
+  ANDROID_TESTING_URL,
+  IOS_SECTION_ID,
+  IOS_TESTFLIGHT_URL,
+  TESTFLIGHT_APP_STORE_URL,
+} from "@/lib/app-links";
 import { useLang } from "@/lib/lang";
 
 type T = (id: ReactNode, en: ReactNode) => ReactNode;
@@ -28,8 +37,8 @@ export function Landing() {
         <Features t={t} />
         <Privacy t={t} />
         <AndroidTesters t={t} />
+        <IphoneTesters t={t} />
         <Pricing t={t} />
-        <Waitlist t={t} />
         <Faq t={t} />
       </main>
       <PublicFooter />
@@ -75,14 +84,19 @@ function Hero({ t }: { t: T }) {
             )}
           </p>
           <div className="mt-7 flex flex-col gap-2.5 sm:flex-row">
-            <a href="#waitlist" className={buttonVariants({ size: "lg" })}>
-              {t("Gabung waitlist", "Join the waitlist")}
-            </a>
+            <Link to="/login" className={buttonVariants({ size: "lg" })}>
+              {t("Daftar gratis", "Sign up free")}
+            </Link>
             <Link to="/demo" className={buttonVariants({ variant: "outline", size: "lg", className: "border-transparent" })}>
               {t("Coba demo, tanpa akun", "Try the demo, no account")} <ArrowRight aria-hidden />
             </Link>
+          </div>
+          <div className="mt-2.5 flex flex-col gap-2.5 sm:flex-row">
             <a href={`#${ANDROID_SECTION_ID}`} className={buttonVariants({ variant: "secondary", size: "lg" })}>
-              <Smartphone aria-hidden /> {t("Jadi tester Android", "Test the Android app")}
+              <AndroidLogo /> {t("Coba di Android", "Try on Android")}
+            </a>
+            <a href={`#${IOS_SECTION_ID}`} className={buttonVariants({ variant: "secondary", size: "lg" })}>
+              <AppleLogo /> {t("Coba di iPhone", "Try on iPhone")}
             </a>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
@@ -298,8 +312,12 @@ function Features({ t }: { t: T }) {
       icon: <Icon d="M7 2h10a2 2 0 012 2v16a2 2 0 01-2 2H7a2 2 0 01-2-2V4a2 2 0 012-2zm4 17h2" />,
       title: t("Aplikasi Android & baca notifikasi", "Android app & notification capture"),
       body: t(
-        "Aplikasi Android (tahap uji di Google Play) mencatat dari notifikasi Jago & GoPay dan menerima PDF statement. iPhone: segera, sementara pakai web dan iOS Shortcuts.",
-        "The Android app (testing on Google Play) captures from Jago & GoPay notifications and takes statement PDFs. iPhone: soon; meanwhile use the web app and iOS Shortcuts.",
+        IOS_TESTFLIGHT_URL
+          ? "Aplikasi Android (tahap uji di Google Play) mencatat dari notifikasi Jago & GoPay dan menerima PDF statement. iPhone: tahap uji lewat TestFlight."
+          : "Aplikasi Android (tahap uji di Google Play) mencatat dari notifikasi Jago & GoPay dan menerima PDF statement. iPhone: lewat TestFlight, link publiknya segera; sementara itu pakai web di Safari.",
+        IOS_TESTFLIGHT_URL
+          ? "The Android app (testing on Google Play) captures from Jago & GoPay notifications and takes statement PDFs. iPhone: testing through TestFlight."
+          : "The Android app (testing on Google Play) captures from Jago & GoPay notifications and takes statement PDFs. iPhone: through TestFlight, public link coming soon; meanwhile use the web app in Safari.",
       ),
     },
   ];
@@ -329,9 +347,72 @@ function Features({ t }: { t: T }) {
   );
 }
 
-/** Android closed testing: join the Google Group, then opt in on Play (lib/app-links.ts). iOS comes later via TestFlight. */
+type Step = {
+  n: string;
+  title: ReactNode;
+  body?: ReactNode;
+  /** External link for the step's button; `to` is an in-app route instead. */
+  href?: string;
+  to?: "/login";
+  icon?: ReactNode;
+  cta?: ReactNode;
+  small?: ReactNode;
+  soon?: boolean;
+};
+
+const STEP_BUTTON =
+  "mt-3 inline-flex min-h-11 items-center gap-2.5 rounded-xl bg-foreground px-4 text-sm font-semibold text-background transition-opacity hover:opacity-90 focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none";
+
+/** One phone platform's install steps: intro on the left, numbered steps on the right. */
+function InstallSection({ id, logo, platform, title, intro, steps, t }: { id: string; logo: ReactNode; platform: ReactNode; title: ReactNode; intro: ReactNode; steps: Step[]; t: T }) {
+  return (
+    <Section id={id} className="py-6 sm:py-8">
+      <div className="grid gap-8 rounded-[2rem] bg-card p-6 sm:p-10 lg:grid-cols-[1fr_1.2fr] lg:items-start">
+        <div>
+          <p className="flex items-center gap-2 text-sm font-bold text-primary">
+            <span className="grid size-9 place-items-center rounded-full bg-primary-soft text-primary-ink [&_svg]:size-5">{logo}</span>
+            {platform}
+          </p>
+          <h2 className="mt-3 text-[1.75rem] leading-tight font-extrabold tracking-tight text-balance sm:text-4xl">{title}</h2>
+          <p className="mt-3 text-pretty text-muted-foreground">{intro}</p>
+        </div>
+        <ol className="space-y-3">
+          {steps.map((s) => (
+            <li key={s.n} className="rounded-3xl bg-muted/60 p-5">
+              <div className="flex items-start gap-3.5">
+                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-sm font-extrabold text-primary-foreground">{s.n}</span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="flex flex-wrap items-center gap-2 font-bold tracking-tight">
+                    {s.title}
+                    {s.soon && <Badge tone="warning">{t("Segera", "Soon")}</Badge>}
+                  </h3>
+                  {s.body && <p className="mt-1 text-sm text-muted-foreground">{s.body}</p>}
+                  {s.href && (
+                    <a href={s.href} target="_blank" rel="noopener" className={STEP_BUTTON}>
+                      {s.icon}
+                      {s.cta}
+                    </a>
+                  )}
+                  {s.to && (
+                    <Link to={s.to} className={STEP_BUTTON}>
+                      {s.icon}
+                      {s.cta}
+                    </Link>
+                  )}
+                  {s.small && <p className="mt-2 text-xs break-all text-muted-foreground">{s.small}</p>}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </Section>
+  );
+}
+
+/** Android closed testing: join the Google Group, then opt in on Play (lib/app-links.ts), then sign in. */
 function AndroidTesters({ t }: { t: T }) {
-  const steps = [
+  const steps: Step[] = [
     {
       n: "1",
       icon: <Users aria-hidden className="size-5" />,
@@ -346,7 +427,7 @@ function AndroidTesters({ t }: { t: T }) {
     },
     {
       n: "2",
-      icon: <Smartphone aria-hidden className="size-5" />,
+      icon: <AndroidLogo className="size-5" />,
       title: t("Daftar jadi tester, lalu pasang", "Opt in, then install"),
       body: t(
         "Ketuk “Jadi penguji” di halaman Google Play, lalu pasang JoyoArto dari Play Store. Update-nya datang lewat Play juga.",
@@ -355,51 +436,78 @@ function AndroidTesters({ t }: { t: T }) {
       href: ANDROID_TESTING_URL,
       cta: t("Daftar di Google Play", "Opt in on Google Play"),
     },
+    {
+      n: "3",
+      title: t("Masuk pakai Google, rumah tanggamu langsung dibuat", "Sign in with Google; your household is created for you"),
+    },
   ];
   return (
-    <Section id={ANDROID_SECTION_ID}>
-      <div className="grid gap-8 rounded-[2rem] bg-card p-6 sm:p-10 lg:grid-cols-[1fr_1.2fr] lg:items-start">
-        <div>
-          <p className="text-sm font-bold text-primary">{t("Aplikasi HP", "Phone app")}</p>
-          <h2 className="mt-1.5 text-[1.75rem] leading-tight font-extrabold tracking-tight text-balance sm:text-4xl">
-            {t("Jadi tester aplikasi Android JoyoArto.", "Test the JoyoArto Android app.")}
-          </h2>
-          <p className="mt-3 text-pretty text-muted-foreground">
-            {t(
-              "Aplikasinya sudah di Google Play, masih tahap uji. Catat cepat, baca notifikasi Jago & GoPay, dan kirim PDF statement langsung dari HP. Dua langkah untuk memasangnya:",
-              "It is on Google Play, still in testing. Quick add, capture from Jago & GoPay notifications, and send statement PDFs straight from your phone. Two steps to install it:",
-            )}
-          </p>
-          <p className="mt-5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <Badge tone="warning">{t("Segera", "Soon")}</Badge>
-            {t("iPhone: segera lewat TestFlight. Sementara itu, pakai web di Safari.", "iPhone: coming soon via TestFlight. Meanwhile, use the web app in Safari.")}
-          </p>
-        </div>
-        <ol className="space-y-3">
-          {steps.map((s) => (
-            <li key={s.n} className="rounded-3xl bg-muted/60 p-5">
-              <div className="flex items-start gap-3.5">
-                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-sm font-extrabold text-primary-foreground">{s.n}</span>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-bold tracking-tight">{s.title}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">{s.body}</p>
-                  <a
-                    href={s.href}
-                    target="_blank"
-                    rel="noopener"
-                    className="mt-3 inline-flex min-h-11 items-center gap-2.5 rounded-xl bg-foreground px-4 text-sm font-semibold text-background transition-opacity hover:opacity-90 focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
-                  >
-                    {s.icon}
-                    {s.cta}
-                  </a>
-                  {s.small && <p className="mt-2 text-xs break-all text-muted-foreground">{s.small}</p>}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </Section>
+    <InstallSection
+      id={ANDROID_SECTION_ID}
+      t={t}
+      logo={<AndroidLogo />}
+      platform="Android"
+      title={t("Jadi tester aplikasi Android JoyoArto.", "Test the JoyoArto Android app.")}
+      intro={t(
+        "Aplikasinya sudah di Google Play, masih tahap uji. Catat cepat, baca notifikasi Jago & GoPay, dan kirim PDF statement langsung dari HP. Tiga langkah untuk mulai:",
+        "It is on Google Play, still in testing. Quick add, capture from Jago & GoPay notifications, and send statement PDFs straight from your phone. Three steps to get started:",
+      )}
+      steps={steps}
+    />
+  );
+}
+
+/** iPhone beta through TestFlight. Until IOS_TESTFLIGHT_URL is set, step 2 points to the web app in Safari. */
+function IphoneTesters({ t }: { t: T }) {
+  const invite: Step = IOS_TESTFLIGHT_URL
+    ? {
+        n: "2",
+        icon: <AppleLogo className="size-5" />,
+        title: t("Buka undangan TestFlight JoyoArto", "Open the JoyoArto TestFlight invite"),
+        body: t("Buka link-nya di iPhone, lalu ketuk Accept, kemudian Install.", "Open the link on your iPhone, then tap Accept, then Install."),
+        href: IOS_TESTFLIGHT_URL,
+        cta: t("Buka undangan", "Open the invite"),
+      }
+    : {
+        n: "2",
+        soon: true,
+        icon: <LogIn aria-hidden className="size-5" />,
+        title: t("Buka undangan TestFlight JoyoArto", "Open the JoyoArto TestFlight invite"),
+        body: t(
+          "Link publiknya segera kami pasang di sini. Nanti tinggal buka di iPhone, lalu ketuk Accept, kemudian Install. Sementara itu, pakai versi web di Safari dengan akun yang sama.",
+          "The public link is coming soon and will be posted here. Then you open it on your iPhone and tap Accept, then Install. Meanwhile, use the web app in Safari with the same account.",
+        ),
+        to: "/login",
+        cta: t("Buka versi web", "Open the web app"),
+      };
+  const steps: Step[] = [
+    {
+      n: "1",
+      icon: <AppleLogo className="size-5" />,
+      title: t("Pasang TestFlight dari App Store", "Install TestFlight from the App Store"),
+      body: t("Aplikasi gratis dari Apple buat mencoba aplikasi yang masih tahap uji.", "Apple's free app for trying apps that are still in testing."),
+      href: TESTFLIGHT_APP_STORE_URL,
+      cta: t("Buka di App Store", "Open in the App Store"),
+    },
+    invite,
+    {
+      n: "3",
+      title: t("Masuk pakai Apple atau Google", "Sign in with Apple or Google"),
+    },
+  ];
+  return (
+    <InstallSection
+      id={IOS_SECTION_ID}
+      t={t}
+      logo={<AppleLogo />}
+      platform="iPhone"
+      title={t("Coba JoyoArto di iPhone.", "Try JoyoArto on iPhone.")}
+      intro={t(
+        "Versi iPhone dibagikan lewat TestFlight, aplikasi resmi Apple buat versi uji. Tiga langkah untuk mulai:",
+        "The iPhone version is shared through TestFlight, Apple's official app for test versions. Three steps to get started:",
+      )}
+      steps={steps}
+    />
   );
 }
 
@@ -496,36 +604,13 @@ function Pricing({ t }: { t: T }) {
   );
 }
 
-function Waitlist({ t }: { t: T }) {
-  return (
-    <Section id="waitlist">
-      <div className="mx-auto grid max-w-4xl gap-8 rounded-[2rem] bg-primary-soft p-6 sm:p-10 lg:grid-cols-2">
-        <div>
-          <p className="text-sm font-bold text-primary-ink">Waitlist</p>
-          <h2 className="mt-1.5 text-[1.75rem] leading-tight font-extrabold tracking-tight text-balance sm:text-3xl">{t("Jadi yang pertama pakai JoyoArto.", "Be first in line for JoyoArto.")}</h2>
-          <p className="mt-3 text-muted-foreground">
-            {t(
-              "Versi hosted, tinggal pakai. Gratis untuk mulai; Joyo Pro (dibeli di JoyoRogo) membuka batas yang lebih longgar.",
-              "The hosted version, ready to use. Free to start; Joyo Pro (bought in JoyoRogo) raises the limits.",
-            )}
-          </p>
-          <p className="mt-3 text-sm text-muted-foreground">
-            {t("Kasih tahu bank yang kamu pakai, biar kami tahu mana yang dibikin duluan.", "Tell us which banks you use, so we know which to support next.")}
-          </p>
-        </div>
-        <WaitlistForm source="landing" />
-      </div>
-    </Section>
-  );
-}
-
 function Faq({ t }: { t: T }) {
   const qa: [ReactNode, ReactNode][] = [
     [
       t("Bank apa aja yang bisa dibaca?", "Which banks can it read?"),
       t(
-        "Sekarang Bank Jago (statement bulanan) dan GoPay (e-statement), langsung dibaca dan diverifikasi oleh JoyoArto. Berikutnya: BCA, BRI, Mandiri, DANA, SeaBank dan lainnya, urutannya ikut permintaan di waitlist. Sementara itu, bank lain bisa lewat CSV atau minta Claude membaca PDF-nya.",
-        "Today: Bank Jago (monthly statements) and GoPay (e-statements), read and verified by JoyoArto itself. Next: BCA, BRI, Mandiri, DANA, SeaBank and more, in the order the waitlist asks for them. Meanwhile, other banks work via CSV or by asking Claude to read the PDF.",
+        "Sekarang Bank Jago (statement bulanan) dan GoPay (e-statement), langsung dibaca dan diverifikasi oleh JoyoArto. Berikutnya: BCA, BRI, Mandiri, DANA, SeaBank dan lainnya. Sementara itu, bank lain bisa lewat CSV atau minta Claude membaca PDF-nya.",
+        "Today: Bank Jago (monthly statements) and GoPay (e-statements), read and verified by JoyoArto itself. Next: BCA, BRI, Mandiri, DANA, SeaBank and more. Meanwhile, other banks work via CSV or by asking Claude to read the PDF.",
       ),
     ],
     [
@@ -552,15 +637,19 @@ function Faq({ t }: { t: T }) {
     [
       t("Ada aplikasi HP?", "Is there a mobile app?"),
       t(
-        "Ada untuk Android, sudah di Google Play dalam tahap uji: catat cepat, baca notifikasi Jago dan GoPay, dan kirim PDF statement dari HP. Versi iPhone segera lewat TestFlight; sementara itu web-nya enak dipakai di HP dan ada iOS Shortcuts buat catat cepat.",
-        "Yes for Android, on Google Play in testing: quick add, capture from Jago and GoPay notifications, and send statement PDFs from your phone. An iPhone version is coming via TestFlight; meanwhile the web app works well on phones and iOS Shortcuts can quick-add.",
+        IOS_TESTFLIGHT_URL
+          ? "Ada untuk Android, sudah di Google Play dalam tahap uji: catat cepat, baca notifikasi Jago dan GoPay, dan kirim PDF statement dari HP. Versi iPhone juga ada dalam tahap uji lewat TestFlight; langkahnya ada di bagian iPhone di atas."
+          : "Ada untuk Android, sudah di Google Play dalam tahap uji: catat cepat, baca notifikasi Jago dan GoPay, dan kirim PDF statement dari HP. Versi iPhone dibagikan lewat TestFlight dan link publiknya segera; langkahnya ada di bagian iPhone di atas. Sementara itu web-nya enak dipakai di Safari dan ada iOS Shortcuts buat catat cepat.",
+        IOS_TESTFLIGHT_URL
+          ? "Yes for Android, on Google Play in testing: quick add, capture from Jago and GoPay notifications, and send statement PDFs from your phone. The iPhone version is in testing too, through TestFlight; the steps are in the iPhone section above."
+          : "Yes for Android, on Google Play in testing: quick add, capture from Jago and GoPay notifications, and send statement PDFs from your phone. The iPhone version is shared through TestFlight and its public link is coming soon; the steps are in the iPhone section above. Meanwhile the web app works well in Safari and iOS Shortcuts can quick-add.",
       ),
     ],
     [
       t("Gimana cara pasang aplikasi Android-nya?", "How do I install the Android app?"),
       t(
-        "Dua langkah. Pertama, gabung grup Google joyoarto-testers (groups.google.com/g/joyoarto-testers, siapa pun bisa gabung) pakai akun Google yang ada di HP-mu. Kedua, buka play.google.com/apps/testing/com.joyodigitama.joyoarto, ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store.",
-        "Two steps. First, join the joyoarto-testers Google Group (groups.google.com/g/joyoarto-testers, anyone can join) with the Google account on your phone. Second, open play.google.com/apps/testing/com.joyodigitama.joyoarto, tap “Become a tester”, then install JoyoArto from the Play Store.",
+        "Tiga langkah. Pertama, gabung grup Google joyoarto-testers (groups.google.com/g/joyoarto-testers, siapa pun bisa gabung) pakai akun Google yang ada di HP-mu. Kedua, buka play.google.com/apps/testing/com.joyodigitama.joyoarto, ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store. Ketiga, buka aplikasinya dan masuk pakai Google; rumah tanggamu langsung dibuat.",
+        "Three steps. First, join the joyoarto-testers Google Group (groups.google.com/g/joyoarto-testers, anyone can join) with the Google account on your phone. Second, open play.google.com/apps/testing/com.joyodigitama.joyoarto, tap “Become a tester”, then install JoyoArto from the Play Store. Third, open the app and sign in with Google; your household is created for you.",
       ),
     ],
     [

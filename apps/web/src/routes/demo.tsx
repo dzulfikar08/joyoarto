@@ -1,20 +1,20 @@
 // No-account demo: Jago / GoPay statement PDFs are read (pdf.js) and analysed in the browser with the same parsers
-// the server uses. Nothing is uploaded or stored; the only request this page can make is the optional waitlist form.
+// the server uses. Nothing is uploaded or stored.
 
 import { sampleGopayText, sampleJagoText } from "@baroka/api/lib/statements/sample";
 import type { StatementSummary } from "@baroka/api/lib/statements/summary";
 import { summarizeStatements } from "@baroka/api/lib/statements/summary";
 import { Badge } from "@baroka/ui/components/badge";
-import { Button } from "@baroka/ui/components/button";
+import { Button, buttonVariants } from "@baroka/ui/components/button";
 import { Card, CardTitle } from "@baroka/ui/components/card";
 import { Skeleton } from "@baroka/ui/components/skeleton";
 import { cn } from "@baroka/ui/lib/utils";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Check, FileUp, ShieldCheck, TriangleAlert } from "lucide-react";
+import { ArrowRight, Check, FileUp, ShieldCheck, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 
-import { PublicFooter, PublicHeader, WaitlistForm } from "@/components/public";
+import { PublicFooter, PublicHeader } from "@/components/public";
 import { formatMoney } from "@/lib/format";
 import { categoryLabel, useLang } from "@/lib/lang";
 import type { Lang } from "@/lib/lang";
@@ -116,20 +116,22 @@ function Demo() {
         )}
         {state.status === "done" && <Result s={state.summary} sample={state.sample} lang={lang} />}
 
-        <div id="waitlist" className="grid gap-6 rounded-[2rem] bg-primary-soft p-6 sm:p-8 lg:grid-cols-2">
-          <div>
+        <div className="flex flex-col gap-6 rounded-[2rem] bg-primary-soft p-6 sm:p-8 lg:flex-row lg:items-center">
+          <div className="flex-1">
             <h2 className="text-2xl leading-tight font-extrabold tracking-tight text-balance">{t("Mau ini tiap bulan, otomatis rapi?", "Want this every month, kept tidy for you?")}</h2>
             <p className="mt-2 text-muted-foreground">
               {t(
-                "Di JoyoArto semua statement tersimpan jadi satu buku keluarga: kategori yang kamu atur sekali, tanya Claude, dan simulasi rencana besar. Gabung waitlist biar dikabari saat dibuka.",
-                "In JoyoArto every statement adds up to one family ledger: categories you set once, Claude to ask, and simulations for big plans. Join the waitlist to hear when it opens.",
+                "Di JoyoArto semua statement tersimpan jadi satu buku keluarga: kategori yang kamu atur sekali, tanya Claude, dan simulasi rencana besar. Gratis untuk mulai.",
+                "In JoyoArto every statement adds up to one family ledger: categories you set once, Claude to ask, and simulations for big plans. Free to start.",
               )}
             </p>
             <Link to="/" hash="fitur" className="mt-3 inline-block text-sm font-semibold text-primary-ink underline underline-offset-4">
               {t("Lihat semua fitur", "See all features")}
             </Link>
           </div>
-          <WaitlistForm source="demo" initialBanks={["jago"]} />
+          <Link to="/login" className={buttonVariants({ size: "lg", className: "self-start lg:self-center" })}>
+            {t("Daftar gratis", "Sign up free")} <ArrowRight aria-hidden />
+          </Link>
         </div>
       </main>
       <PublicFooter />
@@ -154,8 +156,8 @@ function Result({ s, sample, lang }: { s: StatementSummary; sample: boolean; lan
         <p className="rounded-2xl bg-warning-soft p-3.5 text-sm text-warning-ink">
           {t("Belum dikenali:", "Not recognised:")} {unknown.map((f) => f.name).join(", ")}.{" "}
           {t(
-            "Demo ini baru membaca statement Bank Jago dan e-statement GoPay. Bank lain: gabung waitlist dan centang bank-mu.",
-            "This demo reads Bank Jago statements and GoPay e-statements only. Other banks: join the waitlist and tick yours.",
+            "Demo ini baru membaca statement Bank Jago dan e-statement GoPay. Di aplikasinya, bank lain bisa lewat CSV.",
+            "This demo reads Bank Jago statements and GoPay e-statements only. In the app, other banks work via CSV.",
           )}
         </p>
       )}

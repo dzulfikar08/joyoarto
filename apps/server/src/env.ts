@@ -22,8 +22,9 @@ export type Env = BillingEnv & {
   OPEN_SIGNUP?: string;
   MCP_LIMITER?: RateLimit;
   OAUTH_REGISTER_LIMITER?: RateLimit;
+  /** Demo code attempts per IP (the name is from the old public waitlist). */
   WAITLIST_LIMITER?: RateLimit;
-  /** Comma-separated emails that may read the waitlist. */
+  /** Comma-separated emails of the operators (read the kept waitlist, reset the demo). */
   ADMIN_EMAILS?: string;
   /** Domain of the household import addresses (import+<token>@<domain>, Email Routing to this Worker). Unset = off. */
   IMPORT_EMAIL_DOMAIN?: string;
