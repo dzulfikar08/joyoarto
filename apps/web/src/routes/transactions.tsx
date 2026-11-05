@@ -3,6 +3,7 @@ import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Badge } from "@baroka/ui/components/badge";
 import { Button, buttonVariants } from "@baroka/ui/components/button";
 import { Card } from "@baroka/ui/components/card";
+import { Checkbox } from "@baroka/ui/components/checkbox";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@baroka/ui/components/empty";
 import { Input } from "@baroka/ui/components/input";
 import { Combobox } from "@baroka/ui/components/combobox";
@@ -104,12 +105,13 @@ function Transactions() {
     ...(f.status ? { status: f.status } : {}),
     ...(f.reimburse ? { reimburse: f.reimburse } : {}),
   };
-  const list = useInfiniteQuery({
-    queryKey: ["transactions", input],
-    queryFn: ({ pageParam }) => client.transactions.search({ ...input, ...(pageParam ? { cursor: pageParam } : {}) }),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => last.nextCursor ?? undefined,
-  });
+  const list = useInfiniteQuery(
+    orpc.transactions.search.infiniteOptions({
+      input: (pageParam: string | undefined) => ({ ...input, ...(pageParam ? { cursor: pageParam } : {}) }),
+      initialPageParam: undefined as string | undefined,
+      getNextPageParam: (last) => last.nextCursor ?? undefined,
+    }),
+  );
 
   const categorize = useMutation({
     mutationFn: (v: { id: string; category: string; merchant: string | null }) =>
@@ -127,14 +129,16 @@ function Transactions() {
         toast.success("Rule saved", {
           description: `${res.rule.when} → ${res.category}${res.ruleAppliedToExisting ? ` (also applied to ${res.ruleAppliedToExisting} more)` : ""}`,
         });
-      void qc.invalidateQueries({ queryKey: ["transactions"] });
+      void qc.invalidateQueries({ queryKey: orpc.transactions.key() });
       void qc.invalidateQueries({ queryKey: orpc.reports.key() });
+      void qc.invalidateQueries({ queryKey: orpc.budgets.key() });
+      if (res?.rule) void qc.invalidateQueries({ queryKey: orpc.rules.key() });
     },
     onError: (e) => toast.error("Couldn't change the category", { description: errorMessage(e) }),
   });
 
   const refresh = () => {
-    void qc.invalidateQueries({ queryKey: ["transactions"] });
+    void qc.invalidateQueries({ queryKey: orpc.transactions.key() });
     void qc.invalidateQueries({ queryKey: orpc.reports.key() });
     void qc.invalidateQueries({ queryKey: orpc.accounts.key() });
   };
@@ -194,8 +198,8 @@ function Transactions() {
         />
         <Select size="sm" className="sm:w-36" value={f.status} onValueChange={(v) => set({ status: v as Status })} aria-label="Status" items={STATUS_ITEMS} />
         <Select size="sm" className="sm:w-60" value={f.reimburse} onValueChange={(v) => set({ reimburse: v as ReimburseFilter })} aria-label="Reimburse" items={REIMBURSE_ITEMS} />
-        <label className="flex min-h-10 items-center gap-2 text-sm font-medium">
-          <input type="checkbox" checked={f.uncategorized} onChange={(e) => set({ uncategorized: e.target.checked, category: "" })} />
+        <label className="flex min-h-10 cursor-pointer items-center gap-2 text-sm font-medium">
+          <Checkbox checked={f.uncategorized} onCheckedChange={(checked) => set({ uncategorized: checked, category: "" })} />
           Uncategorized only
         </label>
         <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-muted-foreground">
@@ -212,8 +216,8 @@ function Transactions() {
           </Button>
         )}
       </div>
-      <label className="flex items-start gap-2 text-xs text-muted-foreground">
-        <input type="checkbox" className="mt-0.5" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+      <label className="flex cursor-pointer items-start gap-2 text-xs text-muted-foreground">
+        <Checkbox className="-mt-px" checked={remember} onCheckedChange={setRemember} />
         Remember a category I pick for that merchant (adds a rule and fills in its past uncategorized rows)
       </label>
       </Card>

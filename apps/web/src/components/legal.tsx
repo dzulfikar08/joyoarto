@@ -22,16 +22,16 @@ export function LegalPage({ title, intro, sections }: { title: { id: string; en:
       <PublicHeader />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         <h1 className="text-3xl font-semibold tracking-tight text-balance">{title[lang]}</h1>
-        <p className="mt-2 text-sm text-stone-500">
+        <p className="mt-2 text-sm text-muted-foreground">
           {en ? "Effective" : "Berlaku sejak"} {effective(en)}
           {en && " · The Indonesian version prevails if the two differ."}
         </p>
-        <div className="mt-6 text-stone-700 dark:text-stone-300">{intro[lang]}</div>
-        <nav aria-label={en ? "Contents" : "Daftar isi"} className="mt-6 rounded-xl border border-stone-200 p-4 text-sm dark:border-stone-800">
+        <div className="mt-6 text-foreground">{intro[lang]}</div>
+        <nav aria-label={en ? "Contents" : "Daftar isi"} className="mt-6 rounded-xl border border-border p-4 text-sm">
           <ol className="list-decimal space-y-1 pl-5">
             {sections.map((s) => (
               <li key={s.id}>
-                <a href={`#${s.id}`} className="text-emerald-700 hover:underline dark:text-emerald-400">
+                <a href={`#${s.id}`} className="text-primary hover:underline">
                   {s.title[lang]}
                 </a>
               </li>
@@ -43,7 +43,7 @@ export function LegalPage({ title, intro, sections }: { title: { id: string; en:
             <h2 className="text-xl font-semibold tracking-tight">
               {i + 1}. {s.title[lang]}
             </h2>
-            <div className="mt-2 text-stone-700 dark:text-stone-300">{s.body[lang]}</div>
+            <div className="mt-2 text-foreground">{s.body[lang]}</div>
           </section>
         ))}
       </main>
@@ -63,7 +63,7 @@ export function UL({ children }: { children: ReactNode }) {
 
 export function A({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <a href={href} className="text-emerald-700 underline dark:text-emerald-400">
+    <a href={href} className="text-primary underline">
       {children}
     </a>
   );

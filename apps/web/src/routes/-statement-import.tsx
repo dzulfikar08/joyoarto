@@ -82,6 +82,8 @@ export function StatementImport({ shared }: { shared?: string }) {
   /** Statement imports left this month on Free; null = unlimited. */
   const importsLeft = importUsage && importUsage.limit !== null ? Math.max(0, importUsage.limit - importUsage.used) : null;
   const input = useRef<HTMLInputElement>(null);
+  // Read by add() and the drop handler: files that arrive while a batch saves would replace the saved items.
+  const savingRef = useRef(false);
   // The latest items for async work that outlives a render.
   const itemsRef = useRef(items);
   itemsRef.current = items;
@@ -90,6 +92,10 @@ export function StatementImport({ shared }: { shared?: string }) {
 
   const add = async (list: File[]) => {
     if (!list.length) return;
+    if (savingRef.current) {
+      toast.info("Still saving the statements. Add more files when it's done.");
+      return;
+    }
     const fresh: Item[] = list.map((f) => ({
       id: `f${++seq}`,
       name: f.name || "statement.pdf",
@@ -134,9 +140,13 @@ export function StatementImport({ shared }: { shared?: string }) {
   useEffect(() => {
     let live = true;
     void takeSharedFiles()
-      .then((files) => {
+      .then(({ files, failed }) => {
         if (!live) return;
-        if (files.length) {
+        if (failed) {
+          const got = files.length ? `${files.length} shared file${files.length > 1 ? "s" : ""} arrived, but ` : "";
+          setSharedNote({ tone: "error", text: `${got}${failed} couldn't be loaded. They're still waiting: reload this page, or choose the PDFs here.` });
+          if (files.length) void add(files);
+        } else if (files.length) {
           setSharedNote({ tone: "info", text: `${files.length} file${files.length > 1 ? "s" : ""} shared to JoyoArto.` });
           void add(files);
         } else if (shared === "failed") {
@@ -145,7 +155,9 @@ export function StatementImport({ shared }: { shared?: string }) {
           setSharedNote({ tone: "error", text: "Nothing to import arrived with the share. Share the statement PDF itself." });
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        if (live) setSharedNote({ tone: "error", text: "The shared files couldn't be loaded. They're still waiting: reload this page, or choose the PDFs here." });
+      })
       // The note is shown; a reload should not show it again.
       .finally(() => live && shared && void navigate({ to: "/import", search: {}, replace: true }));
     return () => {
@@ -162,6 +174,7 @@ export function StatementImport({ shared }: { shared?: string }) {
       return;
     }
     setSaving(true);
+    savingRef.current = true;
     let saved = 0;
     let failed = 0;
     // One at a time, in order: GoPay first, so the Jago payments arrive already named (see commitOrder).
@@ -169,15 +182,21 @@ export function StatementImport({ shared }: { shared?: string }) {
       patch(x.id, { busy: "saving", saveError: undefined });
       try {
         const result = await client.imports.statement({ text: x.text!, fileName: x.name, commit: true });
-        patch(x.id, { busy: null, result });
-        if (result.committed) saved++;
-        else failed++;
+        if (result.committed) {
+          patch(x.id, { busy: null, result });
+          saved++;
+        } else {
+          // The server checks again and refuses a statement that doesn't add up.
+          patch(x.id, { busy: null, saveError: result.problems[0] ? `it doesn't add up (${result.problems[0]})` : "the server didn't save it" });
+          failed++;
+        }
       } catch (e) {
         patch(x.id, { busy: null, saveError: errorMessage(e) });
         failed++;
       }
     }
     setSaving(false);
+    savingRef.current = false;
     void qc.invalidateQueries();
     if (saved) toast.success(`Imported ${saved} statement${saved > 1 ? "s" : ""}`, failed ? { description: `${failed} not saved; see the list.` } : undefined);
     else toast.error("Nothing was saved. See the list.");
@@ -202,6 +221,10 @@ export function StatementImport({ shared }: { shared?: string }) {
       onDragOver={(e) => {
         if (![...e.dataTransfer.types].includes("Files")) return;
         e.preventDefault();
+        if (savingRef.current) {
+          e.dataTransfer.dropEffect = "none";
+          return;
+        }
         setDragging(true);
       }}
       onDragLeave={(e) => {

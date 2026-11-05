@@ -37,9 +37,12 @@ export function useSaveQuickAdd(onSaved?: () => void) {
     onSuccess: (res) => {
       const t = res.transaction;
       toast.success(`${res.created ? "Added" : "Already added"} as pending`, { description: `${t.display} · ${t.merchant ?? t.description} · ${t.account}` });
-      void qc.invalidateQueries({ queryKey: ["transactions"] });
+      void qc.invalidateQueries({ queryKey: orpc.transactions.key() });
       void qc.invalidateQueries({ queryKey: orpc.reports.key() });
       void qc.invalidateQueries({ queryKey: orpc.accounts.key() });
+      void qc.invalidateQueries({ queryKey: orpc.budgets.key() });
+      // A reimbursable capture (add sheet) lands on the Reimburse page and its employer's receivable.
+      void qc.invalidateQueries({ queryKey: orpc.reimburse.key() });
       onSaved?.();
     },
     onError: (err) => toast.error("Couldn't add it", { description: errorMessage(err) }),
