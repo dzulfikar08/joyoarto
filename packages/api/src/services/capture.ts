@@ -177,6 +177,9 @@ export async function parseCapture(db: Database, p: Principal, ai: AiConfig | un
           response_format: { type: "json_schema", json_schema: schema },
           max_tokens: 600,
           temperature: 0,
+          // Gemma 4 thinks by default: on a receipt that took ~32 s and left the answer empty (the budget went to reasoning).
+          // Off, it answers in ~2 s. Models without a chat template ignore this.
+          chat_template_kwargs: { enable_thinking: false },
         }),
         PARSE_DEADLINE_MS,
       )) as { response?: unknown; usage?: { prompt_tokens?: number; completion_tokens?: number } } | null;
@@ -303,6 +306,9 @@ export async function receiptCapture(
           response_format: { type: "json_schema", json_schema: schema },
           max_tokens: 1_200,
           temperature: 0,
+          // Gemma 4 thinks by default: on a receipt that took ~32 s and left the answer empty (the budget went to reasoning).
+          // Off, it answers in ~2 s. Models without a chat template ignore this.
+          chat_template_kwargs: { enable_thinking: false },
         }),
         RECEIPT_DEADLINE_MS,
       )) as { response?: unknown; usage?: { prompt_tokens?: number; completion_tokens?: number }; choices?: { message?: { content?: unknown } }[] } | null;
