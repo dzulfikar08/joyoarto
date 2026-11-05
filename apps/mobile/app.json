@@ -195,9 +195,22 @@
     "experiments": {
       "typedRoutes": true
     },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/df6f8a8c-9a66-4dd9-a5b1-4dbd3fd3f951",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "extra": {
       "googleWebClientId": "915036968874-0ne1edkq0laljg6cdlnksor1hqpj9gfr.apps.googleusercontent.com",
-      "googleIosClientId": "915036968874-v9nu6n98eb34vqmnva034tu6donspavn.apps.googleusercontent.com"
-    }
+      "googleIosClientId": "915036968874-v9nu6n98eb34vqmnva034tu6donspavn.apps.googleusercontent.com",
+      "eas": {
+        "projectId": "df6f8a8c-9a66-4dd9-a5b1-4dbd3fd3f951"
+      }
+    },
+    "owner": "dzulfikar08"
   }
 }
