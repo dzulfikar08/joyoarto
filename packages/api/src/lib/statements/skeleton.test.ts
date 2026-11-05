@@ -96,3 +96,10 @@ describe("guessBank", () => {
     expect(guessBank(["XXXX"])).toBeNull();
   });
 });
+
+test("bank names that are also given names are masked", () => {
+  const text = "NAMA : MEGA DANA PRIMA\nTRSF E-BANKING CR NEO ALLO\nTOP UP DANA 50.000";
+  const sk = buildSkeleton(text);
+  for (const name of ["MEGA", "DANA", "PRIMA", "NEO", "ALLO"]) expect(sk.text).not.toContain(name);
+  expect(verifySkeleton(text, sk.text)).toEqual({ ok: true });
+});

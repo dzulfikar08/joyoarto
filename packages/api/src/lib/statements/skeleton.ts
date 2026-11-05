@@ -32,21 +32,25 @@ januari februari maret april mei juni juli agustus september oktober november de
 january february march may june july august october december
 jan feb mar apr jun jul agu agt ags aug sep sept okt oct nov des dec
 monday tuesday wednesday thursday friday saturday sunday mon tue wed thu fri sat sun
-bank bca mandiri bri bni cimb niaga permata danamon bsi syariah btn ocbc nisp seabank blu jenius btpn jago allo neo
-neobank ovo dana shopeepay shopee linkaja gopay gojek flip mega panin maybank uob hsbc citibank dbs digibank superbank
-krom bjb muamalat sinarmas bukopin paylater gopaylater spaylater kredivo akulaku isaku doku xendit midtrans livin brimo
-wondr mybca klikbca octo tmrw sakuku visa mastercard jcb gpn prima alto jalin bersama link tbk pt persero
+bank bca mandiri bri bni cimb niaga permata danamon bsi syariah btn ocbc nisp seabank blu jenius btpn jago
+neobank ovo shopeepay shopee linkaja gopay gojek panin maybank uob hsbc citibank dbs digibank superbank
+bjb muamalat sinarmas bukopin paylater gopaylater spaylater kredivo akulaku isaku doku xendit midtrans livin brimo
+wondr mybca klikbca octo tmrw sakuku visa mastercard jcb gpn bersama link tbk pt persero
 `;
 
-/** Statement vocabulary, lower case. Not merchants, not person names. */
+/**
+ * Statement vocabulary, lower case. Not merchants, not person names. Bank and e-wallet names that are also Indonesian
+ * given names (Dana, Mega, Neo, Allo, Flip, Krom, Prima, Alto, Jalin) are left out on purpose: they are always masked,
+ * so a member called Mega never shows. The bank guess loses them; the layout still tells the parser spec enough.
+ */
 export const ALLOWED: ReadonlySet<string> = new Set(WORDS.split(/\s+/).filter(Boolean).map((w) => w.replace(/\.$/, "")));
 
 /** Bank and e-wallet names for the "likely bank" guess, as they are usually written. */
 const BANKS: Record<string, string> = {
   bca: "BCA", mandiri: "Mandiri", bri: "BRI", bni: "BNI", cimb: "CIMB Niaga", permata: "Permata", danamon: "Danamon", bsi: "BSI", btn: "BTN",
-  ocbc: "OCBC", seabank: "SeaBank", blu: "blu", jenius: "Jenius", jago: "Jago", allo: "Allo", neo: "Neo", ovo: "OVO", dana: "DANA",
-  shopeepay: "ShopeePay", linkaja: "LinkAja", gopay: "GoPay", flip: "Flip", mega: "Mega", panin: "Panin", maybank: "Maybank", uob: "UOB",
-  hsbc: "HSBC", citibank: "Citibank", dbs: "DBS", superbank: "Superbank", krom: "Krom", bjb: "BJB", muamalat: "Muamalat", sinarmas: "Sinarmas",
+  ocbc: "OCBC", seabank: "SeaBank", blu: "blu", jenius: "Jenius", jago: "Jago", ovo: "OVO",
+  shopeepay: "ShopeePay", linkaja: "LinkAja", gopay: "GoPay", panin: "Panin", maybank: "Maybank", uob: "UOB",
+  hsbc: "HSBC", citibank: "Citibank", dbs: "DBS", superbank: "Superbank", bjb: "BJB", muamalat: "Muamalat", sinarmas: "Sinarmas",
   bukopin: "Bukopin", kredivo: "Kredivo", akulaku: "Akulaku",
 };
 
