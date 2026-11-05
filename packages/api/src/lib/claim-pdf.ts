@@ -1,6 +1,8 @@
 // The reimbursement claim report as a PDF (pdf-lib, which runs in Workers): header, item table, subtotals per
 // category, the total in numbers and words, signature blocks, then one appendix page per receipt photo. Drawn from a
 // ClaimSnapshot (lib/reimburse.ts), so a re-download prints the same document. Labels are Indonesian first.
+// Receipts: 2 × 2 per A4 page in table order, captioned with the row number; a long receipt (taller than 1:2.2) gets
+// both rows of a column so it stays readable.
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { PDFFont, PDFImage, PDFPage } from "pdf-lib";
@@ -19,6 +21,70 @@ const RULE = rgb(0.82, 0.82, 0.85);
 const FILL = rgb(0.95, 0.95, 0.96);
 
 type Fonts = { regular: PDFFont; bold: PDFFont; italic: PDFFont };
+type Photo = { image: PDFImage | null; caption: string };
+
+/** The receipts grid: a full page holds 2 rows of about 255 × 340 pt photos plus a 2-line caption each. */
+const GRID = (() => {
+  const header = 24;
+  const gap = 12;
+  const rows = 2;
+  return { cols: 2, rows, gap, header, rowH: (A4.h - 2 * M - header - (rows - 1) * gap) / rows, caption: 24, captionSize: 7.5, captionLine: 9.5, tall: 2.2 };
+})();
+
+/** Where each receipt goes: page, row, column and how many rows it spans. Row by row in the given order (never
+ * reordered); a photo taller than 1:2.2 takes the next column with both rows free, so the grid may leave a hole
+ * rather than move it ahead of later ones. The first page may have only `firstRows` rows (under the signatures). */
+export function layoutReceipts(
+  images: readonly ({ width: number; height: number } | null)[],
+  firstRows: number = GRID.rows,
+): { page: number; row: number; col: number; span: number }[] {
+  const out: { page: number; row: number; col: number; span: number }[] = [];
+  let page = 0;
+  let rows = Math.max(1, Math.min(GRID.rows, firstRows));
+  let taken = new Set<number>();
+  let cursor = 0;
+  const next = () => {
+    page++;
+    rows = GRID.rows;
+    taken = new Set();
+    cursor = 0;
+  };
+  for (const img of images) {
+    const tall = !!img && img.height > img.width * GRID.tall;
+    if (tall) {
+      while (cursor < GRID.cols * rows && taken.has(cursor)) cursor++;
+      if (rows < 2 || cursor >= GRID.cols) next();
+      const col = cursor;
+      taken.add(col).add(GRID.cols + col);
+      out.push({ page, row: 0, col, span: 2 });
+      cursor = col + 1;
+      continue;
+    }
+    while (cursor < GRID.cols * rows && taken.has(cursor)) cursor++;
+    if (cursor >= GRID.cols * rows) next();
+    taken.add(cursor);
+    out.push({ page, row: Math.floor(cursor / GRID.cols), col: cursor % GRID.cols, span: 1 });
+    cursor++;
+  }
+  return out;
+}
+
+async function embedImage(doc: PDFDocument, img: { bytes: Uint8Array; mime: string } | null): Promise<PDFImage | null> {
+  try {
+    if (img?.mime === "image/jpeg") return await doc.embedJpg(img.bytes);
+    if (img?.mime === "image/png") return await doc.embedPng(img.bytes);
+  } catch {
+    // A broken file prints as "could not be included" instead of failing the report.
+  }
+  return null;
+}
+
+/** 2026-10-12 as "12 Okt 2026". */
+function shortDate(day: string): string {
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+  const [y, m, d] = day.split("-").map(Number) as [number, number, number];
+  return `${d} ${MONTHS[m - 1] ?? ""} ${y}`;
+}
 
 /** Standard PDF fonts only know WinAnsi: anything else (emoji, CJK) becomes "?" instead of failing the report. */
 function safeText(font: PDFFont, text: string, cache: Map<string, boolean>): string {
@@ -246,42 +312,11 @@ export async function claimPdf(s: ClaimSnapshot, loadImage: ImageLoader): Promis
   });
   y -= 100;
 
-  // ---- appendix: one page per photo
+  // ---- items without a receipt, under the signatures (before the photos so it rarely needs a page of its own)
   const missing = s.items.filter((i) => !i.attachmentIds.length);
-  let photos = 0;
-  for (const item of s.items) {
-    for (const [n, id] of item.attachmentIds.entries()) {
-      const img = await loadImage(id).catch(() => null);
-      let embedded: PDFImage | null = null;
-      try {
-        if (img?.mime === "image/jpeg") embedded = await doc.embedJpg(img.bytes);
-        else if (img?.mime === "image/png") embedded = await doc.embedPng(img.bytes);
-      } catch {
-        embedded = null;
-      }
-      newPage();
-      photos++;
-      text(page, `LAMPIRAN ${item.no}${item.attachmentIds.length > 1 ? `.${n + 1}` : ""} · Bukti / Receipt`, M, y - 12, 11, fonts.bold);
-      text(page, `${longDate(item.date)} · ${item.merchant} · ${money(item.amount)}`, M, y - 26, 9, fonts.regular, MUTED);
-      text(page, wrap(fonts.regular, 8.5, T(item.description), A4.w - 2 * M, 1)[0]!, M, y - 38, 8.5, fonts.regular, MUTED);
-      y -= 50;
-      if (!embedded) {
-        text(page, "Foto tidak dapat ditampilkan / The photo could not be included.", M, y - 14, 9, fonts.italic, MUTED);
-        continue;
-      }
-      const maxW = A4.w - 2 * M;
-      const maxH = y - M - 20;
-      const scale = Math.min(maxW / embedded.width, maxH / embedded.height, 1.5);
-      const w = embedded.width * scale;
-      const h = embedded.height * scale;
-      page.drawImage(embedded, { x: M + (maxW - w) / 2, y: y - h, width: w, height: h });
-    }
-  }
   if (missing.length) {
-    if (!photos) {
-      ensure(40);
-      y -= 6;
-    } else newPage();
+    ensure(40);
+    y -= 6;
     text(page, "Item tanpa bukti / Items without a receipt", M, y - 12, 10, fonts.bold);
     y -= 26;
     for (const item of missing) {
@@ -289,10 +324,71 @@ export async function claimPdf(s: ClaimSnapshot, loadImage: ImageLoader): Promis
       text(page, wrap(fonts.regular, 8.5, T(`${item.no}. ${item.date} · ${item.merchant} · ${money(item.amount)} — tanpa bukti`), A4.w - 2 * M, 1)[0]!, M, y, 8.5);
       y -= 12;
     }
+    y -= 10;
   }
 
+  // ---- appendix: the receipt photos in a grid, in table order
+  const embeddedById = new Map<string, PDFImage | null>();
+  const photos: Photo[] = [];
+  for (const item of s.items) {
+    for (const [n, id] of item.attachmentIds.entries()) {
+      if (!embeddedById.has(id)) embeddedById.set(id, await embedImage(doc, await loadImage(id).catch(() => null)));
+      const image = embeddedById.get(id) ?? null;
+      const part = item.attachmentIds.length > 1 ? ` (${n + 1}/${item.attachmentIds.length})` : "";
+      photos.push({ image, caption: `${item.no}${part} · ${shortDate(item.date)} · ${item.merchant} · ${money(item.amount)}` });
+    }
+  }
+  const headed: { page: PDFPage; top: number }[] = [];
+  if (photos.length) {
+    // The signature block leaves 12 pt under its last line; the receipts may start just under it, but only when a full
+    // grid row fits there (a smaller photo would be hard to read).
+    if (!missing.length) y += 8;
+    const underSignatures = photos.length < GRID.cols * GRID.rows && y - GRID.header - GRID.rowH >= M;
+    const slots = layoutReceipts(
+      photos.map((p) => p.image),
+      underSignatures ? Math.min(GRID.rows, Math.floor((y - GRID.header - M + GRID.gap) / (GRID.rowH + GRID.gap))) : GRID.rows,
+    );
+    let current = -1;
+    let top = 0;
+    for (const [i, slot] of slots.entries()) {
+      if (slot.page !== current) {
+        if (!(slot.page === 0 && underSignatures)) newPage();
+        current = slot.page;
+        headed.push({ page, top: y });
+        top = y - GRID.header;
+      }
+      const cellW = (A4.w - 2 * M - GRID.gap) / 2;
+      const cellH = slot.span * GRID.rowH + (slot.span - 1) * GRID.gap;
+      const x = M + slot.col * (cellW + GRID.gap);
+      const cellTop = top - slot.row * (GRID.rowH + GRID.gap);
+      const photo = photos[i]!;
+      // The photo and its caption as one block, centred in the cell.
+      const lines = wrap(fonts.regular, GRID.captionSize, T(photo.caption), cellW, 2);
+      const boxH = cellH - GRID.caption;
+      const scale = photo.image ? Math.min(cellW / photo.image.width, boxH / photo.image.height, 1) : 1;
+      const w = photo.image ? photo.image.width * scale : cellW;
+      const h = photo.image ? photo.image.height * scale : Math.min(boxH, 120);
+      const blockH = h + 4 + lines.length * GRID.captionLine;
+      const iy = cellTop - (cellH - blockH) / 2 - h;
+      const ix = x + (cellW - w) / 2;
+      if (photo.image) page.drawImage(photo.image, { x: ix, y: iy, width: w, height: h });
+      page.drawRectangle({ x: ix, y: iy, width: w, height: h, borderColor: RULE, borderWidth: 0.5 });
+      if (!photo.image) {
+        wrap(fonts.italic, 8, "Foto tidak dapat ditampilkan / The photo could not be included.", cellW - 16).forEach((l, j) =>
+          text(page, l, x + 8, iy + h / 2 - j * 10, 8, fonts.italic, MUTED),
+        );
+      }
+      lines.forEach((l, j) => text(page, l, x + (cellW - fonts.regular.widthOfTextAtSize(l, GRID.captionSize)) / 2, iy - 4 - GRID.captionSize - j * GRID.captionLine + 1, GRID.captionSize));
+    }
+  }
   // ---- footers
   const pages = doc.getPages();
+  for (const { page: p, top } of headed) {
+    const n = pages.indexOf(p) + 1;
+    text(p, "Lampiran bukti / Receipts", M, top - 12, 11, fonts.bold);
+    right(p, `No. ${s.number} · Halaman ${n} / ${pages.length}`, A4.w - M, top - 12, 8.5, fonts.regular, MUTED);
+    p.drawLine({ start: { x: M, y: top - 18 }, end: { x: A4.w - M, y: top - 18 }, thickness: 0.8, color: RULE });
+  }
   pages.forEach((p, i) => {
     text(p, `JoyoArto · ${s.number} · ${s.company}`, M, 20, 7, fonts.regular, MUTED);
     right(p, `Halaman ${i + 1} / ${pages.length}`, A4.w - M, 20, 7, fonts.regular, MUTED);
