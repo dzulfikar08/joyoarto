@@ -175,6 +175,7 @@
         }
       ],
       "react-native-edge-to-edge",
+      "./plugins/with-optional-hardware",
       [
         "expo-share-intent",
         {
