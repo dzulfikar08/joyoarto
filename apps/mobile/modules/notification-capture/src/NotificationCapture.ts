@@ -10,6 +10,8 @@ export type InboxItem = {
   title: string;
   text: string;
   simulated: boolean;
+  /** Notification.when (epoch ms): the same for updates and re-alerts of one notification. 0 or missing = unknown. */
+  shownAt?: number;
 };
 
 type NativeModule = {

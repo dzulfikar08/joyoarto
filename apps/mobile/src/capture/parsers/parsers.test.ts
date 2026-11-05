@@ -47,6 +47,10 @@ describe("time", () => {
     expect(occurredAtOf("pada 04/11/2026 10:21 WIB", postedAt)).toBe("2026-11-04T03:21:00.000Z");
     expect(occurredAtOf("4 Nov 2026 09.05", postedAt)).toBe("2026-11-04T02:05:00.000Z");
   });
+  test("a time printed before the date", () => {
+    expect(occurredAtOf("Pembayaran pukul 10.21 tgl 04/11/2026", postedAt)).toBe("2026-11-04T03:21:00.000Z");
+    expect(occurredAtOf("Rp25.000 pada 04/11/2026", postedAt)).toBe("2026-11-04T05:00:00.000Z");
+  });
   test("no date, or a date far away (a due date), uses the post time", () => {
     expect(occurredAtOf("Pembayaran berhasil", postedAt)).toBe(new Date(postedAt).toISOString());
     expect(occurredAtOf("jatuh tempo 25/12/2026", postedAt)).toBe(new Date(postedAt).toISOString());

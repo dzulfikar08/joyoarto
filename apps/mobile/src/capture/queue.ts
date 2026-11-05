@@ -10,13 +10,19 @@ export type CaptureStatus =
   | "queued"
   | "sending"
   | "sent"
-  /** Will retry (network/server) when retryAt is set; otherwise needs a fix (bad request, signed out). */
+  /** Will retry (network/server) when retryAt is set; otherwise needs a fix (bad request). */
   | "failed"
   | "ignored";
 
 export type CaptureItem = {
   /** The native inbox id: notification key + posted time. */
   id: string;
+  /** The notification's key (sbn.key); missing on items queued before it was stored (then read from id). */
+  key?: string;
+  /** Notification.when, when the listener reported it. */
+  shownAt?: number;
+  /** Idempotency key sent with the quick add; missing on older items (then derived from id). */
+  clientRef?: string;
   packageName: string;
   source: SourceId;
   postedAt: number;
@@ -33,6 +39,8 @@ export type CaptureItem = {
   attempts: number;
   retryAt?: number;
   lastError?: string;
+  /** Queued but held: the server refused the sign-in. Sent again after the same account signs in. */
+  pausedForSignIn?: boolean;
   transactionId?: string;
   /** What the server saved, for the list. */
   sentDisplay?: string;
@@ -40,12 +48,29 @@ export type CaptureItem = {
   sentCategory?: string | null;
 };
 
-export type InboxItem = { id: string; packageName: string; key: string; postedAt: number; title: string; text: string; simulated: boolean };
+export type InboxItem = { id: string; packageName: string; key: string; postedAt: number; title: string; text: string; simulated: boolean; shownAt?: number };
 
 export type IngestOptions = { accountBySource: Partial<Record<SourceId, string>>; autoSendLowConfidence: boolean };
 
-const DUPLICATE_WINDOW_MS = 2 * 60_000;
 export const MAX_ITEMS = 500;
+
+/** The notification key of a queue item (older items only have it inside the id, "key|postTime"). */
+export function keyOf(item: Pick<CaptureItem, "id" | "key">): string {
+  if (item.key) return item.key;
+  const bar = item.id.lastIndexOf("|");
+  return bar > 0 ? item.id.slice(0, bar) : item.id;
+}
+
+/**
+ * The same notification shown again: an update or re-alert keeps the app, the key, Notification.when and the text,
+ * however much later it comes. A new payment with the same wording gets a new when (or a new key), so two identical
+ * coffees two minutes apart are two captures. Without a when (older items), key and text decide.
+ */
+function isRepeat(o: CaptureItem, n: InboxItem): boolean {
+  if (o.packageName !== n.packageName || o.title !== n.title || o.text !== n.text) return false;
+  if (keyOf(o) !== (n.key || keyOf({ id: n.id }))) return false;
+  return !o.shownAt || !n.shownAt || o.shownAt === n.shownAt;
+}
 
 /** Turns inbox items into queue items: parse, skip repeats, pick the status and the default account. */
 export function ingest(items: CaptureItem[], inbox: InboxItem[], opts: IngestOptions): CaptureItem[] {
@@ -56,10 +81,15 @@ export function ingest(items: CaptureItem[], inbox: InboxItem[], opts: IngestOpt
     ids.add(n.id);
     const result = parseNotification(n);
     const source = sourceForPackage(n.packageName)?.id ?? (result.ok ? result.capture.source : "other");
-    // Apps repost the same notification (update, re-alert): same app and text within two minutes is one capture.
-    const repeat = out.find((o) => o.packageName === n.packageName && o.text === n.text && o.title === n.title && Math.abs(o.postedAt - n.postedAt) < DUPLICATE_WINDOW_MS);
+    // Apps repost the same notification (update, re-alert): skip it; the queue (MAX_ITEMS) is the history.
+    if (out.some((o) => isRepeat(o, n))) continue;
+    const key = n.key || keyOf({ id: n.id });
+    const shownAt = n.shownAt || undefined;
     const item: CaptureItem = {
       id: n.id,
+      key,
+      shownAt,
+      clientRef: notificationRef(key, shownAt, n.title, n.text),
       packageName: n.packageName,
       source,
       postedAt: n.postedAt,
@@ -71,10 +101,7 @@ export function ingest(items: CaptureItem[], inbox: InboxItem[], opts: IngestOpt
       edits: {},
       attempts: 0,
     };
-    if (repeat) {
-      item.status = "ignored";
-      item.ignoredReason = "repeat of an earlier notification";
-    } else if (!result.ok) {
+    if (!result.ok) {
       item.status = "ignored";
       item.ignoredReason = result.ignored;
     } else if (result.capture.confidence === "low" && !opts.autoSendLowConfidence) {
@@ -97,7 +124,7 @@ export function trim(items: CaptureItem[]): CaptureItem[] {
 
 export function due(items: CaptureItem[], now: number): CaptureItem[] {
   return items
-    .filter((i) => i.status === "queued" || (i.status === "failed" && i.retryAt !== undefined && i.retryAt <= now))
+    .filter((i) => sendable(i, now, false))
     .sort((a, b) => a.postedAt - b.postedAt);
 }
 
@@ -106,10 +133,23 @@ export function backoffMs(attempts: number): number {
   return Math.min(30_000 * 2 ** Math.max(0, attempts - 1), 6 * 3_600_000);
 }
 
-/** clientRef: the notification key plus its posted time, hashed when that is longer than the server's 100 chars. */
-export function clientRefOf(item: Pick<CaptureItem, "id">): string {
-  const ref = `notif:${item.id}`;
-  return ref.length <= 100 ? ref : `notif:h${fnv1a(item.id)}:${item.id.slice(-40)}`;
+/**
+ * clientRef: the notification key, its Notification.when and a hash of the text. A repost of the same notification
+ * gives the same ref (the server keeps one transaction); its posted time is left out because a repost changes it.
+ */
+export function notificationRef(key: string, shownAt: number | undefined, title: string, text: string): string {
+  return fitRef(`${key}|${shownAt ?? ""}|${fnv1a(`${title}\n${text}`)}`);
+}
+
+/** The stored ref; items queued before refs were stored keep the old id-based one (it may already be on the server). */
+export function clientRefOf(item: Pick<CaptureItem, "id" | "clientRef">): string {
+  return item.clientRef ?? fitRef(item.id);
+}
+
+/** "notif:" + the ref, hashed when longer than the server's 100 chars. */
+function fitRef(raw: string): string {
+  const ref = `notif:${raw}`;
+  return ref.length <= 100 ? ref : `notif:h${fnv1a(raw)}:${raw.slice(-40)}`;
 }
 
 function fnv1a(s: string): string {
@@ -185,6 +225,28 @@ export function applyOutcome(item: CaptureItem, outcome: SendOutcome, now: numbe
     lastError: outcome.message,
     retryAt: outcome.retryable ? now + backoffMs(attempts) : undefined,
   };
+}
+
+/** May this item be sent now? Checked again right before sending, since the user can ignore or edit mid-run. */
+export function sendable(item: CaptureItem | undefined, now: number, forced: boolean): item is CaptureItem {
+  if (!item || item.pausedForSignIn) return false;
+  if (item.status === "queued") return true;
+  if (item.status !== "failed") return false;
+  return forced || (item.retryAt !== undefined && item.retryAt <= now);
+}
+
+/** The server refused the sign-in: back to the queue, held until someone signs in again. Not counted as an attempt. */
+export function pauseForSignIn(item: CaptureItem): CaptureItem {
+  return { ...item, status: "queued", pausedForSignIn: true, retryAt: undefined, lastError: "Waiting for you to sign in again." };
+}
+
+/** After the same account signs in again: everything held (and anything an older version failed with a 401) goes. */
+export function resumeAfterSignIn(items: CaptureItem[]): CaptureItem[] {
+  return items.map((i) =>
+    i.pausedForSignIn || (i.status === "failed" && !i.retryAt && i.lastError?.startsWith("The token was not accepted"))
+      ? { ...i, status: "queued", pausedForSignIn: undefined, retryAt: undefined, lastError: undefined }
+      : i,
+  );
 }
 
 export function counts(items: CaptureItem[]) {

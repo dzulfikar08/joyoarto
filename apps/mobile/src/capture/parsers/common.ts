@@ -35,23 +35,73 @@ export function amountToMinor(num: string, suffix?: string): number | null {
   return Math.round(major * 100);
 }
 
+/** Never a completed transaction, wherever it appears (outside a free-text note). */
 const NOT_A_TRANSACTION: [RegExp, string][] = [
   [/\b(OTP|kode verifikasi|kode rahasia|verification code)\b/i, "verification code"],
   [/\b(gagal|dibatalkan|ditolak|failed|declined|tidak berhasil)\b/i, "failed or cancelled"],
   [/\b(menunggu pembayaran|segera bayar|jatuh tempo|tagihan .* akan)\b/i, "reminder, not a payment"],
-  [/\bcashback\b/i, "cashback"],
-  [/\b(promo|diskon|voucher|hemat|gratis ongkir|s\.?d\.?|hingga|up to|maks\.?)\b/i, "promotion"],
 ];
 
-/** A reason when the text is clearly not a completed transaction. Promo words only count without a success word. */
-export function notATransaction(text: string): string | null {
-  const done = /\b(berhasil|sukses|diterima|masuk|terkirim|telah dibayar|udah dikirim|sudah dikirim)\b/i.test(text);
-  for (const [re, why] of NOT_A_TRANSACTION) {
-    if (!re.test(text)) continue;
-    if (why === "promotion" && done) continue;
-    return why;
+/** Rewards and adverts. A sentence with one of these is dropped; what is left must still be a finished transaction. */
+const REWARD: [RegExp, string][] = [
+  [/\bcashback\b/i, "cashback"],
+  [/\bGoPay Coins\b/i, "GoPay Coins"],
+  [/\b(promo|diskon|voucher|hemat|gratis ongkir|s\.?d\.?|hingga|up to|maks\.?)(?=\s|$|[^\w])/i, "promotion"],
+];
+
+/** A word saying the money already moved. */
+const DONE = /\b(berhasil|sukses|diterima|menerima|masuk|terkirim|dikirim|dibayarkan|telah dibayar|bertambah|received|successful)\b/i;
+/** A payment, transfer or receipt verb: a reward sentence with one of these plus DONE is the transaction itself. */
+const MOVE = /\b(pembayaran|bayar|transfer|kirim|dikirim|terkirim|menerima|top ?up|tarik tunai|pembelian|autodebit|auto debit|dibayarkan)\b/i;
+/** Free text the sender typed ("Pesan: makan siang hemat") runs to the end of the notification. */
+const NOTE = /\b(?:pesan|catatan|berita|keterangan|deskripsi|note|message)\s*:/i;
+/** Sentence ends, but not inside "s.d." or "maks.". */
+const SENTENCE_END = /(?<!\bs\.d|\bmaks|\bs\/d)[.!?]+(?:\s+|$)/i;
+
+export type Classified = { ignored: string } | { text: string };
+
+/**
+ * Decides whether the text is a finished transaction, and returns the part to parse: reward and promo sentences
+ * ("Kamu dapat cashback Rp2.500!") are cut so their amounts do not compete. A notification that is only a reward or
+ * an advert is ignored with the reason. The sender's note is never read for these rules.
+ */
+export function classify(text: string): Classified {
+  const note = NOTE.exec(text);
+  const core = note ? text.slice(0, note.index) : text;
+  const tail = note ? text.slice(note.index) : "";
+  for (const [re, why] of NOT_A_TRANSACTION) if (re.test(core)) return { ignored: why };
+  let reason: string | null = null;
+  const kept: string[] = [];
+  for (const sentence of splitSentences(core)) {
+    const hit = REWARD.find(([re]) => re.test(sentence));
+    if (hit && !(MOVE.test(sentence) && DONE.test(sentence))) {
+      reason ??= hit[1];
+      continue;
+    }
+    kept.push(sentence);
   }
-  return null;
+  if (!reason) return { text };
+  const rest = kept.join(" ");
+  if (DONE.test(rest) && findAmounts(rest).length) return { text: `${rest} ${tail}`.trim() };
+  return { ignored: reason };
+}
+
+function splitSentences(text: string): string[] {
+  const out: string[] = [];
+  let rest = text;
+  for (let m = SENTENCE_END.exec(rest); m && m[0].length; m = SENTENCE_END.exec(rest)) {
+    const end = m.index + m[0].length;
+    out.push(rest.slice(0, end).trim());
+    rest = rest.slice(end);
+  }
+  if (rest.trim()) out.push(rest.trim());
+  return out.filter(Boolean);
+}
+
+/** A reason when the text is clearly not a completed transaction. */
+export function notATransaction(text: string): string | null {
+  const c = classify(text);
+  return "ignored" in c ? c.ignored : null;
 }
 
 const IN_WORDS = /\b(menerima|diterima|uang masuk|dana masuk|masuk ke|bertambah|refund|dikembalikan|pengembalian|top ?up berhasil|kamu dapat transfer|received)\b/i;
@@ -127,12 +177,21 @@ export function occurredAtOf(text: string, postedAt: number): string {
   if (num) [d, mo, y] = [Number(num[1]), Number(num[2]), Number(num[3])];
   else if (named && MONTHS[named[2]!.toLowerCase()]) [d, mo, y] = [Number(named[1]), MONTHS[named[2]!.toLowerCase()], Number(named[3])];
   if (!y || !mo || !d || mo > 12 || d > 31) return new Date(postedAt).toISOString();
-  const time = /\b(\d{1,2})[:.](\d{2})(?::\d{2})?\s*(?:WIB)?\b/.exec(text.slice((num ?? named)!.index));
-  const [hh, mm] = time ? [Number(time[1]), Number(time[2])] : [12, 0];
+  // The time after the date ("04/11/2026 10:21"), else one before it ("pukul 10.21 tgl 04/11/2026").
+  const at = (num ?? named)!.index;
+  const [hh, mm] = timeIn(text.slice(at)) ?? timeIn(text.slice(0, at)) ?? [12, 0];
   const iso = new Date(Date.UTC(y, mo - 1, d, hh - 7, mm));
   // A printed date far from the post time is more likely a due date or a typo than the transaction.
   if (Number.isNaN(iso.getTime()) || Math.abs(iso.getTime() - postedAt) > 3 * 86_400_000) return new Date(postedAt).toISOString();
   return iso.toISOString();
+}
+
+/** "10:21", "10.21 WIB", "10:21:05"; not part of an amount ("Rp25.000"), a date or a longer number. */
+const TIME = /(?<![\d.,/-])([01]?\d|2[0-3])[:.]([0-5]\d)(?::[0-5]\d)?(?![\d.,/-]?\d)/;
+
+function timeIn(text: string): [number, number] | null {
+  const m = TIME.exec(text);
+  return m ? [Number(m[1]), Number(m[2])] : null;
 }
 
 /** The shared core: given a source label and its success patterns, build a ParseResult. */
@@ -141,10 +200,11 @@ export function parseWith(
   source: "jago" | "gopay" | "other",
   opts: { known: RegExp[]; ignore?: [RegExp, string][] },
 ): ParseResult {
-  const text = `${n.title}. ${n.text}`.replace(/\s+/g, " ").trim();
-  for (const [re, why] of opts.ignore ?? []) if (re.test(text)) return { ok: false, ignored: why };
-  const not = notATransaction(text);
-  if (not) return { ok: false, ignored: not };
+  const full = `${n.title}. ${n.text}`.replace(/\s+/g, " ").trim();
+  for (const [re, why] of opts.ignore ?? []) if (re.test(full)) return { ok: false, ignored: why };
+  const classified = classify(full);
+  if ("ignored" in classified) return { ok: false, ignored: classified.ignored };
+  const text = classified.text;
   const amounts = findAmounts(text);
   if (!amounts.length) return { ok: false, ignored: "no amount" };
 
@@ -171,7 +231,7 @@ export function parseWith(
       amountText: amount.text,
       amountMinor: amount.minor,
       counterparty,
-      occurredAt: occurredAtOf(text, n.postedAt),
+      occurredAt: occurredAtOf(full, n.postedAt),
       confidence: doubts.length ? "low" : "high",
       doubts,
     },

@@ -4,6 +4,7 @@
 
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
+import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
 import type { IdTokenSignIn } from "./social-auth";
@@ -15,6 +16,26 @@ export async function appleSignInAvailable(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+type AppleName = { firstName?: string; lastName?: string };
+
+const PENDING_NAME_KEY = "joyoarto.appleName";
+
+/** The kept name, only for the same Apple ID (credential.user is stable per app). */
+async function pendingAppleName(user: string): Promise<AppleName | null> {
+  try {
+    const raw = await SecureStore.getItemAsync(PENDING_NAME_KEY);
+    const v = raw ? (JSON.parse(raw) as AppleName & { user?: string }) : null;
+    return v && v.user === user && (v.firstName || v.lastName) ? { firstName: v.firstName || undefined, lastName: v.lastName || undefined } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** After a successful Apple sign-in: the server has the name now. */
+export function clearPendingAppleName() {
+  return SecureStore.deleteItemAsync(PENDING_NAME_KEY).catch(() => undefined);
 }
 
 /** The Apple sheet. null = the person closed it. Throws on other failures. */
@@ -29,12 +50,12 @@ export async function requestAppleIdToken(): Promise<Omit<IdTokenSignIn, "server
     });
     if (!credential.identityToken) throw new Error("Apple returned no identity token.");
     const { givenName, familyName } = credential.fullName ?? {};
-    return {
-      provider: "apple",
-      idToken: credential.identityToken,
-      nonce: rawNonce,
-      ...(givenName || familyName ? { name: { firstName: givenName ?? undefined, lastName: familyName ?? undefined } } : {}),
-    };
+    let name: AppleName | null = givenName || familyName ? { firstName: givenName ?? undefined, lastName: familyName ?? undefined } : null;
+    // Apple sends the name only the first time. Keep it until a sign-in succeeds, so a failed first exchange (an
+    // invite-only server, no connection) does not lose it.
+    if (name) await SecureStore.setItemAsync(PENDING_NAME_KEY, JSON.stringify({ user: credential.user, ...name })).catch(() => undefined);
+    else name = await pendingAppleName(credential.user);
+    return { provider: "apple", idToken: credential.identityToken, nonce: rawNonce, ...(name ? { name } : {}) };
   } catch (e) {
     const code = typeof e === "object" && e !== null && "code" in e ? (e as { code: unknown }).code : undefined;
     if (code === "ERR_REQUEST_CANCELED" || code === "ERR_CANCELED") return null;

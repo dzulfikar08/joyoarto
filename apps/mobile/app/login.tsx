@@ -12,7 +12,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { BrandMark } from "@/components/brand";
 import { Button, Card, Field, Row, Text } from "@/components/ui";
 import { createApi, DEFAULT_SERVER, looksLikeToken, requestDemoToken } from "@/src/lib/api";
-import { appleSignInAvailable, requestAppleIdToken } from "@/src/lib/apple-sign-in";
+import { appleSignInAvailable, clearPendingAppleName, requestAppleIdToken } from "@/src/lib/apple-sign-in";
 import { signIn, signInWithIdToken } from "@/src/lib/auth";
 import { signInWithNativeGoogle } from "@/src/lib/google-native";
 import { nativeGoogleAvailable, requestGoogleIdToken } from "@/src/lib/google-native-device";
@@ -64,6 +64,7 @@ export default function Login() {
       const token = await requestAppleIdToken();
       if (!token) return;
       await signInWithIdToken({ ...token, server: normalize(server) });
+      void clearPendingAppleName();
       done();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
