@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { readProcedure, sessionProcedure, writeProcedure } from "../index";
+import { readProcedure, sessionProcedure } from "../index";
 import { refuseDemo } from "../lib/demo";
 import * as account from "../services/account";
 import * as household from "../services/household";
@@ -8,8 +8,9 @@ import * as household from "../services/household";
 const tags = ["household"];
 
 /**
- * Family households: members, invites and which household is active. Inviting needs a browser session (a leaked
- * token must not be able to invite its holder in); owner-only checks live in the service.
+ * Family households: members, invites and which household is active. Every change needs a signed-in session (the web
+ * app's cookie or the phone app's session bearer), never a `brk_` token or AI connection: a leaked token must not be
+ * able to invite its holder in, move members around or switch households. Owner-only checks live in the service.
  */
 export const householdRouter = {
   get: readProcedure
@@ -20,7 +21,7 @@ export const householdRouter = {
       summary: "The active household: name, your role, members, pending invites (owners)",
     })
     .handler(({ context }) => household.householdInfo(context.db, context.principal)),
-  rename: writeProcedure
+  rename: sessionProcedure
     .route({
       method: "PATCH",
       path: "/household",
@@ -32,7 +33,7 @@ export const householdRouter = {
   list: readProcedure
     .route({ method: "GET", path: "/households", tags, summary: "Every household you belong to" })
     .handler(({ context }) => household.listHouseholds(context.db, context.principal)),
-  switch: writeProcedure
+  switch: sessionProcedure
     .route({
       method: "PUT",
       path: "/households/active",
@@ -53,7 +54,7 @@ export const householdRouter = {
       refuseDemo(context.principal.userId, "deleteHousehold");
       return account.deleteHousehold(context.db, context.principal, input, context.files);
     }),
-  leave: writeProcedure
+  leave: sessionProcedure
     .route({
       method: "POST",
       path: "/household/leave",
@@ -66,7 +67,7 @@ export const householdRouter = {
     }),
 
   members: {
-    setRole: writeProcedure
+    setRole: sessionProcedure
       .route({
         method: "PATCH",
         path: "/household/members/{userId}",
@@ -75,7 +76,7 @@ export const householdRouter = {
       })
       .input(household.memberRoleInput)
       .handler(({ context, input }) => household.setMemberRole(context.db, context.principal, input)),
-    remove: writeProcedure
+    remove: sessionProcedure
       .route({
         method: "DELETE",
         path: "/household/members/{userId}",
@@ -99,7 +100,7 @@ export const householdRouter = {
         refuseDemo(context.principal.userId, "invite");
         return household.createInvite(context.db, context.principal, input, context.billing);
       }),
-    revoke: writeProcedure
+    revoke: sessionProcedure
       .route({
         method: "DELETE",
         path: "/household/invites/{id}",
@@ -117,7 +118,7 @@ export const householdRouter = {
       })
       .input(household.tokenInput)
       .handler(({ context, input }) => household.previewInvite(context.db, context.principal, input)),
-    accept: writeProcedure
+    accept: sessionProcedure
       .route({
         method: "POST",
         path: "/household/invites/accept",
