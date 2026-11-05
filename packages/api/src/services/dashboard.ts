@@ -20,6 +20,7 @@ import {
 import { listAccounts } from "./accounts";
 import { baseCurrency, categoriesById, money, month } from "./common";
 import { budgetStatus, cashflow, currentMonth, kindExpr, shiftMonth, topSlug } from "./reports";
+import { openSummary } from "./reimburse";
 
 const t = schema.transaction;
 const c = schema.category;
@@ -51,7 +52,7 @@ export async function dashboard(db: Database, p: Principal, input: z.infer<typeo
   const inRange = (from: string, to: string) =>
     and(eq(t.householdId, p.householdId), eq(t.currency, cur$), gte(t.date, from), lte(t.date, to));
 
-  const [daily, byCategory, merchants, uncategorized, pending, flow, budgets, accounts, cats] = await Promise.all([
+  const [daily, byCategory, merchants, uncategorized, pending, flow, budgets, accounts, cats, reimburse] = await Promise.all([
     db
       .select({ date: t.date, kind: kindExpr, total: sql<number>`sum(${t.amount})` })
       .from(t)
@@ -98,6 +99,7 @@ export async function dashboard(db: Database, p: Principal, input: z.infer<typeo
     budgetStatus(db, p, { month: mo }),
     listAccounts(db, p),
     categoriesById(db, p.householdId),
+    openSummary(db, p.householdId),
   ]);
 
   const sumKind = (m: string, kind: string, upTo: number) =>
@@ -187,6 +189,8 @@ export async function dashboard(db: Database, p: Principal, input: z.infer<typeo
       pendingStale: Number(pending[0]?.stale ?? 0),
       pendingStaleDays: PENDING_STALE_DAYS,
       oldestPending: pending[0]?.oldest ?? null,
+      /** Reimbursable expenses still open (draft = not in a claim yet, submitted = waiting for the employer). */
+      reimburse,
       staleAccounts: staleAccounts(byStatement, today).map((a) => ({
         id: a.id,
         name: a.name,

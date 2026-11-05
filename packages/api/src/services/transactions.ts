@@ -5,7 +5,7 @@ import { and, desc, eq, gte, inArray, isNull, like, lt, lte, or, sql } from "dri
 import type { SQL } from "drizzle-orm";
 import { z } from "zod";
 
-import type { Principal } from "../context";
+import type { FileStore, Principal } from "../context";
 import { counterpartyInText, directionInText, findAmountInText, parseAmountText } from "../lib/amount-text";
 import { addDays, todayWib } from "../lib/dashboard";
 import { chunk } from "../lib/d1";
@@ -26,6 +26,9 @@ import {
   resolveCategory,
 } from "./common";
 import { loadRules } from "./rules";
+import { attachToTransaction, attachmentsByTransaction, purgeTransactionFiles } from "./attachments";
+import type { AttachmentView } from "./attachments";
+import { markReimbursable } from "./reimburse";
 
 const t = schema.transaction;
 
@@ -38,6 +41,12 @@ export const searchInput = z.object({
   q: z.string().max(40).optional().describe("Text in the description, merchant or note"),
   direction: z.enum(["in", "out"]).optional(),
   status: z.enum(["posted", "pending"]).optional().describe("pending = quick-add rows no statement has confirmed yet"),
+  reimburse: z
+    .enum(["any", "open", "draft", "submitted", "paid", "rejected", "payment", "none"])
+    .optional()
+    .describe("Reimbursable (\"Diganti kantor\") expenses: any marked, open = draft or submitted, a status, payment = an employer's payment, none = ordinary rows"),
+  reimburseProfileId: z.string().optional(),
+  hasReceipt: z.boolean().optional().describe("Only rows with (true) or without (false) a receipt photo"),
   minAmount: z.number().int().min(0).optional().describe("Minimum absolute amount, minor units"),
   maxAmount: z.number().int().min(0).optional().describe("Maximum absolute amount, minor units"),
   limit: z.number().int().min(1).max(200).default(50),
@@ -62,6 +71,10 @@ export type TxView = {
   status: "posted" | "pending";
   capturedVia: string | null;
   capturedAt: string | null;
+  /** Reimbursement ("Diganti kantor"); null = an ordinary transaction. */
+  reimburse: { status: "draft" | "submitted" | "paid" | "rejected" | "payment"; profileId: string | null; claimId: string | null } | null;
+  /** Receipt photos (GET /api/attachments/{id}). */
+  attachments: Pick<AttachmentView, "id" | "mime" | "width" | "height">[];
 };
 
 export async function searchTransactions(db: Database, p: Principal, input: z.infer<typeof searchInput>) {
@@ -77,6 +90,15 @@ export async function searchTransactions(db: Database, p: Principal, input: z.in
     where.push(or(like(t.description, pattern), like(t.merchant, pattern), like(t.note, pattern)));
   }
   if (input.status) where.push(eq(t.status, input.status));
+  if (input.reimburse === "any") where.push(inArray(t.reimburseStatus, ["draft", "submitted", "paid", "rejected"]));
+  else if (input.reimburse === "open") where.push(inArray(t.reimburseStatus, ["draft", "submitted"]));
+  else if (input.reimburse === "none") where.push(isNull(t.reimburseStatus));
+  else if (input.reimburse) where.push(eq(t.reimburseStatus, input.reimburse));
+  if (input.reimburseProfileId) where.push(eq(t.reimburseProfileId, input.reimburseProfileId));
+  if (input.hasReceipt !== undefined) {
+    const has = sql`exists (select 1 from attachment where attachment.transaction_id = ${t.id})`;
+    where.push(input.hasReceipt ? has : sql`not ${has}`);
+  }
   if (input.direction === "in") where.push(gte(t.amount, 0));
   if (input.direction === "out") where.push(lt(t.amount, 0));
   if (input.minAmount !== undefined) where.push(gte(sql`abs(${t.amount})`, input.minAmount));
@@ -100,9 +122,10 @@ export async function searchTransactions(db: Database, p: Principal, input: z.in
 }
 
 export async function viewRows(db: Database, householdId: string, rows: (typeof t.$inferSelect)[]): Promise<TxView[]> {
-  const [cats, accounts] = await Promise.all([
+  const [cats, accounts, photos] = await Promise.all([
     categoriesById(db, householdId),
     accountsById(db, householdId, [...new Set(rows.map((r) => r.accountId))]),
+    rows.length ? attachmentsByTransaction(db, householdId, rows.map((r) => r.id)) : new Map<string, AttachmentView[]>(),
   ]);
   return rows.map((r) => {
     const cat = r.categoryId ? cats.get(r.categoryId) : undefined;
@@ -122,6 +145,8 @@ export async function viewRows(db: Database, householdId: string, rows: (typeof 
       status: r.status,
       capturedVia: r.capturedVia,
       capturedAt: r.capturedAt?.toISOString() ?? null,
+      reimburse: r.reimburseStatus ? { status: r.reimburseStatus, profileId: r.reimburseProfileId, claimId: r.reimburseClaimId } : null,
+      attachments: (photos.get(r.id) ?? []).map((x) => ({ id: x.id, mime: x.mime, width: x.width, height: x.height })),
     };
   });
 }
@@ -139,6 +164,7 @@ export const addInput = z.object({
 /** A manual entry (cash, or something the statement has not shown yet). Idempotent like an import row. */
 export async function addTransaction(db: Database, p: Principal, input: z.infer<typeof addInput>) {
   const account = await getAccount(db, p.householdId, input.accountId);
+  if (account.type === "receivable") badRequest("That is a reimbursement account; pick the account that paid.");
   const [key] = await dedupeKeys(account.id, [input]);
   const existing = await db
     .select()
@@ -180,6 +206,8 @@ export const updateInput = z.object({
   amount: z.number().int().refine((v) => v !== 0, "Amount cannot be zero").optional().describe("Pending rows only: signed minor units"),
   description: z.string().min(1).max(500).optional().describe("Pending rows only"),
   accountId: z.string().optional().describe("Pending rows only: move it to another account"),
+  reimbursable: z.boolean().optional().describe("Mark as reimbursable (Diganti kantor) or not; money out only, and not once it is in a claim"),
+  reimburseProfileId: z.string().optional().describe("With reimbursable=true: the company that pays it back (default: the last used)"),
 });
 
 export async function updateTransaction(db: Database, p: Principal, input: z.infer<typeof updateInput>) {
@@ -205,11 +233,17 @@ export async function updateTransaction(db: Database, p: Principal, input: z.inf
     patch.currency = account.currency;
   }
   if (Object.keys(patch).length) await db.update(t).set(patch).where(eq(t.id, row.id));
+  const wantsReimburse = input.reimbursable ?? (input.reimburseProfileId ? true : undefined);
+  if (wantsReimburse !== undefined) {
+    const same = wantsReimburse ? row.reimburseStatus === "draft" && (!input.reimburseProfileId || input.reimburseProfileId === row.reimburseProfileId) : !row.reimburseStatus || row.reimburseStatus === "rejected";
+    if (!same) await markReimbursable(db, p, { ids: [row.id], reimbursable: wantsReimburse, profileId: input.reimburseProfileId });
+  }
   const [fresh] = await db.select().from(t).where(eq(t.id, row.id));
   return (await viewRows(db, p.householdId, [fresh!]))[0]!;
 }
 
-export async function deleteTransaction(db: Database, p: Principal, id: string) {
+export async function deleteTransaction(db: Database, p: Principal, id: string, files?: FileStore) {
+  await purgeTransactionFiles(db, files, p.householdId, [id]);
   const result = await db
     .delete(t)
     .where(and(eq(t.id, id), eq(t.householdId, p.householdId)))
@@ -268,6 +302,9 @@ export const quickAddInput = z.object({
     .max(2000)
     .optional()
     .describe("A bank or e-wallet notification body: amount, direction and merchant are read from it when not given. Never stored."),
+  attachmentIds: z.array(z.string()).max(5).optional().describe("Receipt photos uploaded before (capture.receipt or POST /attachments) to keep with this row"),
+  reimbursable: z.boolean().optional().describe("Money out the employer pays back (Diganti kantor): not counted as household spending"),
+  reimburseProfileId: z.string().optional().describe("With reimbursable: the company; default: the last used profile"),
 });
 
 /** The account with the most transactions (ties: the one used most recently), for captures that do not say. */
@@ -277,7 +314,7 @@ export async function mostUsedAccount(db: Database, householdId: string) {
     .select({ id: a.id })
     .from(a)
     .leftJoin(t, eq(t.accountId, a.id))
-    .where(and(eq(a.householdId, householdId), isNull(a.archivedAt)))
+    .where(and(eq(a.householdId, householdId), isNull(a.archivedAt), sql`${a.type} <> 'receivable'`))
     .groupBy(a.id)
     .orderBy(desc(sql`count(${t.id})`), desc(sql`max(${t.date})`), a.createdAt)
     .limit(1);
@@ -304,6 +341,7 @@ export async function quickAdd(db: Database, p: Principal, input: z.infer<typeof
     if (existing[0]) return { created: false, transaction: (await viewRows(db, p.householdId, existing))[0]! };
   }
   const account = input.accountId ? await getAccount(db, p.householdId, input.accountId) : await mostUsedAccount(db, p.householdId);
+  if (account.type === "receivable") badRequest("That is a reimbursement account; pick the account that paid.");
 
   // rawText is only read here, never saved or logged.
   const raw = input.rawText?.trim() ?? "";
@@ -362,5 +400,10 @@ export async function quickAdd(db: Database, p: Principal, input: z.infer<typeof
   const where = inserted.length ? eq(t.id, id) : and(eq(t.householdId, p.householdId), eq(t.clientRef, input.clientRef ?? ""));
   const rows = await db.select().from(t).where(where);
   if (!rows[0]) badRequest("Could not save the transaction; try again.");
+  if (inserted.length) {
+    await attachToTransaction(db, p.householdId, input.attachmentIds ?? [], id);
+    if (input.reimbursable && amount < 0) await markReimbursable(db, p, { ids: [id], reimbursable: true, profileId: input.reimburseProfileId });
+    if (input.attachmentIds?.length || input.reimbursable) rows.splice(0, 1, ...(await db.select().from(t).where(eq(t.id, id))));
+  }
   return { created: inserted.length > 0, transaction: (await viewRows(db, p.householdId, rows))[0]! };
 }

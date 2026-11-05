@@ -113,6 +113,12 @@ export function describeProposal(tool: string, a: Record<string, unknown>): stri
       return `Budget ${s("category") ?? "?"}: ${a.amount === 0 ? "remove" : `${idr(a.amount) ?? "?"} a month`}`;
     case "save_scenario":
       return `Save scenario "${s("name") ?? "?"}"${typeof a.id === "string" ? " (update)" : ""}`;
+    case "mark_reimbursable": {
+      const n = Array.isArray(a.ids) ? a.ids.length : 0;
+      return `${n} transaction${n === 1 ? "" : "s"} → ${a.reimbursable === false ? "ordinary spending (not reimbursable)" : "reimbursable (diganti kantor)"}`;
+    }
+    case "set_claim_status":
+      return `Claim → ${s("status") ?? "?"}${s("paymentTransactionId") ? " (with the employer's payment)" : ""}${Array.isArray(a.rejectIds) && a.rejectIds.length ? `, ${a.rejectIds.length} item(s) rejected` : ""}`;
     default:
       return tool;
   }
@@ -181,6 +187,12 @@ export function resultLine(tool: string, result: unknown): string {
       return `Rule saved${typeof r.appliedToExisting === "number" ? `, applied to ${r.appliedToExisting} older transactions` : ""}`;
     case "save_scenario":
       return "Scenario saved; it shows on the Plan page";
+    case "mark_reimbursable":
+      return r.profileId ? `${String(r.updated ?? 0)} marked reimbursable` : `${String(r.updated ?? 0)} back to ordinary spending`;
+    case "set_claim_status": {
+      const claim = (r.claim ?? {}) as Record<string, unknown>;
+      return `Claim ${String(claim.number ?? "")} is now ${String(claim.status ?? "updated")}`;
+    }
     default:
       return "Done";
   }

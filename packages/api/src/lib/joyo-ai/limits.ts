@@ -20,7 +20,7 @@ export const CHAT_LIMITS = {
   deadlineMs: 120_000,
 } as const;
 
-export type UsageKind = "chat" | "transcribe" | "parse";
+export type UsageKind = "chat" | "transcribe" | "parse" | "receipt";
 export type UsageEngine = "hosted" | "byok";
 
 const WIB_MS = 7 * 3_600_000;

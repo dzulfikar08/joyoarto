@@ -239,4 +239,15 @@ export const captureRouter = {
     .route({ method: "POST", path: "/capture/parse", tags: ["transactions"], summary: "Free text (\"kopi 25rb gopay\") to a transaction draft to review; saves nothing" })
     .input(capture.parseInput)
     .handler(({ context, input }) => capture.parseCapture(context.db, context.principal, context.ai, input)),
+  receipt: writeProcedure
+    .route({
+      method: "POST",
+      path: "/capture/receipt",
+      tags: ["transactions"],
+      summary: "Receipt photo to a transaction draft (multipart/form-data: image); the photo is kept as an unattached receipt, the draft is not saved",
+      description:
+        "Save the reviewed draft with POST /transactions/quick and attachmentIds: [attachment.id]. ocr.status is ok, off (no AI on this server), cap (today's receipts are used; ocr.upgrade on Free) or failed; the photo is kept in every case.",
+    })
+    .input(capture.receiptInput)
+    .handler(({ context, input }) => capture.receiptCapture(context.db, context.principal, context.ai, context.files, context.billing, input)),
 };

@@ -16,6 +16,7 @@
     "@orpc/client": "catalog:",
     "@orpc/server": "catalog:",
     "drizzle-orm": "catalog:",
+    "pdf-lib": "1.17.1",
     "postal-mime": "^4.2.0",
     "unpdf": "2.1.0",
     "zod": "catalog:"

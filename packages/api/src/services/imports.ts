@@ -3,7 +3,8 @@ import type { Database } from "@baroka/db";
 import { and, desc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { Principal } from "../context";
+import type { FileStore, Principal } from "../context";
+import { purgeTransactionFiles } from "./attachments";
 import { MAPPING_PRESETS, applyMapping, csvMapping, parseCsv } from "../lib/csv";
 import type { ParsedRow, RowError } from "../lib/csv";
 import { addDays } from "../lib/dashboard";
@@ -97,6 +98,9 @@ async function pendingRows(db: Database, householdId: string, accountId: string,
       capturedVia: t.capturedVia,
       capturedAt: t.capturedAt,
       clientRef: t.clientRef,
+      reimburseStatus: t.reimburseStatus,
+      reimburseProfileId: t.reimburseProfileId,
+      reimburseClaimId: t.reimburseClaimId,
     })
     .from(t)
     .where(and(eq(t.householdId, householdId), eq(t.accountId, accountId), eq(t.status, "pending"), gte(t.date, from), lte(t.date, to)));
@@ -218,8 +222,19 @@ export async function importTransactions(db: Database, p: Principal, input: z.in
       .map(({ index, merchantFrom: _m, ...row }) => {
         const pend = replaced.get(index)!;
         return [
-          db.insert(t).values({ ...row, importBatchId: batchId, note: pend.note, capturedVia: pend.capturedVia, capturedAt: pend.capturedAt }),
+          db.insert(t).values({
+            ...row,
+            importBatchId: batchId,
+            note: pend.note,
+            capturedVia: pend.capturedVia,
+            capturedAt: pend.capturedAt,
+            reimburseStatus: pend.reimburseStatus,
+            reimburseProfileId: pend.reimburseProfileId,
+            reimburseClaimId: pend.reimburseClaimId,
+          }),
           db.update(schema.transactionTag).set({ transactionId: row.id }).where(eq(schema.transactionTag.transactionId, pend.id)),
+          // Receipt photos move with it (deleting the pending row would delete them).
+          db.update(schema.attachment).set({ transactionId: row.id }).where(eq(schema.attachment.transactionId, pend.id)),
           db.delete(t).where(and(eq(t.id, pend.id), eq(t.householdId, p.householdId), eq(t.status, "pending"))),
           db.update(t).set({ clientRef: pend.clientRef }).where(eq(t.id, row.id)),
         ] as const;
@@ -357,7 +372,7 @@ export async function listImports(db: Database, p: Principal) {
 }
 
 /** Removes every transaction an import added (to redo it with a better mapping). */
-export async function undoImport(db: Database, p: Principal, batchId: string) {
+export async function undoImport(db: Database, p: Principal, batchId: string, files?: FileStore) {
   const [batch] = await db
     .select()
     .from(schema.importBatch)
@@ -369,6 +384,8 @@ export async function undoImport(db: Database, p: Principal, batchId: string) {
     .set({ status: "pending", importBatchId: null, dedupeKey: sql`'pending:' || ${t.id}`, balanceAfter: null, externalRef: null })
     .where(and(eq(t.importBatchId, batchId), eq(t.householdId, p.householdId), isNotNull(t.capturedAt)))
     .returning({ id: t.id });
+  const doomed = await db.select({ id: t.id }).from(t).where(and(eq(t.importBatchId, batchId), eq(t.householdId, p.householdId)));
+  await purgeTransactionFiles(db, files, p.householdId, doomed.map((d) => d.id));
   const removed = await db.delete(t).where(and(eq(t.importBatchId, batchId), eq(t.householdId, p.householdId))).returning({ id: t.id });
   await db.delete(schema.importBatch).where(eq(schema.importBatch.id, batchId));
   return { removed: removed.length, restoredToPending: restored.length };

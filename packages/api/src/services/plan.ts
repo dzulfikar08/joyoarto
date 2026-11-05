@@ -15,7 +15,7 @@ import { templates as buildTemplates } from "../lib/plan/templates";
 import { listAccounts } from "./accounts";
 import { scenariosByIds } from "./scenarios";
 import { baseCurrency, categoriesById, money, month } from "./common";
-import { currentMonth, kindExpr, topSlug } from "./reports";
+import { currentMonth, kindExpr, ownMoney, topSlug } from "./reports";
 
 const t = schema.transaction;
 const c = schema.category;
@@ -68,7 +68,7 @@ async function computeBaseline(db: Database, p: Principal, input: z.infer<typeof
       .select({ id: t.id, date: t.date, amount: t.amount, description: sql<string>`coalesce(${t.merchant}, ${t.description})`, slug: topSlug })
       .from(t)
       .innerJoin(c, eq(c.id, t.categoryId))
-      .where(and(scope(from), eq(c.kind, "expense"), gte(t.amount, Math.max(1, Math.ceil(opts.outlierMin / 2)))))
+      .where(and(scope(from), ownMoney, eq(c.kind, "expense"), gte(t.amount, Math.max(1, Math.ceil(opts.outlierMin / 2)))))
       .limit(500),
     db
       .select({
@@ -80,7 +80,7 @@ async function computeBaseline(db: Database, p: Principal, input: z.infer<typeof
       })
       .from(t)
       .innerJoin(c, eq(c.id, t.categoryId))
-      .where(and(scope(from), eq(c.kind, "transfer")))
+      .where(and(scope(from), ownMoney, eq(c.kind, "transfer")))
       .groupBy(c.slug, c.name, mo),
     listAccounts(db, p),
     categoriesById(db, p.householdId),

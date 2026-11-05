@@ -15,7 +15,14 @@ const c = schema.category;
  * What a transaction counts as: its category's kind, or by sign when it has none (money out = expense). Transfers
  * between own accounts, top-ups and card payments are never spending or income.
  */
-export const kindExpr = sql<"expense" | "income" | "transfer">`coalesce(${c.kind}, case when ${t.amount} < 0 then 'expense' else 'income' end)`;
+export const kindExpr = sql<"expense" | "income" | "transfer">`case when ${t.reimburseStatus} is not null and ${t.reimburseStatus} <> 'rejected' then 'transfer' else coalesce(${c.kind}, case when ${t.amount} < 0 then 'expense' else 'income' end) end`;
+
+/**
+ * The household's own money: not a reimbursable expense (draft, submitted, paid) nor an employer's payment. Such rows
+ * are transfers into and out of the employer's receivable (services/reimburse.ts); a rejected one is own spending again.
+ * kindExpr already treats them as transfers; queries that read categories directly add this.
+ */
+export const ownMoney = sql`(${t.reimburseStatus} is null or ${t.reimburseStatus} = 'rejected')`;
 export const topSlug = sql<string | null>`case when instr(${c.slug}, '/') > 0 then substr(${c.slug}, 1, instr(${c.slug}, '/') - 1) else ${c.slug} end`;
 
 function firstOfMonth(m: string) {
@@ -200,6 +207,7 @@ export async function budgetStatus(db: Database, p: Principal, input: z.infer<ty
         eq(t.currency, cur),
         gte(t.date, firstOfMonth(mo)),
         lte(t.date, lastOfMonth(mo)),
+        ownMoney,
       ),
     )
     .groupBy(t.categoryId);

@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { Principal } from "../context";
 import { badRequest, getAccount, money } from "./common";
 import { parentSlug } from "../lib/household";
+import { receivableBalances } from "./reimburse";
 
 const a = schema.finAccount;
 const t = schema.transaction;
@@ -30,6 +31,7 @@ export async function listAccounts(db: Database, p: Principal, input: { includeA
     .where(eq(t.householdId, p.householdId))
     .groupBy(t.accountId);
   const by = new Map(stats.map((s) => [s.accountId, s]));
+  const owed = accounts.some((x) => x.type === "receivable") ? await receivableBalances(db, p.householdId) : new Map<string, number>();
   return {
     accounts: accounts.map((acc) => {
       const s = by.get(acc.id);
@@ -42,7 +44,8 @@ export async function listAccounts(db: Database, p: Principal, input: { includeA
         last4: acc.last4,
         archived: acc.archivedAt !== null,
         /** Opening balance plus every recorded transaction (pending ones too); only right once statements cover the whole history. */
-        balance: money(acc.openingBalance + Number(s?.sum ?? 0), acc.currency),
+        /** A receivable (reimbursement) account holds what its employer still owes: the open reimbursable items. */
+        balance: money(acc.openingBalance + Number(s?.sum ?? 0) + (owed.get(acc.id) ?? 0), acc.currency),
         /** What the account held before its first recorded transaction (the edit form starts from it). */
         openingBalance: money(acc.openingBalance, acc.currency),
         transactions: Number(s?.count ?? 0),
