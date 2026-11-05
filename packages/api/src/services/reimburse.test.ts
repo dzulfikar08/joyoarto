@@ -176,8 +176,8 @@ describe("claims", () => {
     expect(pdf.type).toBe("application/pdf");
     const bytes = new Uint8Array(await pdf.arrayBuffer());
     expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
-    // Report page + one receipt page + the "without a receipt" list.
-    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(3);
+    // Report page (with the "without a receipt" list) + the receipts page.
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(2);
 
     const csv = await (await call(r.claims.csv, { id: claim.id }, { context: ctx() })).text();
     expect(csv).toContain(claim.number);
