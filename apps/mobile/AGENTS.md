@@ -78,6 +78,13 @@ iOS compiles and ships through TestFlight. Read the repo's README.md "Mobile app
   `onPress`/`selected`), `Card` (`title`/`subtitle`/`action`), `ListSection` + `ListRow`, `Money` (`signed`: money in green
   with "+"), `Avatar`, `Sheet`, `Skeleton`/`SkeletonCard`/`SkeletonRows`, `EmptyState`, `ErrorState` (`compact` keeps
   cached data visible above it), `toast.success/error` (`src/lib/toast.ts`).
+- Toasts: call `toast.success(title, description?)`, `toast.error` (5 s) or `toast.show` from `src/lib/toast.ts`, never
+  sonner-native directly. `components/ui/toaster.tsx` (`AppToaster`) draws them with sonner-native: top centre, under
+  the header on stack screens, swipe up to dismiss, at most 3. The root one (`app/_layout.tsx`) sits in a
+  FullWindowOverlay on iOS, above modals; on Android every open `Sheet` (a RN `Modal`, its own window) mounts its own
+  host and hands still-showing toasts back to the root one when it closes. Don't add other toast UIs; a new RN `Modal`
+  outside `Sheet` needs the same `pushToastHost` + `<AppToaster id>` pair. sonner-native is JS only (its native peers,
+  gesture-handler pinned at 3.4.0, screens, svg, reanimated, were already in the binary): OTA-safe.
 - Every screen handles loading (skeletons), error (with Try again), empty (with what to do next) and offline (cached data
   plus a compact error).
 - Money: prefer the API's `display` string; else `formatMoney` / `compactMoney` (`src/lib/format.ts`, the web's notation:
