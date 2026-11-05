@@ -1,7 +1,8 @@
 // The add-transaction sheet behind the bottom nav's centre button: say it or type it, review the draft, save it as a
 // pending transaction (transactions.quickAdd, the same as the quick-add box). Voice recording follows JoyoRogo's
 // "Ceritakan" sheet (apps/web/src/components/cerita.tsx): MediaRecorder, at most 60 s, transcribed on the server.
-// Nothing is saved before the member taps Save on the review step.
+// A receipt photo (camera or gallery, shrunk to ~1600 px JPEG here) is read on the server into the same draft; the photo
+// is kept and attached on Save. Nothing is saved before the member taps Save on the review step.
 
 import { parseAmountText } from "@baroka/api/lib/amount-text";
 import type { CaptureDraft } from "@baroka/api/lib/capture-parse";
@@ -12,7 +13,7 @@ import { Sheet } from "@baroka/ui/components/sheet";
 import { Textarea } from "@baroka/ui/components/textarea";
 import { cn } from "@baroka/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, Mic, Square, X } from "lucide-react";
+import { ArrowLeft, Loader2, Mic, ReceiptText, Square, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
@@ -22,6 +23,7 @@ import { setAddSheetOpen, useAddSheetOpen } from "@/lib/add-sheet";
 import { formatMoney } from "@/lib/format";
 import { accountOptions, categoryOptions } from "@/lib/options";
 import { client, errorMessage, orpc } from "@/lib/orpc";
+import { PhotoButtons, ReimburseSwitch } from "@/components/receipts";
 
 /** Whisper reads these as-is: Chrome/Firefox record webm/opus, Safari mp4/aac. */
 const AUDIO_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
@@ -50,7 +52,7 @@ function amountTextOf(minor: number | null): string {
   return (minor / 100).toLocaleString("id-ID", { maximumFractionDigits: 2 });
 }
 
-type Phase = "input" | "recording" | "listening" | "reading" | "review";
+type Phase = "input" | "recording" | "listening" | "reading" | "scanning" | "review";
 
 type Review = {
   amountText: string;
@@ -61,13 +63,33 @@ type Review = {
   category: string;
   accountId: string;
   date: string;
-  via: "voice" | "manual";
+  via: "voice" | "manual" | "receipt";
   heard: string | null;
   source: CaptureDraft["source"] | "hand";
+  /** The receipt photo, uploaded already (attached on Save), and a local preview of it. */
+  photo: { id: string; preview: string } | null;
+  /** Why the photo could not be read (no AI, today's cap, unreadable); the draft is then empty. */
+  ocrNote: string | null;
+  reimburse: { on: boolean; profileId: string };
 };
 
 function emptyReview(): Review {
-  return { amountText: "", direction: "out", description: "", merchant: "", note: "", category: "", accountId: storedAccount(), date: todayWib(), via: "manual", heard: null, source: "hand" };
+  return {
+    amountText: "",
+    direction: "out",
+    description: "",
+    merchant: "",
+    note: "",
+    category: "",
+    accountId: storedAccount(),
+    date: todayWib(),
+    via: "manual",
+    heard: null,
+    source: "hand",
+    photo: null,
+    ocrNote: null,
+    reimburse: { on: false, profileId: "" },
+  };
 }
 
 export function AddSheet() {
@@ -119,8 +141,9 @@ function AddFlow({ onDone }: { onDone: () => void }) {
     return () => clearInterval(timer);
   }, [phase]);
 
-  const toReview = (draft: CaptureDraft, via: Review["via"], heard: string | null) => {
+  const toReview = (draft: CaptureDraft, via: Review["via"], heard: string | null, extra: Partial<Review> = {}) => {
     setReview({
+      ...emptyReview(),
       amountText: amountTextOf(draft.amount),
       direction: draft.direction,
       description: draft.description,
@@ -132,8 +155,29 @@ function AddFlow({ onDone }: { onDone: () => void }) {
       via,
       heard,
       source: draft.source,
+      ...extra,
     });
     setPhase("review");
+  };
+
+  const scanReceipt = async (file: File) => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setError(null);
+    setPhase("scanning");
+    try {
+      const res = await client.capture.receipt({ image: file }, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      toReview(res.draft, "receipt", null, {
+        photo: { id: res.attachment.id, preview: URL.createObjectURL(file) },
+        ocrNote: res.ocr.status === "ok" ? null : res.ocr.message,
+        accountId: res.draft.accountId ?? storedAccount(),
+      });
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      setError(errorMessage(err));
+      setPhase("input");
+    }
   };
 
   const parse = async (input: string, via: Review["via"], heard: string | null) => {
@@ -243,11 +287,11 @@ function AddFlow({ onDone }: { onDone: () => void }) {
     );
   }
 
-  if (phase === "listening" || phase === "reading") {
+  if (phase === "listening" || phase === "reading" || phase === "scanning") {
     return (
       <div className="flex flex-col items-center gap-3 py-10 text-center" aria-live="polite">
         <Loader2 className="size-8 animate-spin text-primary motion-reduce:animate-none" aria-hidden />
-        <p className="text-sm font-semibold">{phase === "listening" ? "Turning your voice note into text…" : "Reading it…"}</p>
+        <p className="text-sm font-semibold">{phase === "listening" ? "Turning your voice note into text…" : phase === "scanning" ? "Reading the receipt…" : "Reading it…"}</p>
         {phase === "reading" && text && <p className="max-w-sm text-sm text-muted-foreground">“{text}”</p>}
         <Button
           type="button"
@@ -281,6 +325,16 @@ function AddFlow({ onDone }: { onDone: () => void }) {
           </span>
         </button>
       )}
+      <div className="flex flex-col gap-3 rounded-3xl bg-muted/60 p-4 sm:flex-row sm:items-center">
+        <span className="flex min-w-0 flex-1 items-center gap-3">
+          <ReceiptText className="size-6 shrink-0 text-primary" aria-hidden />
+          <span className="min-w-0">
+            <span className="block font-bold">Foto struk · Photo receipt</span>
+            <span className="block text-xs text-muted-foreground">Read by AI, kept as proof (for reimbursement claims too).</span>
+          </span>
+        </span>
+        <PhotoButtons size="sm" takeLabel="Foto" chooseLabel="Galeri" onPick={(file) => void scanReceipt(file)} />
+      </div>
       <div className="space-y-2">
         <label htmlFor="add-text" className="text-sm font-semibold">
           {voiceOn ? "Or type it" : "Type it"}
@@ -367,6 +421,10 @@ function ReviewForm({ review, setReview, onBack, onDone }: { review: Review; set
       occurredAt: review.date,
       capturedVia: review.via,
       clientRef: clientRef.current,
+      ...(review.photo ? { attachmentIds: [review.photo.id] } : {}),
+      ...(review.reimburse.on && review.direction === "out"
+        ? { reimbursable: true, ...(review.reimburse.profileId ? { reimburseProfileId: review.reimburse.profileId } : {}) }
+        : {}),
     });
   };
 
@@ -376,12 +434,20 @@ function ReviewForm({ review, setReview, onBack, onDone }: { review: Review; set
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {review.photo && (
+        <div className="flex items-start gap-3">
+          <img src={review.photo.preview} alt="Receipt" className="h-24 w-18 shrink-0 rounded-xl bg-muted object-cover" />
+          <p className="text-sm text-muted-foreground">
+            {review.ocrNote ?? "Read from the photo. Check the total, date and merchant."} The photo is saved with the transaction.
+          </p>
+        </div>
+      )}
       {review.heard && (
         <p className="rounded-2xl bg-muted px-4 py-3 text-sm text-muted-foreground">
           Heard: <span className="text-foreground">“{review.heard}”</span>
         </p>
       )}
-      {review.source === "rules" && !review.heard && <p className="text-xs text-muted-foreground">Read without AI. Check every field.</p>}
+      {review.source === "rules" && !review.heard && !review.photo && <p className="text-xs text-muted-foreground">Read without AI. Check every field.</p>}
       <div className="flex items-center gap-2">
         <div className="inline-flex h-11 rounded-full bg-muted p-1 text-sm" role="group" aria-label="Direction">
           {(["out", "in"] as const).map((d) => (
@@ -437,6 +503,7 @@ function ReviewForm({ review, setReview, onBack, onDone }: { review: Review; set
       <Field label="Note" htmlFor="add-note" hint="Optional">
         <Input id="add-note" value={review.note} maxLength={500} onChange={(e) => set({ note: e.target.value })} />
       </Field>
+      {review.direction === "out" && <ReimburseSwitch value={review.reimburse} onChange={(reimburse) => set({ reimburse })} />}
       <p className="text-xs text-muted-foreground">Saved as pending: the next statement import of that account confirms it.</p>
       <div className="flex gap-2">
         <Button type="button" variant="secondary" onClick={onBack}>

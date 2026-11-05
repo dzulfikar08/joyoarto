@@ -8,7 +8,7 @@ import { Input } from "@baroka/ui/components/input";
 import { Combobox } from "@baroka/ui/components/combobox";
 import { Select } from "@baroka/ui/components/select";
 import { Skeleton } from "@baroka/ui/components/skeleton";
-import { ReceiptText, Search, SearchX } from "lucide-react";
+import { Camera, ReceiptText, Search, SearchX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -17,6 +17,7 @@ import type { AppRouterClient } from "@baroka/api/routers/index";
 
 import { PageHeader } from "@/components/kit";
 import { QuickAdd } from "@/components/quick-add";
+import { REIMBURSE_LABEL, TransactionExtras } from "@/components/receipts";
 import { requireSession } from "@/lib/auth";
 import { accountOptions, categoryOptions } from "@/lib/options";
 import { client, errorMessage, orpc } from "@/lib/orpc";
@@ -28,7 +29,19 @@ const STATUS_ITEMS = [
   { value: "pending", label: "Pending only" },
   { value: "posted", label: "Posted only" },
 ];
-type Filters = { q: string; accountId: string; category: string; uncategorized: boolean; from: string; to: string; status: Status };
+const REIMBURSE_FILTERS = ["any", "open", "draft", "submitted", "paid", "rejected", "none"] as const;
+type ReimburseFilter = "" | (typeof REIMBURSE_FILTERS)[number];
+const REIMBURSE_ITEMS = [
+  { value: "", label: "Reimburse: all" },
+  { value: "any", label: "Reimbursable (diganti kantor)" },
+  { value: "open", label: "Reimburse: open" },
+  { value: "draft", label: "Reimburse: not claimed yet" },
+  { value: "submitted", label: "Reimburse: submitted" },
+  { value: "paid", label: "Reimburse: paid back" },
+  { value: "rejected", label: "Reimburse: rejected" },
+  { value: "none", label: "Not reimbursable" },
+];
+type Filters = { q: string; accountId: string; category: string; uncategorized: boolean; from: string; to: string; status: Status; reimburse: ReimburseFilter };
 export type TransactionsSearch = Partial<Filters>;
 
 const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
@@ -46,6 +59,7 @@ function validateSearch(raw: Record<string, unknown>): TransactionsSearch {
   if (isDay(from)) out.from = from;
   if (isDay(to)) out.to = to;
   if (raw.status === "pending" || raw.status === "posted") out.status = raw.status;
+  if ((REIMBURSE_FILTERS as readonly string[]).includes(str(raw.reimburse))) out.reimburse = str(raw.reimburse) as ReimburseFilter;
   return out;
 }
 
@@ -63,6 +77,7 @@ function Transactions() {
     from: search.from ?? "",
     to: search.to ?? "",
     status: search.status ?? "",
+    reimburse: search.reimburse ?? "",
   };
   const [remember, setRemember] = useState(true);
   // The search box types into local state; the URL follows after a pause so typing never fights the router.
@@ -87,6 +102,7 @@ function Transactions() {
     ...(f.from ? { from: f.from } : {}),
     ...(f.to ? { to: f.to } : {}),
     ...(f.status ? { status: f.status } : {}),
+    ...(f.reimburse ? { reimburse: f.reimburse } : {}),
   };
   const list = useInfiniteQuery({
     queryKey: ["transactions", input],
@@ -177,6 +193,7 @@ function Transactions() {
           searchPlaceholder="Search categories"
         />
         <Select size="sm" className="sm:w-36" value={f.status} onValueChange={(v) => set({ status: v as Status })} aria-label="Status" items={STATUS_ITEMS} />
+        <Select size="sm" className="sm:w-60" value={f.reimburse} onValueChange={(v) => set({ reimburse: v as ReimburseFilter })} aria-label="Reimburse" items={REIMBURSE_ITEMS} />
         <label className="flex min-h-10 items-center gap-2 text-sm font-medium">
           <input type="checkbox" checked={f.uncategorized} onChange={(e) => set({ uncategorized: e.target.checked, category: "" })} />
           Uncategorized only
@@ -246,6 +263,12 @@ function Transactions() {
                     pending
                   </Badge>
                 )}
+                {t.reimburse && (
+                  <Badge tone={t.reimburse.status === "rejected" ? "destructive" : t.reimburse.status === "paid" || t.reimburse.status === "payment" ? "positive" : "primary"} className="px-2 py-px text-[10px] tracking-wide uppercase">
+                    {REIMBURSE_LABEL[t.reimburse.status]}
+                  </Badge>
+                )}
+                {t.attachments.length > 0 && <Camera className="size-3.5 shrink-0 text-muted-foreground" aria-label={`${t.attachments.length} receipt photo(s)`} />}
               </div>
               <div className="truncate text-xs text-muted-foreground" title={t.description}>
                 <span className="tabular-nums sm:hidden">{t.date} · </span>
@@ -266,11 +289,11 @@ function Transactions() {
                 items={catItems}
                 searchPlaceholder="Search categories"
               />
-              {t.status === "pending" && (
-                <span className="flex shrink-0 gap-3 sm:order-3 sm:gap-2">
-                  <button type="button" className="py-1 text-xs font-semibold text-primary hover:underline" aria-expanded={editing === t.id} onClick={() => setEditing(editing === t.id ? null : t.id)}>
-                    {editing === t.id ? "Close" : "Edit"}
-                  </button>
+              <span className="flex shrink-0 gap-3 sm:order-3 sm:gap-2">
+                <button type="button" className="py-1 text-xs font-semibold text-primary hover:underline" aria-expanded={editing === t.id} onClick={() => setEditing(editing === t.id ? null : t.id)}>
+                  {editing === t.id ? "Close" : t.status === "pending" ? "Edit" : "Details"}
+                </button>
+                {t.status === "pending" && (
                   <button
                     type="button"
                     className="py-1 text-xs font-semibold text-destructive hover:underline"
@@ -279,10 +302,11 @@ function Transactions() {
                   >
                     Delete
                   </button>
-                </span>
-              )}
+                )}
+              </span>
             </div>
-            {editing === t.id && <EditPending t={t} onDone={() => (setEditing(null), refresh())} />}
+            {editing === t.id && t.status === "pending" && <EditPending t={t} onDone={() => (setEditing(null), refresh())} />}
+            {editing === t.id && <TransactionExtras t={t} />}
           </li>
         ))}
       </ul>

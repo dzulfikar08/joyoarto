@@ -47,3 +47,8 @@ test("accounts match on name, last digits, institution and accents", () => {
   expect(matchesOption(cafe!, "cafe credit")).toBe(true);
   expect(matchesOption(cafe!, "bca")).toBe(false);
 });
+
+test("receivable (reimbursement) accounts are never offered", async () => {
+  const { accountOptions } = await import("./options");
+  expect(accountOptions([{ id: "r", name: "Reimburse PT Maju", type: "receivable" }, { id: "b", name: "BCA", type: "bank" }]).map((o) => o.value)).toEqual(["b"]);
+});
