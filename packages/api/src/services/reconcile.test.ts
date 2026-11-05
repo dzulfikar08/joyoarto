@@ -9,7 +9,7 @@ import { testAccount, testDb, testPrincipal } from "../test/d1";
 import { dashboard } from "./dashboard";
 import { importTransactions, undoImport } from "./imports";
 import type { ImportRow } from "./imports";
-import { quickAdd, quickAddInput, searchTransactions, updateTransaction } from "./transactions";
+import { parseWibInstant, quickAdd, quickAddInput, searchTransactions, updateTransaction } from "./transactions";
 
 let db: Database;
 let p: Principal;
@@ -157,4 +157,46 @@ test("pending rows: editable, deletable, counted in the dashboard", async () => 
   const [stmtRow] = (await searchTransactions(db, p, { status: "posted", limit: 5 })).transactions;
   expect(posted.inserted).toBe(1);
   await expect(updateTransaction(db, p, { id: stmtRow!.id, amount: -2 })).rejects.toThrow(/cannot be edited/);
+});
+
+test("statement import: two concurrent commits of the same statement save each row once", async () => {
+  const pend = await quick({ accountId: bca, amountText: "25rb", description: "Kopi", occurredAt: "2026-11-02", clientRef: "c-race" });
+  const rows: ImportRow[] = [
+    { date: "2026-11-01", amount: -1000000, description: "INDOMARET" },
+    { date: "2026-11-02", amount: -2500000, description: "QRIS KOPI KENANGAN" },
+  ];
+  // Hold the first write until the second import has read too, so both see the same pending row and no saved rows.
+  const batch = db.batch.bind(db);
+  let waiting: (() => void) | null = null;
+  let calls = 0;
+  (db as { batch: unknown }).batch = async (stmts: Parameters<typeof batch>[0]) => {
+    calls++;
+    if (calls === 1) await new Promise<void>((resolve) => (waiting = resolve));
+    else if (calls === 2) waiting!();
+    return batch(stmts);
+  };
+  const [a, b] = await Promise.all([importRows(bca, rows, true), importRows(bca, rows, true)]);
+  (db as { batch: unknown }).batch = batch;
+  expect(a.inserted + b.inserted).toBe(2);
+  expect(a.reconciled + b.reconciled).toBe(1);
+  const all = await db.select().from(schema.transaction).where(eq(schema.transaction.accountId, bca));
+  expect(all.map((r) => r.status).sort()).toEqual(["posted", "posted"]);
+  expect(all.find((r) => r.amount === -2500000)!.clientRef).toBe("c-race");
+  expect(all.some((r) => r.id === pend.transaction.id)).toBe(false);
+  // The import log counts what each import actually saved; an import that saved nothing leaves no entry.
+  const batches = await db.select().from(schema.importBatch).where(eq(schema.importBatch.accountId, bca));
+  expect(batches.reduce((s, x) => s + x.insertedCount, 0)).toBe(2);
+  for (const x of batches) expect(x.insertedCount + x.duplicateCount).toBe(2);
+});
+
+test("quick add: an occurredAt without an offset is WIB wall-clock time", async () => {
+  // 20:00 WIB on the 5th is still the 5th (read as UTC it would be 03:00 WIB on the 6th).
+  const r = await quick({ accountId: bca, amount: -100000, description: "Makan malam", occurredAt: "2026-11-05T20:00:00" });
+  expect(r.transaction.date).toBe("2026-11-05");
+  const early = await quick({ accountId: bca, amount: -100000, description: "Sarapan", occurredAt: "2026-11-05 06:30" });
+  expect(early.transaction.date).toBe("2026-11-05");
+  // Independent of the machine's time zone.
+  expect(parseWibInstant("2026-11-05T20:00:00").toISOString()).toBe("2026-11-05T13:00:00.000Z");
+  expect(parseWibInstant("2026-11-05T20:00:00Z").toISOString()).toBe("2026-11-05T20:00:00.000Z");
+  expect(parseWibInstant("2026-11-05T20:00:00+09:00").toISOString()).toBe("2026-11-05T11:00:00.000Z");
 });

@@ -81,6 +81,25 @@ describe("loan math", () => {
     expect(financed.installment).toBeGreaterThan(upfront.installment);
   });
 
+  test("effective rate paid in advance: smaller installment, schedule clears, implied rate matches", () => {
+    // Rp 200 jt at 10% effective over 60 months, first installment with the DP: arrears 4.249.409 / (1 + 10%/12).
+    expect(annuityInstallment(jt(200), 10, 60)).toBe(424_940_900);
+    expect(annuityInstallment(jt(200), 10, 60, true)).toBe(421_429_000);
+    const loan = item({ type: "loan", price: jt(200), downPayment: 0, tenorMonths: 60, rateType: "effective", ratePct: 10, payment: "advance" });
+    if (loan.type !== "loan") throw new Error("loan");
+    const t = loanTerms(loan);
+    expect(t.installment).toBe(421_429_000);
+    expect(t.effectiveRatePct).toBe(10);
+    // The schedule outstandingPrincipal runs ends at ~0: after 59 installments, the last one (plus a month's interest) clears it.
+    const left = outstandingPrincipal(t, 59) * (1 + t.monthlyRate) - t.installment;
+    expect(Math.abs(left)).toBeLessThan(jt(0.001));
+    // The quoted installment implies the same rate on the same (advance) timing, and the same settlement amount.
+    const quoted = loanTerms({ ...loan, installment: t.installment });
+    expect(quoted.effectiveRatePct).toBe(10);
+    expect(Math.abs(outstandingPrincipal(quoted, 24) - outstandingPrincipal(t, 24))).toBeLessThan(jt(0.01));
+    expect(impliedEffectiveRate(jt(200), t.installment, 60, true)).toBe(10);
+  });
+
   test("installment in advance is part of the upfront cash", () => {
     const t = loanTerms(car({ payment: "advance" }));
     expect(t.upfront).toBe(jt(75) + t.installment);

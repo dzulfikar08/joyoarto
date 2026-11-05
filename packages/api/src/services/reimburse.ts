@@ -345,30 +345,32 @@ export async function createClaim(db: Database, p: Principal, input: z.infer<typ
     attachmentsByTransaction(db, p.householdId, rows.map((r) => r.id)),
   ]);
   const issuedOn = todayWib();
-  const snapshot = buildSnapshot(
-    {
-      number: "",
-      issuedOn,
-      periodFrom: input.from,
-      periodTo: input.to,
-      currency: [...currencies][0]!,
-      company: profile.companyName,
-      claimant: { name: profile.claimantName, employeeId: profile.employeeId, department: profile.department },
-      approver: { name: profile.approverName, email: profile.approverEmail },
-      notes: input.notes?.trim() || null,
-    },
-    rows.map((r) => ({
-      transactionId: r.id,
-      date: r.date,
-      merchant: r.merchant ?? r.description,
-      description: r.merchant && r.description !== r.merchant ? r.description : (r.note?.split("\n")[0] ?? r.description),
-      category: r.categoryId ? (cats.get(r.categoryId)?.name ?? null) : null,
-      paidWith: accounts.get(r.accountId)?.name ?? "—",
-      amount: -r.amount,
-      note: r.note,
-      attachmentIds: (photos.get(r.id) ?? []).map((x) => x.id),
-    })),
-  );
+  const snapshotOf = (items: typeof rows) =>
+    buildSnapshot(
+      {
+        number: "",
+        issuedOn,
+        periodFrom: input.from,
+        periodTo: input.to,
+        currency: [...currencies][0]!,
+        company: profile.companyName,
+        claimant: { name: profile.claimantName, employeeId: profile.employeeId, department: profile.department },
+        approver: { name: profile.approverName, email: profile.approverEmail },
+        notes: input.notes?.trim() || null,
+      },
+      items.map((r) => ({
+        transactionId: r.id,
+        date: r.date,
+        merchant: r.merchant ?? r.description,
+        description: r.merchant && r.description !== r.merchant ? r.description : (r.note?.split("\n")[0] ?? r.description),
+        category: r.categoryId ? (cats.get(r.categoryId)?.name ?? null) : null,
+        paidWith: accounts.get(r.accountId)?.name ?? "—",
+        amount: -r.amount,
+        note: r.note,
+        attachmentIds: (photos.get(r.id) ?? []).map((x) => x.id),
+      })),
+    );
+  const snapshot = snapshotOf(rows);
 
   const year = Number(issuedOn.slice(0, 4));
   const id = crypto.randomUUID();
@@ -401,8 +403,36 @@ export async function createClaim(db: Database, p: Principal, input: z.infer<typ
     if (res.length) number = candidate;
   }
   if (!number) throw new ORPCError("CONFLICT", { message: "Could not number the claim; try again." });
-  for (const part of chunk(rows.map((r) => r.id), 90)) {
-    await db.update(t).set({ reimburseStatus: "submitted", reimburseClaimId: id }).where(and(eq(t.householdId, p.householdId), inArray(t.id, part)));
+
+  // Claim the items only while they are still drafts outside any claim, in one transaction: a concurrent claim of the
+  // same items gets only what this one did not take. The report then lists exactly the rows claimed here.
+  const updates = chunk(rows.map((r) => r.id), 90).map((part) =>
+    db
+      .update(t)
+      .set({ reimburseStatus: "submitted", reimburseClaimId: id })
+      .where(and(eq(t.householdId, p.householdId), inArray(t.id, part), eq(t.reimburseStatus, "draft"), isNull(t.reimburseClaimId)))
+      .returning({ id: t.id }),
+  );
+  const results = (await db.batch(updates as unknown as Parameters<typeof db.batch>[0])) as unknown as { id: string }[][];
+  const claimedIds = new Set(results.flat().map((x) => x.id));
+  const claimed = rows.filter((r) => claimedIds.has(r.id));
+  if (claimed.length !== rows.length) {
+    if (input.transactionIds || !claimed.length) {
+      // The items asked for are not all available any more: undo, and leave no empty claim behind.
+      for (const part of chunk([...claimedIds], 90)) {
+        await db
+          .update(t)
+          .set({ reimburseStatus: "draft", reimburseClaimId: null })
+          .where(and(eq(t.householdId, p.householdId), inArray(t.id, part), eq(t.reimburseClaimId, id)));
+      }
+      await db.delete(rc).where(eq(rc.id, id));
+      throw new ORPCError("CONFLICT", { message: "Some of these items were just claimed in another report (they are no longer draft). Reload and try again." });
+    }
+    const saved: ClaimSnapshot = { ...snapshotOf(claimed), number };
+    await db
+      .update(rc)
+      .set({ total: saved.total, itemCount: saved.items.length, snapshot: JSON.stringify(saved) })
+      .where(eq(rc.id, id));
   }
   await db.update(rp).set({ lastUsedAt: new Date() }).where(eq(rp.id, profile.id));
   await countClaimReport(db, p.userId);

@@ -6,7 +6,7 @@ import type { SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import type { FileStore, Principal } from "../context";
-import { counterpartyInText, directionInText, findAmountInText, parseAmountText } from "../lib/amount-text";
+import { counterpartyInText, quickAddAmount } from "../lib/amount-text";
 import { addDays, todayWib } from "../lib/dashboard";
 import { chunk } from "../lib/d1";
 import { dedupeKeys } from "../lib/dedupe";
@@ -321,11 +321,20 @@ export async function mostUsedAccount(db: Database, householdId: string) {
   return row ? getAccount(db, householdId, row.id) : badRequest("No account yet: create an account first, or pass accountId.");
 }
 
+/**
+ * An ISO date-time as an instant. Without an offset ("2026-11-05T20:00:00") it is WIB wall-clock time, as the API
+ * documents; JavaScript would read it as the runtime's local time (UTC on Workers).
+ */
+export function parseWibInstant(value: string): Date {
+  const local = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)$/.exec(value.trim());
+  return new Date(local ? `${local[1]}T${local[2]}+07:00` : value);
+}
+
 /** WIB calendar day of an instant (or the day itself when only a day was given). */
-function wibDay(occurredAt: string | undefined, now: Date): string {
+export function wibDay(occurredAt: string | undefined, now: Date): string {
   if (!occurredAt) return todayWib(now);
   if (/^\d{4}-\d{2}-\d{2}$/.test(occurredAt)) return occurredAt;
-  return todayWib(new Date(occurredAt));
+  return todayWib(parseWibInstant(occurredAt));
 }
 
 /**
@@ -345,19 +354,11 @@ export async function quickAdd(db: Database, p: Principal, input: z.infer<typeof
 
   // rawText is only read here, never saved or logged.
   const raw = input.rawText?.trim() ?? "";
-  let amount = input.amount;
-  if (amount === undefined) {
-    let parsed: ReturnType<typeof parseAmountText> | null = null;
-    if (input.amountText?.trim()) {
-      try {
-        parsed = parseAmountText(input.amountText, account.currency);
-      } catch (error) {
-        badRequest(error instanceof Error ? error.message : String(error));
-      }
-    } else if (raw) parsed = findAmountInText(raw, account.currency);
-    if (!parsed) badRequest("Send amount, amountText or a rawText that contains an amount.");
-    const sign = input.direction ? (input.direction === "in" ? 1 : -1) : (parsed.sign ?? (raw ? directionInText(raw) : null) ?? -1);
-    amount = sign * parsed.amount;
+  let amount: number;
+  try {
+    amount = quickAddAmount({ ...input, rawText: raw }, account.currency);
+  } catch (error) {
+    badRequest(error instanceof Error ? error.message : String(error));
   }
   const merchantIn = input.merchant?.trim() || (raw && !input.description?.trim() ? counterpartyInText(raw) : null) || undefined;
   const description = input.description?.trim() || merchantIn;

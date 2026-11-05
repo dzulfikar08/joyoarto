@@ -115,7 +115,45 @@ describe("Jago", () => {
   });
 });
 
+describe("Jago: malformed input", () => {
+  test("a Pocket ID without a balance summary after it does not hang and is reported", () => {
+    const text = ["Bank Jago", "Monthly Statements", "Closing Balance", "1.000,00", "0,00", "0,00", "1.000,00", "Main Pocket", "Pocket ID 500000001234"].join("\n");
+    const s = parseJago(text);
+    expect(s.pockets.length).toBe(1);
+    expect(s.problems.some((p) => p.includes("no balance summary"))).toBe(true);
+  });
+
+  test("negative running and closing balances keep their sign", () => {
+    const text = JAGO.split("Jajan\nPocket ID 500100005678")[0]!
+      .replace("1.000.000,00\n+5.000.000,00\n-130.000,00\n5.870.000,00", "-1.000.000,00\n+5.000.000,00\n-130.000,00\n3.870.000,00")
+      .replace("-30.000,00 970.000,00", "-30.000,00 -1.030.000,00")
+      .replace("-100.000,00 870.000,00", "-100.000,00\n-1.130.000,00")
+      .replace("+5.000.000,00 5.870.000,00", "+5.000.000,00 3.870.000,00");
+    const s = parseJago(text);
+    expect(s.problems).toEqual([]);
+    expect(s.pockets[0]!.previous).toBe(-100000000);
+    expect(s.pockets[0]!.rows.map((r) => r.balanceAfter)).toEqual([-103000000, -113000000, 387000000]);
+  });
+
+  test("Indonesian month abbreviations", () => {
+    for (const [mon, mm] of [["Mei", "05"], ["Agu", "08"], ["Okt", "10"], ["Des", "12"]] as const) {
+      const s = parseJago(JAGO.replace("02 Jul 2026", `02 ${mon} 2026`));
+      expect(s.pockets[0]!.rows[0]!.date).toBe(`2026-${mm}-02`);
+    }
+  });
+});
+
 describe("GoPay", () => {
+  test("a minus split from the amount still makes it money out", () => {
+    for (const tail of ["Jago - Rp30.000", "Jago -\nRp30.000", "Jago -Rp 30.000"]) {
+      const s = parseGopay(GOPAY.replace("Jago -Rp30.000", tail));
+      const pay = s.rows.find((r) => r.amount !== null)!;
+      expect(pay.amount).toBe(-3000000);
+      expect(pay.method).toBe("Jago");
+      expect(s.problems).toEqual([]);
+    }
+  });
+
   test("rows, coins, totals and the id shared with Jago", () => {
     expect(isGopayStatement(GOPAY)).toBe(true);
     const s = parseGopay(GOPAY);

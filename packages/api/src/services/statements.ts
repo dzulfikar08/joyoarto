@@ -88,7 +88,7 @@ export async function importStatement(db: Database, p: Principal, input: Input, 
     return res;
   }
   const res = await importGopay(db, p, input, source);
-  if (input.commit && (res.wallet.inserted > 0 || res.bankPaymentsNamed > 0)) await countStatementImport(db, p.userId);
+  if (res.committed && (res.wallet.inserted > 0 || res.bankPaymentsNamed > 0)) await countStatementImport(db, p.userId);
   return res;
 }
 
@@ -198,6 +198,8 @@ async function importGopay(db: Database, p: Principal, input: Input, source: "pd
   const money_ = statement.rows.filter((r) => r.amount !== null && !/^Cashback\b/i.test(r.name));
   const viaBank = money_.filter((r) => /Jago/i.test(r.method));
   const wallet = money_.filter((r) => !/Jago/i.test(r.method));
+  // Totals that do not add up mean a row was read wrong: nothing is saved then (as for Jago).
+  const commit = input.commit && statement.problems.length === 0;
 
   // Jago payments already imported that still say only "GoPay".
   const matched: { id: string; ref: string }[] = [];
@@ -211,7 +213,7 @@ async function importGopay(db: Database, p: Principal, input: Input, source: "pd
 
   let updated = 0;
   let walletResult: Awaited<ReturnType<typeof importTransactions>> | null = null;
-  if (input.commit) {
+  if (commit) {
     const hintRows = viaBank.map((r) => ({
       householdId: p.householdId,
       source: "gopay",
@@ -242,7 +244,7 @@ async function importGopay(db: Database, p: Principal, input: Input, source: "pd
       .select()
       .from(a)
       .where(and(eq(a.householdId, p.householdId), eq(a.institution, "gopay")));
-    if (!walletAccount && input.commit) {
+    if (!walletAccount && commit) {
       const row = { id: crypto.randomUUID(), householdId: p.householdId, name: "GoPay wallet", institution: "gopay", type: "ewallet" as const, currency: "IDR", openingBalance: 0 };
       await db.insert(a).values(row);
       [walletAccount] = await db.select().from(a).where(eq(a.id, row.id));
@@ -261,19 +263,19 @@ async function importGopay(db: Database, p: Principal, input: Input, source: "pd
             ...(category ? { category } : {}),
           };
         });
-      walletResult = await importTransactions(db, p, { accountId: walletAccount.id, rows, commit: input.commit, source, fileName: input.fileName, previewLimit: 0 });
+      walletResult = await importTransactions(db, p, { accountId: walletAccount.id, rows, commit, source, fileName: input.fileName, previewLimit: 0 });
     }
   }
 
   return {
     kind: "gopay" as const,
     period: period(statement.rows.map((r) => r.date)),
-    committed: input.commit,
+    committed: commit,
     problems: statement.problems,
     totalsVerified: statement.problems.length === 0,
     payments: money_.length,
     paidFromBank: viaBank.length,
-    bankPaymentsNamed: input.commit ? updated : matched.length,
+    bankPaymentsNamed: commit ? updated : matched.length,
     bankPaymentsNotImportedYet: viaBank.length - matched.length,
     wallet: walletResult
       ? {
@@ -286,7 +288,9 @@ async function importGopay(db: Database, p: Principal, input: Input, source: "pd
           uncategorized: walletResult.uncategorized,
         }
       : { rows: wallet.length, newRows: wallet.length, inserted: 0, duplicates: 0, reconciled: 0, unmatchedPending: 0, uncategorized: 0 },
-    next: input.commit
+    next: statement.problems.length
+      ? "Totals do not add up, so nothing can be saved. The PDF text was probably extracted differently; report it."
+      : commit
       ? "Saved. GoPay merchants are remembered, so Jago statements imported later are named too."
       : `Preview only: ${matched.length} Jago payments will get their GoPay merchant. Call again with commit=true.`,
   };

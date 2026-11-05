@@ -6,8 +6,23 @@ import { z } from "zod";
 
 import { formatMoney } from "../lib/money";
 
-export const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
-export const month = z.string().regex(/^\d{4}-\d{2}$/, "YYYY-MM");
+/** A real calendar day: "2026-02-31" has the right shape but no such date. */
+export function isCalendarDay(s: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d;
+}
+
+export const day = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD")
+  .refine(isCalendarDay, "Not a calendar day");
+export const month = z
+  .string()
+  .regex(/^\d{4}-\d{2}$/, "YYYY-MM")
+  .refine((s) => Number(s.slice(5)) >= 1 && Number(s.slice(5)) <= 12, "Not a month (01..12)");
 
 export function notFound(what: string): never {
   throw new ORPCError("NOT_FOUND", { message: `${what} not found.` });
