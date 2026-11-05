@@ -189,10 +189,11 @@ INFO=$APPDIR/Info.plist
 sdk=$(plist "$INFO" DTSDKName)
 case $sdk in iphoneos2[6-9]* | iphoneos[3-9]*) ;; *) fail "built with $sdk, App Store Connect wants the iOS 26 SDK or later" ;; esac
 
-# Permission texts: the microphone (voice quick add, expo-audio's plugin in app.json) and nothing else (document
-# picker and Keychain need none). Any other key means a plugin added a prompt the app never shows, which App Review
+# Permission texts: the microphone (voice quick add, expo-audio), the camera and photo library (receipt photos,
+# expo-image-picker) and nothing else (document picker and Keychain need none). expo-image-picker's
+# microphonePermission must stay a string: false deletes the key expo-audio set. Any other key means a plugin added a prompt the app never shows, which App Review
 # questions; add it to app.json on purpose (and here, and docs/ios-release.md) or remove the plugin.
-EXPECTED_USAGE="NSMicrophoneUsageDescription"
+EXPECTED_USAGE="NSCameraUsageDescription NSMicrophoneUsageDescription NSPhotoLibraryUsageDescription"
 usage=$(plutil -convert xml1 -o - "$INFO" | grep -oE '<key>NS[A-Za-z]+UsageDescription</key>' | sed -E 's/<\/?key>//g' | sort -u | tr '\n' ' ' | sed 's/ $//' || true)
 [ "$usage" = "$EXPECTED_USAGE" ] || fail "permission texts in Info.plist are '$usage', expected exactly '$EXPECTED_USAGE'"
 mic=$(plist "$INFO" NSMicrophoneUsageDescription)
@@ -202,7 +203,9 @@ grep -qi "mikrofon" <<< "$mic" || fail "NSMicrophoneUsageDescription has no Indo
 for lang in id en; do
   strings_file=$APPDIR/$lang.lproj/InfoPlist.strings
   [ -f "$strings_file" ] || fail "no $lang.lproj/InfoPlist.strings (app.json locales)"
-  plutil -convert xml1 -o - "$strings_file" | grep -q NSMicrophoneUsageDescription || fail "$lang.lproj/InfoPlist.strings lacks NSMicrophoneUsageDescription"
+  for key in $EXPECTED_USAGE; do
+    plutil -convert xml1 -o - "$strings_file" | grep -q "$key" || fail "$lang.lproj/InfoPlist.strings lacks $key"
+  done
 done
 # Recording happens only with the sheet open: no background audio mode.
 ! plutil -convert xml1 -o - "$INFO" | grep -q '<string>audio</string>' || fail "UIBackgroundModes includes audio (expo-audio enableBackgroundPlayback/Recording must be false)"
