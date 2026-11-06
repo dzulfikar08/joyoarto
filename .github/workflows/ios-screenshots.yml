@@ -33,6 +33,10 @@ jobs:
     env:
       DEVICE: ${{ inputs.device || 'iPhone 17 Pro Max' }}
       OUT: ${{ github.workspace }}/dist/screenshots
+      # As apps/mobile/scripts/ios/build-ios.sh: a production bundle, a UTF-8 locale for CocoaPods, and Metro caches
+      # in a fresh temp dir (a stale or dev-mode bundle without the routes shows a blank white app with no error).
+      NODE_ENV: production
+      LANG: en_US.UTF-8
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -65,6 +69,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Fresh Metro temp dir
+        run: mkdir -p "$RUNNER_TEMP/metro" && echo "TMPDIR=$RUNNER_TEMP/metro" >> "$GITHUB_ENV"
+
       - name: Prebuild and pods
         working-directory: apps/mobile
         run: |
@@ -77,10 +84,16 @@ jobs:
           set -o pipefail
           xcodebuild build -workspace JoyoArto.xcworkspace -scheme JoyoArto -configuration Release \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/dd" \
-            CODE_SIGNING_ALLOWED=NO > "$RUNNER_TEMP/xcodebuild.log" 2>&1 \
+            CODE_SIGNING_ALLOWED=NO > "$RUNNER_TEMP/xcodebuild.log" 2>&1 < /dev/null \
             || { grep -E 'error:|BUILD FAILED' "$RUNNER_TEMP/xcodebuild.log" | head -n 30; exit 1; }
           app="$(find "$RUNNER_TEMP/dd/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' | head -1)"
           [ -n "$app" ] || { echo "no .app built"; exit 1; }
+          # Same bundle sanity check as the release build: app code (routes) and the live API URL are in the bundle.
+          [ -f "$app/main.jsbundle" ] || { echo "::error::no main.jsbundle in the app"; exit 1; }
+          strings -a "$app/main.jsbundle" > "$RUNNER_TEMP/bundle.txt"
+          grep -qF "Without finance:write the app can show balances" "$RUNNER_TEMP/bundle.txt" || { echo "::error::main.jsbundle holds no app code"; exit 1; }
+          grep -qF "https://app.arto.joyorogo.com" "$RUNNER_TEMP/bundle.txt" || { echo "::error::main.jsbundle lacks the API URL"; exit 1; }
+          echo "main.jsbundle $(stat -f %z "$app/main.jsbundle") bytes, app code present"
           echo "APP_PATH=$app" >> "$GITHUB_ENV"
 
       - name: Boot the simulator
