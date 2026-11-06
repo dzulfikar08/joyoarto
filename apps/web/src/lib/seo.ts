@@ -419,7 +419,7 @@ function demoBody(): string {
 function pricingBody(): string {
   return wrap(
     `<h1>Harga JoyoArto</h1>` +
-      `<p>Gratis untuk mulai: catat manual, quick add, import CSV dan beberapa import statement sebulan. Joyo Pro, satu langganan per akun yang juga membuka Pro di JoyoRogo dan JoyoFit: import e-statement tanpa batas, konektor Claude (MCP), simulasi rencana yang disimpan, dan lebih banyak anggota. Dibeli di JoyoRogo, harga dalam rupiah.</p>` +
+      `<p>Gratis untuk mulai: catat manual, quick add, import CSV dan beberapa import statement sebulan. Joyo Pro, satu langganan per akun yang juga membuka Pro di JoyoRogo dan JoyoFit: import e-statement tanpa batas, konektor Claude yang bisa mencatat dan mengubah data (MCP), simulasi rencana yang disimpan, dan lebih banyak anggota. Dibeli di JoyoRogo, harga dalam rupiah.</p>` +
       `<p>Kodenya open source (AGPL), jadi kamu juga bisa host sendiri secara gratis. <a href="https://app.arto.joyorogo.com/login">Mulai gratis</a>.</p>`,
   );
 }
@@ -429,7 +429,7 @@ function claudeBody(): string {
   return wrap(
     `<h1>Sambungkan JoyoArto ke Claude</h1>` +
       `<p>Tanya Claude soal uangmu pakai bahasa sehari-hari. Claude membaca buku keuangan rumah tanggamu di JoyoArto lewat konektor MCP, hanya setelah kamu menyambungkan dan menyetujuinya. Alamat server MCP: <code>${mcp}</code>.</p>` +
-      `<h2>Yang kamu perlukan</h2><ul><li>Akun JoyoArto dan Joyo Pro (konektor Claude termasuk di Pro).</li><li>Akun Claude: claude.ai, Claude Desktop, aplikasi HP, atau Claude Code.</li></ul>` +
+      `<h2>Yang kamu perlukan</h2><ul><li>Akun JoyoArto. Di paket Free, Claude bisa membaca dan menjawab; mencatat dan mengubah data lewat Claude termasuk di Joyo Pro.</li><li>Akun Claude: claude.ai, Claude Desktop, aplikasi HP, atau Claude Code.</li></ul>` +
       `<h2>Cara menyambungkan</h2><ol><li>Di Claude, buka Customize → Connectors.</li><li>Cari JoyoArto di direktori, atau pilih Add custom connector dan isi <code>${mcp}</code>.</li><li>Klik Connect, masuk ke JoyoArto, baca izinnya, lalu Allow.</li></ol>` +
       `<p>Claude Code: <code>claude mcp add --transport http joyoarto ${mcp}</code>, lalu /mcp untuk masuk.</p>` +
       `<h2>Izin: baca dan tulis</h2><p>Baca (finance:read): rekening, transaksi, anggaran, ringkasan dan simulasi. Tulis (finance:write): mencatat, meng-import dan mengkategorikan transaksi, aturan, anggaran, skenario. Kamu bisa memilih akses hanya-baca. Alat yang mengubah atau menghapus data ditandai destruktif, jadi Claude bertanya dulu.</p>` +

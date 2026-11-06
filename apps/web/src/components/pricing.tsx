@@ -119,7 +119,7 @@ export function PricingPlans({ t, action, freeAction }: { t: T; action?: (p: Pri
     },
     { label: t("Anggota rumah tangga yang kamu undang", "Household members you invite"), free: String(free.members), pro: String(pro.members) },
     { label: t("Simpan skenario Rencana & simulasi", "Saved Plan & simulate scenarios"), free: false, pro: true },
-    { label: t("Konektor Claude (claude.ai, Desktop, Code)", "Claude connector (claude.ai, Desktop, Code)"), free: false, pro: true },
+    { label: t("Konektor Claude (claude.ai, Desktop, Code)", "Claude connector (claude.ai, Desktop, Code)"), free: t("Baca dan tanya", "Read and ask"), pro: t("Baca, catat dan ubah", "Read, add and change") },
     { label: t("Pro di JoyoRogo dan JoyoFit juga", "Pro in JoyoRogo and JoyoFit too"), free: false, pro: true },
   ];
   const cell = (v: ReactNode) =>

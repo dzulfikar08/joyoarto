@@ -81,8 +81,8 @@ export function upgradeCopy(feature: UpgradeFeature, t: T): { title: string; bod
       };
     case "mcpConnector":
       return {
-        title: t("Konektor Claude itu fitur Pro", "The Claude connector is Pro"),
-        body: t("Tanya Claude soal uangmu dari claude.ai, Claude Desktop atau Claude Code.", "Ask Claude about your money from claude.ai, Claude Desktop or Claude Code."),
+        title: t("Mengubah data lewat Claude itu fitur Pro", "Making changes from Claude is Pro"),
+        body: t("Di Free, Claude bisa membaca dan menjawab soal uangmu. Dengan Pro, Claude juga bisa mencatat, import dan merapikan kategori.", "On Free, Claude can read your data and answer questions. With Pro it can also add transactions, import statements and tidy up categories."),
       };
     case "receiptScans":
       return {

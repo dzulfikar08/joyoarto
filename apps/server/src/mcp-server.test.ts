@@ -1,4 +1,4 @@
-// What a read-only connection (an OAuth consent or brk_ token without finance:write) gets from the MCP server.
+// What a read-only connection (an OAuth consent or brk_ token without finance:write) or a Free household gets from the MCP server.
 
 import { beforeEach, expect, test } from "bun:test";
 
@@ -20,14 +20,14 @@ beforeEach(async () => {
   await testAccount(db, dewi, "GoPay");
 });
 
-async function connect(scopes: Scope[]) {
+async function connect(scopes: Scope[], connectorAllowed = true) {
   const pending: Promise<unknown>[] = [];
   const server = createMcpServer({
     db,
     principal: { ...dewi, scopes, via: "oauth", clientId: "claude" },
     clientId: "claude",
     waitUntil: (p) => void pending.push(p),
-    connectorAllowed: true,
+    connectorAllowed,
   });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await server.connect(serverSide);
@@ -63,5 +63,21 @@ test("read and write lists the write tools, and they run", async () => {
   const result = await client.callTool({ name: "quick_add", arguments: { amountText: "25rb", description: "kopi" } });
   expect(result.isError).toBeFalsy();
   expect(await db.select().from(schema.transaction)).toHaveLength(1);
+  await settle();
+});
+
+test("a Free household gets the read tools, and they succeed; writes are not listed", async () => {
+  const { client, settle } = await connect(["finance:read", "finance:write"], false);
+  const { tools } = await client.listTools();
+  const names = tools.map((t) => t.name);
+  expect(names).toContain("list_accounts");
+  expect(names).not.toContain("quick_add");
+  expect(tools.every((t) => t.annotations?.readOnlyHint === true)).toBe(true);
+  expect(client.getInstructions()).toContain("Free plan");
+  const read = await client.callTool({ name: "list_accounts", arguments: {} });
+  expect(read.isError).toBeFalsy();
+  const write = await client.callTool({ name: "quick_add", arguments: { amountText: "25rb", description: "kopi" } });
+  expect(write.isError).toBe(true);
+  expect(await db.select().from(schema.transaction)).toHaveLength(0);
   await settle();
 });

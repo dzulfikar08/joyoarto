@@ -78,7 +78,7 @@ function ClaudeConnector() {
               </Link>
             </li>
             <li>
-              {t("Joyo Pro: konektor Claude termasuk di Joyo Pro. Di paket Free, setiap alat menjawab bahwa konektor butuh Pro. ", "Joyo Pro: the Claude connector is part of Joyo Pro. On the Free plan every tool answers that the connector needs Pro. ")}
+              {t("Paket Free: Claude bisa membaca dan menjawab pertanyaan soal uangmu. Mencatat, import dan mengubah data lewat Claude termasuk di Joyo Pro. ", "Free plan: Claude can read your data and answer questions about it. Adding, importing and changing data from Claude is part of Joyo Pro. ")}
               <Link to="/pricing" className="font-semibold text-primary underline underline-offset-4">
                 {t("Lihat harga", "See pricing")}
               </Link>
@@ -260,8 +260,8 @@ function ClaudeConnector() {
         <Section id="masalah" title={t("Kalau ada masalah", "Troubleshooting")}>
           <ul className="list-disc space-y-1.5 pl-5">
             <li>
-              <b>{t("“The Claude connector is part of JoyoArto Pro”", "“The Claude connector is part of JoyoArto Pro”")}</b>:{" "}
-              {t("rumah tangga ini masih di paket Free. Upgrade di Settings → Billing.", "this household is on the Free plan. Upgrade in Settings → Billing.")}
+              <b>{t("Claude bilang tidak bisa mengubah apa pun", "Claude says it can't change anything")}</b>:{" "}
+              {t("koneksinya read-only, atau rumah tangga ini di paket Free (di Free, Claude hanya membaca). Pilih “Baca dan ubah” saat menyambungkan lagi, atau upgrade di Settings → Billing.", "the connection is read-only, or this household is on the Free plan (on Free, Claude only reads). Choose “Read and make changes” when you connect again, or upgrade in Settings → Billing.")}
             </li>
             <li>
               <b>“This connection was removed”</b>: {t("koneksinya diputus dari JoyoArto. Sambungkan lagi dari Claude.", "the connection was removed in JoyoArto. Connect again from Claude.")}

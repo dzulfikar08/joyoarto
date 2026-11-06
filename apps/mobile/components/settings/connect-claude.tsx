@@ -25,7 +25,7 @@ export function ConnectClaude() {
 
   return (
     <Card title="Connect Claude" subtitle="Ask Claude about your money, import statements by chat">
-      {billing.data && !billing.data.limits.mcpConnector ? <Text variant="caption" tone="warning">{proOnlyNote("The Claude connector", { storeSafe })}</Text> : null}
+      {billing.data && !billing.data.limits.mcpConnector ? <Text variant="caption" tone="warning">{proOnlyNote("Making changes from Claude", { storeSafe }) + " On this plan Claude can read and answer."}</Text> : null}
       <Text>
         <Text variant="label">claude.ai / Claude Desktop: </Text>
         Settings → Connectors → Add custom connector, with this URL. You sign in and approve there.
