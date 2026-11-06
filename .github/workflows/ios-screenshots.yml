@@ -104,6 +104,8 @@ jobs:
         env:
           DEMO_CODE: ${{ secrets.JOYOARTO_DEMO_CODE }}
           MAESTRO_CLI_NO_ANALYTICS: "1"
+          # The XCTest driver takes minutes to start on a cold hosted runner (default 15 s gives "iOS driver not ready").
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: "300000"
         run: |
           mkdir -p "$OUT"
           maestro --device "$UDID" test -e DEMO_CODE="$DEMO_CODE" -e OUT="$OUT" apps/mobile/scripts/ios/screenshots/flow.yaml \
