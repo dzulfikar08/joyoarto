@@ -7,7 +7,7 @@ import { useState, type ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-import { Button, Card, Icon, IconButton, Input, Pill, SwitchRow, Text } from "@/components/ui";
+import { Button, Card, Disclosure, Icon, IconButton, Input, Pill, SwitchRow, Text } from "@/components/ui";
 import { monthLabel, shiftMonth } from "@/src/lib/format";
 import {
   addBlocks,
@@ -339,10 +339,10 @@ function SaleEditor({ item, sale, onChange }: { item: LoanIn; sale: SaleOut | nu
               ]}
             />
           ) : null}
-          <Text variant="caption" tone="muted">
-            Add the next car as another loan bought in the sale month. Default resale: battery EVs in Indonesia lose about 35% in the first year and 10% a year after; ask for a
-            trade-in quote.
-          </Text>
+          <Text variant="caption" tone="muted">Add the next car as another loan bought in the sale month.</Text>
+          <Disclosure plain title="About the resale estimate">
+            Default resale: battery EVs in Indonesia lose about 35% in the first year and 10% a year after; ask for a trade-in quote.
+          </Disclosure>
         </>
       ) : null}
     </View>

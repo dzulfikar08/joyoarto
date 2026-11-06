@@ -7,4 +7,5 @@
 - D1: max 100 bound parameters per statement. Chunk anything caller-sized (`lib/d1.ts`).
 - Schema change: edit packages/db/src/schema, `bun run db:generate`, `bun run db:migrate:local`.
 - UI: use `@baroka/ui` components and tokens (bg-card, text-muted-foreground, primary/positive/warning/destructive); no raw stone/emerald colours. Dark mode is the `.dark` class.
+- Long explanations, how-it-works text and tables behind charts go in `Disclosure` (`@baroka/ui`, collapsed by default; `plain` inside a card), as in JoyoRogo. Headers keep one short subtitle.
 - Dropdowns: `Select` (short lists) or `Combobox` (searchable; categories, accounts, anything over ~10 options; `lazy` in table rows) from `@baroka/ui`. No native `<select>`. Category/account items come from `apps/web/src/lib/options.ts`.

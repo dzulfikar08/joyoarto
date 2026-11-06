@@ -12,7 +12,7 @@ import { Alert, Linking, View } from "react-native";
 
 import { useMe } from "@/components/data";
 import { SessionOnlyNote, useHasSession } from "@/components/session-only";
-import { Button, Card, Field, ListRow, ListSection, Row, Screen, SkeletonCard, Text } from "@/components/ui";
+import { Button, Card, Disclosure, Field, ListRow, ListSection, Row, Screen, SkeletonCard, Text } from "@/components/ui";
 import { signOut, useSession } from "@/src/lib/auth";
 import { downloadError, emailConfirmed, EXPORTS, exportFileName, exportUrl, nameConfirmed, type ExportKind } from "@/src/lib/data-privacy";
 import { errorMessage } from "@/src/lib/errors";
@@ -80,10 +80,10 @@ function Download() {
 
   return (
     <Card title="Download your data">
-      <Text tone="muted">
-        Everything about you and the active household (profile, accounts, transactions, categories, rules, budgets, imports, saved plan scenarios, tokens, connected apps, AI
-        activity log, your Joyo AI conversations and AI usage counts) as JSON, or just the transactions as CSV for a spreadsheet. You choose where it goes in the share sheet.
-      </Text>
+      <Text tone="muted">Everything as JSON, or just the transactions as CSV. You choose where it goes in the share sheet.</Text>
+      <Disclosure plain title="What the JSON includes">
+        Everything about you and the active household: profile, accounts, transactions, categories, rules, budgets, imports, saved plan scenarios, tokens, connected apps, AI activity log, your Joyo AI conversations and AI usage counts.
+      </Disclosure>
       <Row>
         <Button title="All (JSON)" icon="download-outline" small flex loading={busy === "json"} disabled={!!busy} onPress={() => void run("json")} />
         <Button title="Transactions (CSV)" variant="secondary" small flex loading={busy === "csv"} disabled={!!busy} onPress={() => void run("csv")} />

@@ -29,6 +29,9 @@ export const lightTheme = {
     primaryForeground: "#fafcff",
     primarySoft: "#e6eeff",
     primaryInk: "#283f92",
+    /** The balance card (Home, Accounts): primary in light mode, the deep primary-soft in dark. */
+    hero: "#3752ae",
+    heroForeground: "#fafcff",
     destructive: "#d02c2a",
     destructiveSoft: "#ffe7e4",
     destructiveInk: "#9e1618",
@@ -73,6 +76,8 @@ export const darkTheme = {
     primaryForeground: "#0a1023",
     primarySoft: "#212c4c",
     primaryInk: "#bdd0ff",
+    hero: "#212c4c",
+    heroForeground: "#f4f1ec",
     destructive: "#fa6863",
     destructiveSoft: "#4b1d1b",
     destructiveInk: "#ffbdb7",

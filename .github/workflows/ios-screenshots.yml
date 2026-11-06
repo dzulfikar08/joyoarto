@@ -123,12 +123,16 @@ jobs:
           MAESTRO_DRIVER_STARTUP_TIMEOUT: "300000"
         run: |
           mkdir -p "$OUT"
-          maestro --device "$UDID" test -e DEMO_CODE="$DEMO_CODE" -e OUT="$OUT" apps/mobile/scripts/ios/screenshots/flow.yaml \
+          # takeScreenshot with an absolute ${OUT} path fails in current Maestro, so the flow uses bare names (01-home)
+          # and runs from $OUT; whichever directory Maestro resolves them against, collect them into $OUT afterwards.
+          collect() { find "$OUT" "$GITHUB_WORKSPACE/apps/mobile/scripts/ios/screenshots" "$HOME/.maestro" -name '[0-9][0-9]-*.png' -not -path "$OUT/*" -exec cp {} "$OUT/" \; 2>/dev/null || true; }
+          (cd "$OUT" && maestro --device "$UDID" test -e DEMO_CODE="$DEMO_CODE" "$GITHUB_WORKSPACE/apps/mobile/scripts/ios/screenshots/flow.yaml") \
             || { xcrun simctl io "$UDID" screenshot "$OUT/zz-failure.png"
                  xcrun simctl spawn "$UDID" log show --last 10m --style compact \
                    --predicate 'process == "JoyoArto"' > "$OUT/app.log" 2>&1 || true
                  grep -iE "error|exception|fatal|warn" "$OUT/app.log" | tail -n 60 || true
-                 exit 1; }
+                 collect; exit 1; }
+          collect
 
       - name: Check the sizes
         if: always()

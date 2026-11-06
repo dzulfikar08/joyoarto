@@ -23,12 +23,12 @@ appId: com.joyodigitama.joyoarto
 # Let the dashboard's queries and charts settle.
 - waitForAnimationToEnd:
     timeout: 15000
-- takeScreenshot: ${OUT}/01-home
+- takeScreenshot: 01-home
 
 - tapOn: "Transactions"
 - waitForAnimationToEnd:
     timeout: 15000
-- takeScreenshot: ${OUT}/02-transactions
+- takeScreenshot: 02-transactions
 
 - openLink: joyoarto://accounts
 - runFlow:
@@ -38,7 +38,7 @@ appId: com.joyodigitama.joyoarto
       - tapOn: "Open"
 - waitForAnimationToEnd:
     timeout: 15000
-- takeScreenshot: ${OUT}/03-accounts
+- takeScreenshot: 03-accounts
 
 - openLink: joyoarto://plan
 - runFlow:
@@ -48,7 +48,7 @@ appId: com.joyodigitama.joyoarto
       - tapOn: "Open"
 - waitForAnimationToEnd:
     timeout: 15000
-- takeScreenshot: ${OUT}/04-plan
+- takeScreenshot: 04-plan
 
 - openLink: joyoarto://import
 - runFlow:
@@ -58,7 +58,7 @@ appId: com.joyodigitama.joyoarto
       - tapOn: "Open"
 - waitForAnimationToEnd:
     timeout: 15000
-- takeScreenshot: ${OUT}/05-import
+- takeScreenshot: 05-import
 
 # Quick add: the centre tab button opens the add sheet.
 - openLink: joyoarto://
@@ -78,4 +78,4 @@ appId: com.joyodigitama.joyoarto
 - tapOn: "kopi 25rb gopay"
 - inputText: "kopi 25rb gopay"
 - hideKeyboard
-- takeScreenshot: ${OUT}/06-quick-add
+- takeScreenshot: 06-quick-add

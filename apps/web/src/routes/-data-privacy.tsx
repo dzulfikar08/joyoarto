@@ -5,6 +5,8 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { Button } from "@baroka/ui/components/button";
+import { Disclosure } from "@baroka/ui/components/disclosure";
+import { ShieldCheck } from "lucide-react";
 import { Input } from "@baroka/ui/components/input";
 
 import { authClient } from "@/lib/auth-client";
@@ -26,9 +28,8 @@ function save(file: File) {
 
 export function DataPrivacySettings() {
   return (
-    <section className="card space-y-5 text-sm" id="data-privacy">
-      <div className="flex flex-wrap items-baseline gap-x-3">
-        <h2 className="font-semibold">Data &amp; privacy</h2>
+    <Disclosure id="data-privacy" icon={<ShieldCheck />} title="Data & privacy" description="Download or delete your data" bodyClassName="space-y-5 text-foreground">
+      <div>
         <span className="text-xs text-muted-foreground">
           <Link to="/privasi" className="underline">
             Privacy policy
@@ -43,7 +44,7 @@ export function DataPrivacySettings() {
       <ConnectedApps />
       <DeleteHousehold />
       <DeleteAccount />
-    </section>
+    </Disclosure>
   );
 }
 

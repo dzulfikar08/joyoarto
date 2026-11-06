@@ -2,6 +2,7 @@
 export * from "./avatar";
 export * from "./core";
 export * from "./date-field";
+export * from "./disclosure";
 export * from "./list";
 export * from "./money";
 export * from "./picker";

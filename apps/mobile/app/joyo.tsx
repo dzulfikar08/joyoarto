@@ -14,7 +14,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 import { invalidateLedger } from "@/components/data";
 import { AssistantTurn, UserBubble } from "@/components/joyo/message";
-import { Button, EmptyState, ErrorState, FieldLabel, Icon, IconButton, Input, ListRow, Segmented, Sheet, SkeletonRows, SwitchRow, Text } from "@/components/ui";
+import { Button, Disclosure, EmptyState, ErrorState, FieldLabel, Icon, IconButton, Input, ListRow, Segmented, Sheet, SkeletonRows, SwitchRow, Text } from "@/components/ui";
 import type { FetchLike } from "@/src/lib/api";
 import { currentCredentials } from "@/src/lib/auth";
 import { errorMessage } from "@/src/lib/errors";
@@ -454,12 +454,9 @@ function KeySheet({
       <FieldLabel label="Model (optional)">
         <Input value={model} onChangeText={setModel} placeholder={info?.defaultModel ?? ""} autoCapitalize="none" autoCorrect={false} accessibilityLabel="Model" />
       </FieldLabel>
-      <View style={styles.keyNote}>
-        <Text variant="caption" tone="muted">
-          The key stays on this phone, in its secure storage, and is removed when you sign out. It's sent with each question to JoyoArto's server, which uses it for that call to the
-          provider and never stores or logs it. Your question, the conversation and the ledger data Joyo reads go to that provider under its own terms. Not counted in the daily limit.
-        </Text>
-      </View>
+      <Disclosure plain title="How your key is used">
+        The key stays on this phone, in its secure storage, and is removed when you sign out. It's sent with each question to JoyoArto's server, which uses it for that call to the provider and never stores or logs it. Your question, the conversation and the ledger data Joyo reads go to that provider under its own terms. Not counted in the daily limit.
+      </Disclosure>
       <View style={{ flexDirection: "row", gap: 8 }}>
         {settings ? <Button title="Remove key" variant="secondary" disabled={saving} onPress={() => void save(null, "Key removed")} /> : null}
         <Button
@@ -487,5 +484,4 @@ const styles = StyleSheet.create((theme) => ({
   stopButton: { backgroundColor: theme.colors.primarySoft },
   notice: { backgroundColor: theme.colors.card, borderRadius: 24, borderWidth: 1, borderColor: theme.colors.border, padding: 14, gap: 4, alignItems: "flex-start" },
   disclaimer: { textAlign: "center", marginTop: 4 },
-  keyNote: { backgroundColor: theme.colors.muted, borderRadius: theme.radius.tile, padding: 12 },
 }));

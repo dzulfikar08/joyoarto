@@ -4,22 +4,24 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useRouter, type Href } from "expo-router";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Platform, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+import { BalanceCard, HeroGrid, HeroStat, HeroText } from "@/components/accounts/balance-card";
 import { BudgetSheet, type BudgetTarget } from "@/components/budgets/budget-sheet";
 import { CashflowChart } from "@/components/charts/cashflow";
 import { DonutChart, LegendRow, Swatch } from "@/components/charts/donut";
 import { PaceChart } from "@/components/charts/pace";
 import { useMe } from "@/components/data";
-import { Avatar, Card, EmptyState, ErrorState, Icon, IconButton, Pill, Row, Screen, SkeletonCard, Text, Button } from "@/components/ui";
+import { Avatar, Button, Card, Disclosure, EmptyState, ErrorState, Icon, IconButton, Pill, Row, Screen, SkeletonCard, Text } from "@/components/ui";
 import { isCaptureSupported, NotificationCapture } from "@/modules/notification-capture";
 import { counts } from "@/src/capture/queue";
 import { useCaptures } from "@/src/capture/store";
+import { shortName } from "@/src/lib/accounts";
 import { openAddSheet } from "@/src/lib/add-sheet";
-import { attentionItems, changeText, delta, donutSlices, keyOf, monthRange, OTHER, periodLabel, type Dashboard, type FilterLink } from "@/src/lib/dashboard";
+import { attentionItems, balanceSplit, changeText, delta, donutSlices, keyOf, monthRange, OTHER, periodLabel, type Dashboard, type FilterLink } from "@/src/lib/dashboard";
 import { currentMonthWib, monthLabel, shiftMonth } from "@/src/lib/format";
 import { orpc } from "@/src/lib/orpc";
 import { useSettings } from "@/src/lib/settings";
@@ -37,17 +39,10 @@ export default function Home() {
       <Header />
       <Screen refreshing={q.isRefetching && !q.isPlaceholderData} onRefresh={() => void q.refetch()}>
         <MonthSwitcher month={month} thisMonth={thisMonth} onChange={setMonth} />
-        <QuickAddCard />
         {q.isError && q.data ? <ErrorState error={q.error} onRetry={() => void q.refetch()} compact /> : null}
         {q.isPending ? (
           <>
-            <View style={styles.tiles}>
-              {[0, 1, 2, 3].map((i) => (
-                <View key={i} style={styles.tile}>
-                  <SkeletonCard height={56} />
-                </View>
-              ))}
-            </View>
+            <SkeletonCard height={300} />
             <SkeletonCard height={200} />
             <SkeletonCard lines={4} />
           </>
@@ -133,7 +128,8 @@ function Body({ d, onMonth, openTransactions }: { d: Dashboard; onMonth: (m: str
   }
   return (
     <>
-      <Kpis d={d} />
+      <Overview d={d} />
+      <QuickAddCard />
       <Categories d={d} openTransactions={openTransactions} />
       <Cashflow d={d} onMonth={onMonth} />
       <Pace d={d} />
@@ -145,53 +141,46 @@ function Body({ d, onMonth, openTransactions }: { d: Dashboard; onMonth: (m: str
   );
 }
 
-function DeltaText({ value, upIsGood, vs, unit }: { value: number | null | undefined; upIsGood: boolean; vs: string; unit?: "pct" | "pts" }) {
-  const { theme } = useUnistyles();
-  const dl = delta(value, upIsGood, unit);
-  if (!dl) return <Text variant="caption" tone="muted">no comparison for {vs}</Text>;
-  const color = dl.good === null ? theme.colors.mutedForeground : dl.good ? theme.viz.goodText : theme.viz.badText;
+/** Change vs the comparison period on the balance card: arrow and sign carry good/bad (no status colours there). */
+function HeroDelta({ value, vs, unit }: { value: number | null | undefined; vs: string; unit?: "pct" | "pts" }) {
+  const dl = delta(value, true, unit);
   return (
-    <Text variant="caption" tone="muted" numberOfLines={1}>
-      <Text variant="caption" style={{ color, fontFamily: theme.fonts.medium }}>{dl.text}</Text> vs {vs}
-    </Text>
+    // A row, not nested Text: opacity (faint) does not apply to nested text spans.
+    <Row gap={4}>
+      {dl ? <HeroText strong>{dl.text}</HeroText> : null}
+      <HeroText faint numberOfLines={1} style={{ flexShrink: 1 }}>
+        {dl ? `vs ${vs}` : `no comparison for ${vs}`}
+      </HeroText>
+    </Row>
   );
 }
 
-function Kpis({ d }: { d: Dashboard }) {
+/** Top of Home, like a bank app's balance card: today's total, its split by account type, and the month's figures. */
+function Overview({ d }: { d: Dashboard }) {
   const vs = periodLabel(d);
   const k = d.kpis;
   const sr = k.savingsRate;
-  const tiles: { label: string; value: string; tone?: "positive"; delta: ReactNode }[] = [
-    { label: "Money in", value: k.income.display, tone: "positive", delta: <DeltaText value={k.income.changePct} upIsGood vs={vs} /> },
-    { label: "Money out", value: k.spending.display, delta: <DeltaText value={k.spending.changePct} upIsGood={false} vs={vs} /> },
-    { label: "Net", value: k.net.display, delta: <DeltaText value={k.net.changePct} upIsGood vs={vs} /> },
-    {
-      label: "Savings rate",
-      value: sr.value === null ? "–" : `${sr.value}%`,
-      delta: sr.note ? (
-        <Text variant="caption" tone="muted">{sr.note === "too-early" ? "too early in the month" : "spending far above income"}</Text>
-      ) : (
-        <DeltaText value={sr.value !== null && sr.previous !== null ? Math.round((sr.value - sr.previous) * 10) / 10 : null} upIsGood vs={vs} unit="pts" />
-      ),
-    },
-  ];
+  const count = d.accounts.groups.reduce((n, g) => n + g.accounts.length, 0);
   return (
-    <View style={styles.tiles}>
-      {tiles.map((t) => (
-        <View key={t.label} style={styles.tile}>
-          <Card style={{ gap: 4, padding: 14 }}>
-            <Text variant="caption" tone="muted">{t.label}</Text>
-            <Text variant="heading" tone={t.tone} numberOfLines={1} adjustsFontSizeToFit style={{ fontVariant: ["tabular-nums"] }}>
-              {t.value}
-            </Text>
-            {t.delta}
-          </Card>
-        </View>
-      ))}
-      <Text variant="caption" tone="muted" style={{ width: "100%" }}>
-        Transfers between your own accounts are not counted.
-      </Text>
-    </View>
+    <BalanceCard total={d.accounts.total.display} caption={`${count} account${count === 1 ? "" : "s"} · today`} split={balanceSplit(d.accounts.groups)}>
+      <HeroGrid>
+        <HeroStat label="Income" value={k.income.display} delta={<HeroDelta value={k.income.changePct} vs={vs} />} />
+        <HeroStat label="Spending" value={k.spending.display} delta={<HeroDelta value={k.spending.changePct} vs={vs} />} />
+        <HeroStat label="Net" value={k.net.display} delta={<HeroDelta value={k.net.changePct} vs={vs} />} />
+        <HeroStat
+          label="Savings rate"
+          value={sr.value === null ? "–" : `${sr.value}%`}
+          delta={
+            sr.note ? (
+              <HeroText faint numberOfLines={1}>{sr.note === "too-early" ? "too early in the month" : "spending far above income"}</HeroText>
+            ) : (
+              <HeroDelta value={sr.value !== null && sr.previous !== null ? Math.round((sr.value - sr.previous) * 10) / 10 : null} vs={vs} unit="pts" />
+            )
+          }
+        />
+      </HeroGrid>
+      <HeroText faint>{monthLabel(d.month)} · transfers between your own accounts are not counted</HeroText>
+    </BalanceCard>
   );
 }
 
@@ -271,10 +260,16 @@ function Cashflow({ d, onMonth }: { d: Dashboard; onMonth: (m: string) => void }
       </Row>
       <CashflowChart months={months} selected={d.month} onSelect={onMonth} currency={d.currency} />
       {sel ? (
-        <Text variant="caption" tone="muted">
+        <Text variant="caption" tone="muted" style={styles.num}>
           {monthLabel(sel.month, "short")}: in {sel.income.display}, out {sel.expense.display}, net {sel.net.display}
         </Text>
       ) : null}
+      <Disclosure plain title="Table">
+        <TableRow head cells={["Month", "In", "Out", "Net"]} />
+        {d.cashflow.map((m) => (
+          <TableRow key={m.month} cells={[monthLabel(m.month, "short"), m.income.display, m.expense.display, m.net.display]} />
+        ))}
+      </Disclosure>
     </Card>
   );
 }
@@ -304,6 +299,14 @@ function Pace({ d }: { d: Dashboard }) {
         </Row>
       </Row>
       <PaceChart points={points} label={`Spending pace. ${sub}`} />
+      <Disclosure plain title="Table">
+        <TableRow head cells={["Day", cur, prev]} />
+        {d.spendingByDay
+          .filter((p) => p.day % 5 === 0 || p.day === 1 || p.day === d.spendingByDay.length)
+          .map((p) => (
+            <TableRow key={p.day} cells={[String(p.day), p.current?.display ?? "–", p.previous.display]} />
+          ))}
+      </Disclosure>
     </Card>
   );
 }
@@ -365,7 +368,7 @@ function Budgets({ d }: { d: Dashboard }) {
           >
             <Row style={{ justifyContent: "space-between" }}>
               <Text numberOfLines={1} style={{ flex: 1 }}>{b.name}</Text>
-              <Text variant="caption" tone="muted">
+              <Text variant="caption" tone="muted" style={styles.num}>
                 {b.spent.display} / {b.budget.display}
               </Text>
             </Row>
@@ -379,7 +382,11 @@ function Budgets({ d }: { d: Dashboard }) {
           </Pressable>
         );
       })}
-      {items.length ? <Text variant="caption" tone="muted">Tap a budget to change or remove it.{d.isCurrentMonth ? " The tick marks an even pace for today." : ""}</Text> : null}
+      {items.length ? (
+        <Disclosure plain title="How budgets work">
+          {`Tap a budget to change or remove it.${d.isCurrentMonth ? " The tick on each bar marks an even pace for today: past it, you are spending faster than the month." : ""}`}
+        </Disclosure>
+      ) : null}
       <BudgetSheet target={target} budgeted={items.map((b) => b.category)} onClose={() => setTarget(null)} />
     </Card>
   );
@@ -390,7 +397,7 @@ function Merchants({ d, openTransactions }: { d: Dashboard; openTransactions: (l
   if (!d.merchants.length) return null;
   const range = monthRange(d);
   return (
-    <Card title="Top merchants" subtitle="Where the most money went this month">
+    <Card title="Top merchants" subtitle="Biggest spending this month">
       {d.merchants.map((m, i) => (
         <Pressable key={m.name} accessibilityRole="button" onPress={() => openTransactions({ q: m.name.slice(0, 40), ...range })} style={({ pressed }) => [styles.merchant, pressed && { backgroundColor: theme.colors.muted }]}>
           <Text variant="caption" tone="muted" style={{ width: 16 }}>{i + 1}</Text>
@@ -406,16 +413,16 @@ function Merchants({ d, openTransactions }: { d: Dashboard; openTransactions: (l
 function Balances({ d, openTransactions }: { d: Dashboard; openTransactions: (l: FilterLink) => void }) {
   const { theme } = useUnistyles();
   return (
-    <Card title="Balances" subtitle="Opening balance plus recorded transactions, today" action={<Text variant="heading" style={{ fontVariant: ["tabular-nums"] }}>{d.accounts.total.display}</Text>}>
+    <Card title="Balances" subtitle="By account, today" action={<Text variant="heading" style={{ fontVariant: ["tabular-nums"] }}>{d.accounts.total.display}</Text>}>
       {d.accounts.groups.map((g) => (
         <View key={g.type} style={{ gap: 2 }}>
           <Row style={styles.groupHead}>
             <Text variant="caption" tone="muted" style={{ flex: 1 }}>{g.label}</Text>
-            <Text variant="caption" tone="muted">{g.total.display}</Text>
+            <Text variant="caption" tone="muted" style={styles.num}>{g.total.display}</Text>
           </Row>
           {g.accounts.map((a) => (
             <Pressable key={a.id} accessibilityRole="button" onPress={() => openTransactions({ accountId: a.id })} style={({ pressed }) => [styles.balance, pressed && { backgroundColor: theme.colors.muted }]}>
-              <Text numberOfLines={1} style={{ flex: 1 }}>{a.name}</Text>
+              <Text numberOfLines={1} style={{ flex: 1 }}>{shortName(a.name, a.institution)}</Text>
               <Text variant="label" tone={a.balance.amount < 0 ? "destructive" : "default"} style={{ fontVariant: ["tabular-nums"] }}>
                 {a.balance.display}
               </Text>
@@ -423,7 +430,23 @@ function Balances({ d, openTransactions }: { d: Dashboard; openTransactions: (l:
           ))}
         </View>
       ))}
+      <Disclosure plain title="How balances are worked out">
+        Each balance is the opening balance plus every recorded transaction, pending quick adds included. Debts (cards, loans) are subtracted from the total.
+      </Disclosure>
     </Card>
+  );
+}
+
+/** One line of a small table behind a chart: first cell left, figures right-aligned in tabular numbers. */
+function TableRow({ cells, head }: { cells: string[]; head?: boolean }) {
+  return (
+    <Row gap={8}>
+      {cells.map((c, i) => (
+        <Text key={i} variant="caption" tone={head ? "muted" : "default"} numberOfLines={1} style={[styles.num, i === 0 ? { width: 44 } : { flex: 1, textAlign: "right" }]}>
+          {c}
+        </Text>
+      ))}
+    </Row>
   );
 }
 
@@ -479,8 +502,7 @@ const styles = StyleSheet.create((theme) => ({
   quick: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: theme.colors.card, borderRadius: theme.radius.card, paddingHorizontal: 16, paddingVertical: 12 },
   quickIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: theme.colors.primarySoft },
   body: { gap: theme.spacing.md },
-  tiles: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  tile: { width: "48.8%", flexGrow: 1 },
+  num: { fontVariant: ["tabular-nums"] },
   attention: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 12 },
   dot: { width: 6, height: 6, borderRadius: 3 },
   track: { height: 8, borderRadius: 4, overflow: "visible" },

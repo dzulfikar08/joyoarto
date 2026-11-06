@@ -3,6 +3,7 @@
 // short card linking to it.
 import type { AppRouterClient } from "@baroka/api/routers/index";
 import { Badge } from "@baroka/ui/components/badge";
+import { Disclosure } from "@baroka/ui/components/disclosure";
 import { Button } from "@baroka/ui/components/button";
 import { Select } from "@baroka/ui/components/select";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -170,10 +171,7 @@ export function SavingsBlock({ state, onApply }: { state: PlanState; onApply: (c
       )}
 
       {waiting.length > 0 && (
-        <details className="text-sm">
-          <summary className="cursor-pointer text-xs text-muted-foreground hover:underline">
-            {t(`${waiting.length} kebiasaan belum cukup data`, `${waiting.length} habit${waiting.length > 1 ? "s" : ""} without enough data`)}
-          </summary>
+        <Disclosure plain title={<>{t(`${waiting.length} kebiasaan belum cukup data`, `${waiting.length} habit${waiting.length > 1 ? "s" : ""} without enough data`)}</>}>
           <ul className="mt-2 space-y-1">
             {waiting.map((h) => (
               <li key={h.key} className="flex items-baseline justify-between gap-2">
@@ -190,7 +188,7 @@ export function SavingsBlock({ state, onApply }: { state: PlanState; onApply: (c
           <p className="mt-1 text-[11px] text-muted-foreground">
             {t("Saran muncul setelah ada minimal 2 bulan lengkap dan sekitar 4 transaksi sebulan.", "Suggestions start from 2 complete months and about 4 purchases a month.")}
           </p>
-        </details>
+        </Disclosure>
       )}
 
       {ready.length > 0 && d?.effect && (

@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { Badge } from "@baroka/ui/components/badge";
+import { Disclosure } from "@baroka/ui/components/disclosure";
+import { Mail } from "lucide-react";
 import { Button } from "@baroka/ui/components/button";
 
 import { ProNotice } from "@/components/upgrade";
@@ -46,9 +48,8 @@ export function EmailImportSettings() {
     );
 
   return (
-    <section className="card space-y-3 text-sm">
+    <Disclosure id="email-import" icon={<Mail />} title="Import by email" description="Forward statement PDFs to a private address" bodyClassName="space-y-3 text-foreground">
       <div>
-        <h2 className="text-base font-bold tracking-tight">Import by email</h2>
         <p className="text-muted-foreground">
           Forward Bank Jago monthly statements and GoPay e-statements (PDF) to your household's private address. They are imported right away and you get a summary back.
           Only mail from a member's own email address is read.
@@ -112,6 +113,6 @@ export function EmailImportSettings() {
           </ul>
         </div>
       )}
-    </section>
+    </Disclosure>
   );
 }

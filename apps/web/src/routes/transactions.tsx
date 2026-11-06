@@ -7,6 +7,7 @@ import { Checkbox } from "@baroka/ui/components/checkbox";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@baroka/ui/components/empty";
 import { Input } from "@baroka/ui/components/input";
 import { Combobox } from "@baroka/ui/components/combobox";
+import { Disclosure } from "@baroka/ui/components/disclosure";
 import { Select } from "@baroka/ui/components/select";
 import { Skeleton } from "@baroka/ui/components/skeleton";
 import { Camera, ReceiptText, Search, SearchX } from "lucide-react";
@@ -20,6 +21,7 @@ import { PageHeader } from "@/components/kit";
 import { QuickAdd } from "@/components/quick-add";
 import { REIMBURSE_LABEL, TransactionExtras } from "@/components/receipts";
 import { requireSession } from "@/lib/auth";
+import { formatMoney } from "@/lib/format";
 import { accountOptions, categoryOptions } from "@/lib/options";
 import { client, errorMessage, orpc } from "@/lib/orpc";
 
@@ -166,6 +168,8 @@ function Transactions() {
       },
     });
   const filtered = Object.keys(search).length > 0;
+  const advanced = [f.reimburse, f.uncategorized, f.from, f.to].filter(Boolean).length;
+  const days = groupByDay(rows);
 
   return (
     <div className="space-y-4">
@@ -197,7 +201,10 @@ function Transactions() {
           searchPlaceholder="Search categories"
         />
         <Select size="sm" className="sm:w-36" value={f.status} onValueChange={(v) => set({ status: v as Status })} aria-label="Status" items={STATUS_ITEMS} />
-        <Select size="sm" className="sm:w-60" value={f.reimburse} onValueChange={(v) => set({ reimburse: v as ReimburseFilter })} aria-label="Reimburse" items={REIMBURSE_ITEMS} />
+      </div>
+      <Disclosure plain defaultOpen={advanced > 0} title={advanced ? `More filters (${advanced})` : "More filters"}>
+      <div className="grid grid-cols-2 items-end gap-2 pt-1 text-foreground sm:flex sm:flex-wrap">
+        <Select size="sm" className="col-span-2 sm:w-60" value={f.reimburse} onValueChange={(v) => set({ reimburse: v as ReimburseFilter })} aria-label="Reimburse" items={REIMBURSE_ITEMS} />
         <label className="flex min-h-10 cursor-pointer items-center gap-2 text-sm font-medium">
           <Checkbox checked={f.uncategorized} onCheckedChange={(checked) => set({ uncategorized: checked, category: "" })} />
           Uncategorized only
@@ -210,16 +217,17 @@ function Transactions() {
           To
           <Input type="date" className="h-10 px-3 sm:text-sm" value={f.to} min={f.from || undefined} onChange={(e) => set({ to: e.target.value })} />
         </label>
-        {filtered && (
-          <Button variant="link" size="sm" className="col-span-2 h-10 justify-self-start" onClick={() => void navigate({ search: {}, replace: true })}>
-            Clear filters
-          </Button>
-        )}
       </div>
-      <label className="flex cursor-pointer items-start gap-2 text-xs text-muted-foreground">
+      <label className="flex cursor-pointer items-start gap-2 pt-1 text-xs text-muted-foreground">
         <Checkbox className="-mt-px" checked={remember} onCheckedChange={setRemember} />
         Remember a category I pick for that merchant (adds a rule and fills in its past uncategorized rows)
       </label>
+      </Disclosure>
+      {filtered && (
+        <Button variant="link" size="sm" className="h-auto" onClick={() => void navigate({ search: {}, replace: true })}>
+          Clear filters
+        </Button>
+      )}
       </Card>
 
       {list.isPending && (
@@ -251,10 +259,16 @@ function Transactions() {
         </Card>
       )}
 
-      <ul className="divide-y divide-border overflow-hidden rounded-3xl bg-card empty:hidden">
-        {rows.map((t) => (
+      <div className="overflow-hidden rounded-3xl bg-card empty:hidden">
+        {days.map((day) => (
+          <section key={day.date}>
+            <header className="flex items-baseline justify-between gap-3 border-b border-border bg-muted/40 px-4 py-2 text-xs font-semibold text-muted-foreground sm:px-5">
+              <h2>{dayLabel(day.date)}</h2>
+              {day.out > 0 && <span className="tabular-nums">−{formatMoney(day.out)}</span>}
+            </header>
+      <ul className="divide-y divide-border">
+        {day.rows.map((t) => (
           <li key={t.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 sm:flex sm:flex-wrap sm:px-5 sm:py-2.5">
-            <span className="hidden w-20 shrink-0 text-xs tabular-nums text-muted-foreground sm:block">{t.date}</span>
             <div className="min-w-0 sm:flex-1">
               <div className="flex items-center gap-1.5">
                 <span className="truncate text-sm font-semibold">{t.merchant ?? t.description}</span>
@@ -275,7 +289,6 @@ function Transactions() {
                 {t.attachments.length > 0 && <Camera className="size-3.5 shrink-0 text-muted-foreground" aria-label={`${t.attachments.length} receipt photo(s)`} />}
               </div>
               <div className="truncate text-xs text-muted-foreground" title={t.description}>
-                <span className="tabular-nums sm:hidden">{t.date} · </span>
                 {t.account} · {t.description}
               </div>
             </div>
@@ -314,6 +327,9 @@ function Transactions() {
           </li>
         ))}
       </ul>
+          </section>
+        ))}
+      </div>
       {list.hasNextPage && (
         <Button variant="secondary" size="sm" className="w-full sm:w-auto" disabled={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
           {list.isFetchingNextPage ? "Loading…" : "Load more"}
@@ -322,6 +338,21 @@ function Transactions() {
     </div>
   );
 }
+
+/** Consecutive rows of the same day (the list is newest first), with the day's outgoing money in IDR, transfers between own accounts left out. */
+function groupByDay(rows: Tx[]) {
+  const days: { date: string; rows: Tx[]; out: number }[] = [];
+  for (const t of rows) {
+    let d = days.at(-1);
+    if (!d || d.date !== t.date) days.push((d = { date: t.date, rows: [], out: 0 }));
+    d.rows.push(t);
+    if (t.amount < 0 && t.currency === "IDR" && !t.category?.startsWith("transfer/")) d.out -= t.amount;
+  }
+  return days;
+}
+
+const DAY_FORMAT = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const dayLabel = (date: string) => DAY_FORMAT.format(new Date(`${date}T00:00:00Z`));
 
 /** Pending rows can still be corrected (amount, date, description); a statement row's own fields never change. */
 function EditPending({ t, onDone }: { t: Tx; onDone: () => void }) {

@@ -37,15 +37,15 @@ const card = (c: OgCard) => c;
  * Bump when the cards change (scripts/og.ts): WhatsApp, Telegram, X and Facebook cache share images by URL for days,
  * so a new ?v= makes them fetch the new picture.
  */
-export const OG_VERSION = "20261105";
+export const OG_VERSION = "20261106";
 /** Absolute-path URL of a share card, versioned for scraper caches. */
 export const ogPath = (c: Pick<OgCard, "file">) => `/${c.file}?v=${OG_VERSION}`;
 export const OG = {
   home: card({
     file: "og/home.png",
-    title: ["Mampu nggak beli mobil?", "Lihat dulu angkanya."],
-    sub: "Dihitung dari e-statement Jago & GoPay-mu: dana darurat, porsi cicilan, sisa tiap bulan.",
-    alt: "JoyoArto: Mampu nggak beli mobil? Lihat dulu angkanya, dihitung dari e-statement Jago & GoPay-mu.",
+    title: ["Keputusan uang besar,", "dengan angka yang pasti."],
+    sub: "Mobil, rumah, anak pertama: dijawab dari semua rekening dan transaksimu sendiri.",
+    alt: "JoyoArto: keputusan uang besar dengan angka yang pasti, dijawab dari semua rekening dan transaksimu sendiri.",
   }),
   demo: card({
     file: "og/demo.png",
@@ -78,9 +78,9 @@ export const OG = {
   /** public/og.png: the fallback for any page without its own card (same picture as home). */
   default: card({
     file: "og.png",
-    title: ["Mampu nggak beli mobil?", "Lihat dulu angkanya."],
-    sub: "Dihitung dari e-statement Jago & GoPay-mu: dana darurat, porsi cicilan, sisa tiap bulan.",
-    alt: "JoyoArto: Mampu nggak beli mobil? Lihat dulu angkanya.",
+    title: ["Keputusan uang besar,", "dengan angka yang pasti."],
+    sub: "Mobil, rumah, anak pertama: dijawab dari semua rekening dan transaksimu sendiri.",
+    alt: "JoyoArto: keputusan uang besar dengan angka yang pasti.",
   }),
 } satisfies Record<string, OgCard>;
 export const OG_CARDS: OgCard[] = Object.values(OG);
@@ -92,33 +92,27 @@ export const OG_SIZE = { width: 1200, height: 630 } as const;
 export const FAQ: { q: string; a: string }[] = [
   {
     q: "Bank apa aja yang bisa dibaca?",
-    a: "Sekarang Bank Jago (statement bulanan) dan GoPay (e-statement), langsung dibaca dan diverifikasi oleh JoyoArto. Berikutnya: BCA, BRI, Mandiri, DANA, SeaBank dan lainnya. Sementara itu, bank lain bisa lewat CSV atau minta Claude membaca PDF-nya.",
-  },
-  {
-    q: "Berapa harganya?",
-    a: "Ada paket Free (catat manual, CSV, 2 import statement sebulan) dan Joyo Pro: satu langganan per akun yang juga membuka Pro di JoyoRogo dan JoyoFit, dibeli di JoyoRogo per bulan atau per tahun. Harga terbarunya ada di halaman Harga. Kalau mau gratis sepenuhnya, kodenya open source: silakan host sendiri.",
+    a: "Bank Jago dan GoPay dibaca dan diverifikasi otomatis. Bank lain bisa lewat CSV atau minta Claude membaca PDF-nya. BCA, BRI, Mandiri dan lainnya menyusul.",
   },
   {
     q: "Apakah JoyoArto nyambung langsung ke rekening bank?",
-    a: "Nggak. JoyoArto nggak minta login bank dan nggak menarik data otomatis. Kamu yang download statement dari aplikasi bank lalu upload. Lebih repot sedikit, tapi lebih aman dan angkanya bisa dicek.",
+    a: "Nggak. JoyoArto nggak pernah minta login bank. Kamu download statement dari aplikasi bank lalu upload, jadi lebih aman dan angkanya bisa dicek.",
+  },
+  {
+    q: "Berapa harganya?",
+    a: "Paket Free gratis selamanya. Joyo Pro adalah satu langganan per akun yang juga membuka Pro di JoyoRogo dan JoyoFit, bulanan atau tahunan. Kodenya open source, jadi kamu juga bisa host sendiri.",
   },
   {
     q: "Harus pakai Claude?",
-    a: "Nggak wajib. Dashboard, import, kategori dan simulasi semua ada di web. Claude itu bonus: kalau kamu sudah pakai Claude, tinggal sambungkan dan tanya.",
-  },
-  {
-    q: "Ada aplikasi HP?",
-    a: IOS_TESTFLIGHT_URL
-      ? "Ada untuk Android, sudah di Google Play dalam tahap uji: catat cepat, baca notifikasi Jago dan GoPay, dan kirim PDF statement dari HP. Versi iPhone juga ada dalam tahap uji lewat TestFlight; langkahnya ada di bagian iPhone di atas."
-      : "Ada untuk Android, sudah di Google Play dalam tahap uji: catat cepat, baca notifikasi Jago dan GoPay, dan kirim PDF statement dari HP. Versi iPhone dibagikan lewat TestFlight dan link publiknya segera; langkahnya ada di bagian iPhone di atas. Sementara itu web-nya enak dipakai di Safari dan ada iOS Shortcuts buat catat cepat.",
+    a: "Nggak wajib. Semua fitur ada di web dan aplikasi, termasuk Joyo AI. Claude itu bonus kalau kamu sudah memakainya.",
   },
   {
     q: "Gimana cara pasang aplikasi Android-nya?",
-    a: "Tiga langkah. Pertama, gabung grup Google joyoarto-testers (groups.google.com/g/joyoarto-testers, siapa pun bisa gabung) pakai akun Google yang ada di HP-mu. Kedua, buka play.google.com/apps/testing/com.joyodigitama.joyoarto, ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store. Ketiga, buka aplikasinya dan masuk pakai Google; rumah tanggamu langsung dibuat.",
+    a: "Gabung grup Google joyoarto-testers (groups.google.com/g/joyoarto-testers), buka play.google.com/apps/testing/com.joyodigitama.joyoarto dan ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store dan masuk pakai Google.",
   },
   {
     q: "Data saya dipakai buat apa?",
-    a: "Cuma buat nampilin keuanganmu ke kamu (dan anggota rumah tangga yang kamu undang). Datamu nggak kami jual dan nggak dipakai buat iklan.",
+    a: "Cuma buat nampilin keuanganmu ke kamu dan anggota rumah tangga yang kamu undang. Nggak dijual, nggak dipakai buat iklan.",
   },
 ];
 
@@ -145,19 +139,19 @@ export const SITE_NAME = PRODUCT_NAME;
 export const url = (path: string) => (path === "/" ? `${SITE_URL}/` : `${SITE_URL}${path}`);
 
 const SOFTWARE_DESCRIPTION =
-  "Aplikasi keuangan keluarga open source untuk Indonesia: baca e-statement Bank Jago dan GoPay, cek setiap saldo sampai cocok, atur anggaran rumah tangga bareng pasangan, dan tanya Claude soal uangmu.";
+  "Aplikasi keuangan pribadi dan keluarga open source untuk Indonesia: semua rekening, arus kas, anggaran dan simulasi rencana besar dalam satu tempat, dihitung dari e-statement asli, dengan asisten AI.";
 
 export const PAGES: PublicPage[] = [
   {
     path: "/",
     file: "index.html",
     sources: ["src/routes/-landing.tsx", "src/routes/index.tsx"],
-    title: "JoyoArto: Mampu Nggak Beli Mobil? Cek dari e-Statement Jago & GoPay",
+    title: "JoyoArto: Aplikasi Keuangan Pribadi & Keluarga",
     description:
-      "Cicilan di brosur selalu kelihatan ringan. JoyoArto baca e-statement Jago & GoPay-mu, hitung uang masuk dan keluar tiap bulan, lalu uji cicilannya.",
+      "Keputusan uang besar dengan angka yang pasti. Semua rekening, arus kas, anggaran dan simulasi rencana dalam satu aplikasi. Gratis untuk mulai.",
     social: {
-      title: "Mampu nggak beli mobil? Lihat dulu angkanya.",
-      description: "JoyoArto baca e-statement Jago & GoPay-mu, lalu uji cicilannya: dana darurat masih 6 bulan, total cicilan di bawah 30% penghasilan. Coba demonya tanpa akun.",
+      title: "Keputusan uang besar, dengan angka yang pasti.",
+      description: "Rekening, anggaran, arus kas dan rencana besar, dihitung dari transaksi asli. Tanpa login bank. Coba demonya tanpa akun.",
     },
     og: OG.home,
     priority: 1,
@@ -369,42 +363,33 @@ const wrap = (main: string) => `${nav()}<main>${main}</main>${footer()}`;
 
 function homeBody(): string {
   const features: [string, string][] = [
-    ["Baca statement Jago & GoPay, dicek tiap saldonya", "Setiap pocket Jago jadi rekening sendiri. Saldo berjalan dan total harus cocok dengan statement, jadi angkanya bisa dipercaya."],
-    ["“Gopay - Generic” jadi nama merchant asli", "JoyoArto mencocokkan pembayaran GoPay dari Jago dengan e-statement GoPay, jadi kelihatan itu Kopi Kenangan atau Indomaret."],
-    ["Satu buku untuk keluarga", "Undang pasangan ke rumah tangga yang sama. Rekening, kategori dan rencana dipakai bareng, tiap orang tetap login pakai akunnya sendiri."],
-    ["Tanya Claude soal uangmu", "Konektor Claude (MCP) untuk claude.ai, Claude Desktop dan Claude Code: cari transaksi, rangkum pengeluaran, bantu kategorikan."],
-    ["Rencana & simulasi", "Kuat nggak ambil mobil ini, padahal bayi mau lahir? Hitungan dari data asli: dana darurat, porsi cicilan, saldo bulan demi bulan."],
-    ["Aplikasi Android & baca notifikasi", "Aplikasi Android (tahap uji di Google Play) mencatat dari notifikasi Jago & GoPay dan menerima PDF statement. iPhone: " + (IOS_TESTFLIGHT_URL ? "tahap uji lewat TestFlight." : "lewat TestFlight, link publiknya segera; sementara itu pakai web di Safari.")],
-    ["Open source (AGPL)", "Kodenya terbuka. Mau host sendiri boleh; mau praktis, pakai Joyo Pro yang kami jalankan."],
+    ["Semua rekening", "Bank, kartu kredit dan e-wallet dalam satu saldo."],
+    ["Arus kas", "Uang masuk dan keluar tiap bulan, per kategori."],
+    ["Anggaran", "Pasang batas per kategori dan pantau sisanya."],
+    ["Rencana & simulasi", "Uji cicilan mobil atau biaya bayi sebelum memutuskan."],
+    ["Asisten AI", "Tanya Joyo AI atau Claude pakai bahasa sehari-hari."],
+    ["Untuk keluarga", "Satu buku bareng pasangan, akun masing-masing."],
   ];
   return wrap(
-    `<h1>Mampu nggak beli mobil? Lihat dulu angkanya.</h1>` +
-      `<p>Cicilan di brosur dealer selalu kelihatan ringan. JoyoArto baca e-statement Jago dan GoPay-mu, hitung berapa yang benar-benar masuk dan keluar tiap bulan, lalu uji cicilannya: dana darurat masih cukup 6 bulan atau nggak, total cicilan masih di bawah 30% penghasilan atau nggak.</p>` +
-      `<p><a href="https://app.arto.joyorogo.com/login">Daftar gratis</a> · <a href="/demo">Coba demo, tanpa akun</a> · <a href="/#${ANDROID_SECTION_ID}">Coba di Android</a> · <a href="/#${IOS_SECTION_ID}">Coba di iPhone</a></p>` +
-      `<p>Simulasinya hitungan dari transaksimu sendiri, bukan nasihat keuangan.</p>` +
-      `<section id="kenapa"><h2>Nyatat pengeluaran itu membosankan kalau nggak ada tujuannya.</h2>` +
-      `<p>Tujuannya biasanya datang sendiri: mau beli mobil, anak mau lahir, kontrak rumah mau habis. Saat itu kamu butuh rata-rata pengeluaran dari bulan-bulan yang sudah lewat, bukan perkiraan. JoyoArto mengumpulkannya dari statement, jadi kamu nggak perlu mengetik tiap transaksi.</p><ul>` +
-      `<li>Cicilan mobil 4 juta sebulan, masih aman?</li><li>Anak pertama lahir tahun depan, tabungan masih jalan?</li>` +
-      `<li>Pindah ke kontrakan yang lebih besar, sisa berapa tiap bulan?</li><li>Cicilan dan paylater sekarang sudah makan berapa persen gaji?</li></ul></section>` +
-      `<section id="cara-kerja"><h2>Cara kerjanya: tiga langkah, sebulan sekali</h2><ol>` +
-      `<li><strong>Upload statement.</strong> Download e-statement Bank Jago dan GoPay (PDF) dari aplikasinya, lalu taruh di JoyoArto. Bank lain bisa lewat CSV.</li>` +
-      `<li><strong>Dicek sampai cocok.</strong> Setiap saldo berjalan dan total per pocket dihitung ulang. Upload ulang pun aman, nggak dobel.</li>` +
-      `<li><strong>Tanya Claude, bikin rencana.</strong> Tanya pakai bahasa sehari-hari, atau simulasikan cicilan mobil, biaya bayi, pindah rumah.</li></ol></section>` +
-      `<section id="fitur"><h2>Fitur</h2>${features.map(([t, b]) => `<h3>${esc(t)}</h3><p>${esc(b)}</p>`).join("")}</section>` +
-      `<section id="privasi"><h2>Uang itu urusan pribadi. Kami anggap begitu juga.</h2><p>Kodenya terbuka, jadi siapa pun bisa periksa ke mana datamu pergi. Nggak dijual, nggak dipakai buat iklan.</p></section>` +
-      `<section id="${ANDROID_SECTION_ID}"><h2>Jadi tester aplikasi Android JoyoArto</h2>` +
-      `<p>Aplikasinya sudah di Google Play, masih tahap uji. Tiga langkah untuk mulai:</p><ol>` +
-      `<li><strong>Gabung grup tester.</strong> Siapa pun bisa gabung di <a href="${ANDROID_TESTERS_GROUP_URL}">Google Groups: joyoarto-testers</a> (${esc(ANDROID_TESTERS_GROUP_EMAIL)}), pakai akun Google yang sama dengan di HP-mu.</li>` +
-      `<li><strong>Daftar jadi tester, lalu pasang.</strong> Buka <a href="${ANDROID_TESTING_URL}">halaman uji JoyoArto di Google Play</a>, ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store.</li>` +
-      `<li><strong>Masuk pakai Google, rumah tanggamu langsung dibuat.</strong></li></ol></section>` +
-      `<section id="${IOS_SECTION_ID}"><h2>Coba JoyoArto di iPhone</h2>` +
-      `<p>Versi iPhone dibagikan lewat TestFlight, aplikasi resmi Apple buat versi uji. Tiga langkah untuk mulai:</p><ol>` +
-      `<li><strong>Pasang TestFlight dari App Store.</strong> <a href="${TESTFLIGHT_APP_STORE_URL}">TestFlight di App Store</a>.</li>` +
+    `<h1>Keputusan uang besar, dengan angka yang pasti.</h1>` +
+      `<p>Mobil, rumah, anak pertama. JoyoArto merangkum semua rekeningmu dan menjawab dari data aslimu.</p>` +
+      `<p><a href="https://app.arto.joyorogo.com/login">Mulai gratis</a> · <a href="/demo">Coba demo, tanpa akun</a> · <a href="/#${ANDROID_SECTION_ID}">Android</a> · <a href="/#${IOS_SECTION_ID}">iPhone</a></p>` +
+      `<section id="fitur"><h2>Lebih dari catatan pengeluaran.</h2>${features.map(([t, b]) => `<h3>${esc(t)}</h3><p>${esc(b)}</p>`).join("")}</section>` +
+      `<section><h2>Putuskan hal besar dengan angka.</h2><p>Mobil baru, anak pertama, pindah rumah. Simulasikan dari rata-rata bulananmu sendiri, bulan demi bulan: dana darurat tetap aman, cicilan di bawah 30% penghasilan.</p></section>` +
+      `<section><h2>Angka yang bisa dipercaya.</h2><p>Upload e-statement, JoyoArto cek setiap saldo sampai cocok. Bank Jago & GoPay dibaca otomatis, bank lain lewat CSV.</p></section>` +
+      `<section id="privasi"><h2>Uang itu urusan pribadi.</h2><p>Tanpa login bank. Datamu nggak dijual dan nggak dipakai buat iklan. Kodenya terbuka (AGPL).</p></section>` +
+      `<section id="aplikasi"><h2>Di web, Android dan iPhone</h2>` +
+      `<h3 id="${ANDROID_SECTION_ID}">Android (Google Play, tahap uji)</h3><ol>` +
+      `<li>Gabung grup tester di <a href="${ANDROID_TESTERS_GROUP_URL}">Google Groups: joyoarto-testers</a> (${esc(ANDROID_TESTERS_GROUP_EMAIL)}).</li>` +
+      `<li>Buka <a href="${ANDROID_TESTING_URL}">halaman uji JoyoArto di Google Play</a>, ketuk “Jadi penguji”, lalu pasang dari Play Store.</li>` +
+      `<li>Masuk pakai Google.</li></ol>` +
+      `<h3 id="${IOS_SECTION_ID}">iPhone (TestFlight, tahap uji)</h3><ol>` +
+      `<li>Pasang <a href="${TESTFLIGHT_APP_STORE_URL}">TestFlight dari App Store</a>.</li>` +
       (IOS_TESTFLIGHT_URL
-        ? `<li><strong>Buka undangan TestFlight JoyoArto.</strong> Buka <a href="${IOS_TESTFLIGHT_URL}">link undangannya</a> di iPhone, lalu ketuk Accept, kemudian Install.</li>`
-        : `<li><strong>Buka undangan TestFlight JoyoArto.</strong> Link publiknya segera kami pasang di sini. Sementara itu, pakai <a href="https://app.arto.joyorogo.com/login">versi web</a> di Safari dengan akun yang sama.</li>`) +
-      `<li><strong>Masuk pakai Apple atau Google.</strong></li></ol></section>` +
-      `<section id="faq"><h2>Yang sering ditanyain</h2>${FAQ.map(({ q, a }) => `<h3>${esc(q)}</h3><p>${esc(a)}</p>`).join("")}</section>`,
+        ? `<li>Buka <a href="${IOS_TESTFLIGHT_URL}">undangan JoyoArto</a> di iPhone, ketuk Accept lalu Install.</li>`
+        : `<li>Undangan TestFlight segera; sementara pakai <a href="https://app.arto.joyorogo.com/login">versi web</a> di Safari.</li>`) +
+      `<li>Masuk pakai Apple atau Google.</li></ol></section>` +
+      `<section id="faq"><h2>Pertanyaan umum</h2>${FAQ.map(({ q, a }) => `<h3>${esc(q)}</h3><p>${esc(a)}</p>`).join("")}</section>`,
   );
 }
 

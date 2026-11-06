@@ -170,7 +170,7 @@ export default function PlanScreen() {
       {baseline.data ? <SavingsCard state={state} /> : null}
 
       {saved.data?.scenarios.length ? (
-        <Card title="Saved scenarios" subtitle="Shared with your household. Open one to compare it with what is on this page." padded>
+        <Card title="Saved scenarios" subtitle="Shared with your household" padded>
           {saved.data.scenarios.map((s) => {
             const by = s.updatedBy?.name ?? s.createdBy?.name;
             const onPage = openIds.has(s.id);

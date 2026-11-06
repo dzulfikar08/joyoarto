@@ -10,7 +10,7 @@ import { Alert, View } from "react-native";
 
 import { invalidateLedger } from "@/components/data";
 import { FormatRequestSheet } from "@/components/import/format-request";
-import { Button, Card, Icon, IconButton, Pill, Row, Text } from "@/components/ui";
+import { Button, Card, Disclosure, Icon, IconButton, Pill, Row, Text } from "@/components/ui";
 import { uploadStatement } from "@/src/imports/statement-file";
 import type { UploadFile } from "@/src/lib/api";
 import { getApi } from "@/src/lib/auth";
@@ -123,10 +123,10 @@ export function StatementBatch({ billing }: { billing: BillingStatus | undefined
 
   return (
     <Card title="Statement PDFs" subtitle="Bank Jago monthly statements and GoPay e-statements">
-      <Text tone="muted">
-        Add every month at once, Jago and GoPay mixed. Each PDF is checked first (every running balance must add up); nothing is saved until you tap Import. Each Jago pocket
-        becomes an account, and statements already imported add nothing twice.
-      </Text>
+      <Text tone="muted">Add every month at once, Jago and GoPay mixed.</Text>
+      <Disclosure plain title="How it works">
+        Each PDF is checked first (every running balance must add up); nothing is saved until you tap Import. Each Jago pocket becomes an account, and statements already imported add nothing twice.
+      </Disclosure>
       {left !== null && billing ? (
         <Text variant="caption" tone="muted">
           {left} of {billing.usage.statementImports.limit} statement imports left this month.
