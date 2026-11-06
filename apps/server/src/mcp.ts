@@ -1,6 +1,6 @@
 import type { Context as ApiContext, Principal, Scope } from "@baroka/api/context";
 import { SCOPES } from "@baroka/api/context";
-import { isDemoUser } from "@baroka/api/lib/demo";
+import { DEMO_TOKEN_DAYS, isDemoUser } from "@baroka/api/lib/demo";
 import { ensureHousehold } from "@baroka/api/lib/household";
 import { pruneMcpAudit } from "@baroka/api/services/account";
 import { userPlan } from "@baroka/api/services/billing";
@@ -17,11 +17,23 @@ import { and, eq } from "drizzle-orm";
 import type { Context, Hono } from "hono";
 import { cors } from "hono/cors";
 
+import { isAnthropicEgress } from "./anthropic-egress";
 import { billing } from "./billing";
 import { env } from "./env";
 import { getAuth, getDb } from "./services";
 
 
+/** What MCP clients show for this server (serverInfo); the directory listing and docs page say the same. */
+export const SERVER_INFO = {
+  name: "joyoarto",
+  title: "JoyoArto",
+  version: "1.0.0",
+  websiteUrl: "https://arto.joyorogo.com/claude",
+  icons: [
+    { src: "https://arto.joyorogo.com/icon-512.png", mimeType: "image/png", sizes: ["512x512"] },
+    { src: "https://arto.joyorogo.com/icon.svg", mimeType: "image/svg+xml", sizes: ["any"] },
+  ],
+};
 
 function text(data: unknown): CallToolResult {
   return { content: [{ type: "text", text: JSON.stringify(data) }] };
@@ -46,7 +58,7 @@ const UPGRADE_MESSAGE =
   "The Claude connector is part of JoyoArto Pro, and this household is on the Free plan. Tell the user they can upgrade in JoyoArto (Settings → Billing, or /pricing); everything else in the app keeps working on Free.";
 
 function createMcpServer(principal: Principal, clientId: string, waitUntil: (p: Promise<unknown>) => void, connectorAllowed: boolean): McpServer {
-  const server = new McpServer({ name: "joyoarto", title: "JoyoArto", version: "0.1.0" }, { instructions: MCP_INSTRUCTIONS });
+  const server = new McpServer(SERVER_INFO, { instructions: MCP_INSTRUCTIONS });
   const db = getDb();
   const context: ApiContext = { db, principal, billing };
 
@@ -60,8 +72,9 @@ function createMcpServer(principal: Principal, clientId: string, waitUntil: (p: 
         ...(input ? { inputSchema: input.shape } : {}),
         annotations: {
           readOnlyHint: def.readOnly ?? false,
-          destructiveHint: def.destructive ?? false,
-          idempotentHint: def.readOnly ?? false,
+          // The MCP default for a write tool is destructive; read-only tools have no destructive hint to give.
+          destructiveHint: def.readOnly ? false : (def.destructive ?? true),
+          idempotentHint: Boolean(def.readOnly || def.idempotent),
           openWorldHint: false,
         },
       },
@@ -135,15 +148,18 @@ async function authenticate(request: Request): Promise<{ principal: Principal; c
   }
   try {
     const p = await verifyMcpAccessToken(getAuth(), request, env.BETTER_AUTH_URL);
-    // The demo account (store reviewers) cannot keep a connection alive past its daily reset.
-    if (isDemoUser(p.userId)) return challenge(401, "demo", "The demo account cannot connect AI apps.");
     // A JWT cannot be revoked, so the consent is checked on every request: removing a connection works at once.
     const [consent] = await db
-      .select({ id: schema.oauthConsent.id })
+      .select({ id: schema.oauthConsent.id, createdAt: schema.oauthConsent.createdAt, updatedAt: schema.oauthConsent.updatedAt })
       .from(schema.oauthConsent)
       .where(and(eq(schema.oauthConsent.userId, p.userId), eq(schema.oauthConsent.clientId, p.clientId)))
       .limit(1);
     if (!consent) return challenge(401, "revoked", "This connection was removed. Connect JoyoArto again.");
+    // The demo account (store and connector-directory reviewers): its made-up data resets daily, and a connection to it
+    // lasts DEMO_TOKEN_DAYS, like the phone app's demo token. The daily reset removes older demo consents too.
+    if (isDemoUser(p.userId) && Date.now() - ((consent.updatedAt ?? consent.createdAt)?.getTime() ?? 0) > DEMO_TOKEN_DAYS * 86_400_000) {
+      return challenge(401, "demo", `Demo connections last ${DEMO_TOKEN_DAYS} days. Connect JoyoArto again with the demo code.`);
+    }
     return {
       principal: {
         userId: p.userId,
@@ -185,8 +201,11 @@ export function registerMcpRoutes(app: Hono) {
   };
 
   app.use("/api/auth/oauth2/register", async (c, next) => {
-    if (env.OAUTH_REGISTER_LIMITER && c.req.method === "POST") {
-      const { success } = await env.OAUTH_REGISTER_LIMITER.limit({ key: `register:${c.req.header("CF-Connecting-IP") ?? "unknown"}` });
+    const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
+    // claude.ai registers a client (DCR) for every new connection from Anthropic's few egress addresses, so a per-IP
+    // limit there would be shared by every Claude user; each of those registrations follows a person's Connect click.
+    if (env.OAUTH_REGISTER_LIMITER && c.req.method === "POST" && !isAnthropicEgress(ip)) {
+      const { success } = await env.OAUTH_REGISTER_LIMITER.limit({ key: `register:${ip}` });
       if (!success) return c.json({ error: "temporarily_unavailable", error_description: "Too many registrations; try again in a minute." }, 429);
     }
     await next();

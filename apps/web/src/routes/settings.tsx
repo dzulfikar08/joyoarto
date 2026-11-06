@@ -11,6 +11,7 @@ import { Avatar } from "@/components/avatar";
 import { PageHeader, ThemeSwitch } from "@/components/kit";
 
 import { requireSession, signOut } from "@/lib/auth";
+import { SITE_URL } from "@/lib/brand";
 import { SERVER_URL, client, errorMessage, orpc } from "@/lib/orpc";
 
 import { ProNotice } from "@/components/upgrade";
@@ -85,8 +86,12 @@ function Settings() {
         <h2 className="text-base font-bold tracking-tight">Connect Claude</h2>
         {billing.data && !billing.data.limits.mcpConnector && <ProNotice feature="mcpConnector" />}
         <p>
-          <b>claude.ai / Claude Desktop:</b> Settings → Connectors → Add custom connector, URL <code className="rounded-md bg-muted px-1.5 py-0.5 text-xs break-all">{mcpUrl}</code>. You
-          sign in and approve here.
+          <b>claude.ai / Claude Desktop:</b> Customize → Connectors → Add custom connector, URL <code className="rounded-md bg-muted px-1.5 py-0.5 text-xs break-all">{mcpUrl}</code>. You
+          sign in and approve here. What Claude sees and how to disconnect:{" "}
+          <a className="text-primary underline" href={`${SITE_URL}/claude`} target="_blank" rel="noreferrer">
+            the connector guide
+          </a>
+          .
         </p>
         <p>
           <b>Claude Code:</b> create a token below, then run

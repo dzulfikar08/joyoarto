@@ -16,8 +16,11 @@ export function isDemoUser(userId: string | null | undefined): boolean {
   return userId === DEMO_USER_ID;
 }
 
-/** Things the demo account may not do: anything that reaches real people or outlives the daily reset. */
-export type DemoRestricted = "invite" | "acceptInvite" | "leaveHousehold" | "deleteHousehold" | "deleteAccount" | "longLivedToken" | "emailImport" | "aiConnection";
+/**
+ * Things the demo account may not do: anything that reaches real people or outlives the daily reset. AI connections
+ * (OAuth) are allowed for reviewers of Claude's connectors directory and last DEMO_TOKEN_DAYS (apps/server/src/mcp.ts).
+ */
+export type DemoRestricted = "invite" | "acceptInvite" | "leaveHousehold" | "deleteHousehold" | "deleteAccount" | "longLivedToken" | "emailImport";
 
 const WHAT: Record<DemoRestricted, string> = {
   invite: "invite people",
@@ -27,7 +30,6 @@ const WHAT: Record<DemoRestricted, string> = {
   deleteAccount: "delete the account",
   longLivedToken: "create API tokens that last longer than a day",
   emailImport: "import statements by email",
-  aiConnection: "connect an AI app",
 };
 
 /** Throws FORBIDDEN (data.demo) when the caller is the demo user. */

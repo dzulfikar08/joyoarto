@@ -1,4 +1,4 @@
-// Chrome shared by the public pages (landing, demo, privacy policy, terms): header and footer.
+// Chrome shared by the public pages (landing, demo, Claude connector, privacy policy, terms): header and footer.
 
 import { buttonVariants } from "@baroka/ui/components/button";
 import { cn } from "@baroka/ui/lib/utils";
@@ -80,6 +80,9 @@ export function PublicFooter() {
           </Link>
           <Link to="/pricing" className="hover:underline">
             {en ? "Pricing" : "Harga"}
+          </Link>
+          <Link to="/claude" className="hover:underline">
+            Claude
           </Link>
           <Link to="/privasi" className="hover:underline">
             {en ? "Privacy" : "Privasi"}

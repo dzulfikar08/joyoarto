@@ -61,6 +61,13 @@ export const OG = {
     sub: "Satu langganan Joyo Pro: JoyoArto, JoyoRogo dan JoyoFit.",
     alt: "Harga JoyoArto: gratis untuk mulai, Joyo Pro satu langganan untuk JoyoArto, JoyoRogo dan JoyoFit.",
   }),
+  claude: card({
+    file: "og/claude.png",
+    eyebrow: "Konektor Claude",
+    title: ["Tanya Claude", "soal uangmu."],
+    sub: "Sambungkan JoyoArto ke Claude: pengeluaran, anggaran, cicilan. Kamu yang pegang izinnya.",
+    alt: "JoyoArto untuk Claude: sambungkan buku keuangan keluargamu ke Claude dan tanya soal pengeluaran, anggaran dan cicilan.",
+  }),
   legal: card({
     file: "og/legal.png",
     eyebrow: "Privasi & syarat",
@@ -119,7 +126,7 @@ export const FAQ: { q: string; a: string }[] = [
 // Pages
 
 export type PublicPage = {
-  path: "/" | "/demo" | "/pricing" | "/privasi" | "/syarat";
+  path: "/" | "/demo" | "/pricing" | "/claude" | "/privasi" | "/syarat";
   /** File in dist/ (Workers assets serve demo.html at /demo). */
   file: string;
   /** Route sources whose last commit dates the page (sitemap lastmod). */
@@ -181,6 +188,21 @@ export const PAGES: PublicPage[] = [
     og: OG.pricing,
     priority: 0.8,
     body: pricingBody,
+  },
+  {
+    path: "/claude",
+    file: "claude.html",
+    sources: ["src/routes/claude.tsx"],
+    title: "JoyoArto untuk Claude: Sambungkan Keuangan Keluarga ke Claude",
+    description:
+      "Cara menyambungkan JoyoArto ke Claude (konektor MCP): data apa yang dilihat Claude, izin baca dan tulis, contoh pertanyaan, dan cara memutuskannya.",
+    social: {
+      title: "Tanya Claude soal uangmu",
+      description: "Sambungkan JoyoArto ke Claude: pengeluaran, anggaran dan simulasi cicilan dari transaksimu sendiri. Kamu yang pegang izinnya.",
+    },
+    og: OG.claude,
+    priority: 0.6,
+    body: claudeBody,
   },
   {
     path: "/privasi",
@@ -340,7 +362,7 @@ function softwareApplication(): Record<string, unknown> {
 // Body for crawlers without JavaScript (and people with it turned off). Same words as the pages, kept short.
 
 const nav = () =>
-  `<header><p><a href="/"><strong>JoyoArto</strong></a></p><nav aria-label="Navigasi"><a href="/#fitur">Fitur</a> · <a href="/demo">Demo</a> · <a href="/pricing">Harga</a> · <a href="/#faq">FAQ</a> · <a href="https://app.arto.joyorogo.com/login">Masuk</a></nav></header>`;
+  `<header><p><a href="/"><strong>JoyoArto</strong></a></p><nav aria-label="Navigasi"><a href="/#fitur">Fitur</a> · <a href="/demo">Demo</a> · <a href="/pricing">Harga</a> · <a href="/claude">Claude</a> · <a href="/#faq">FAQ</a> · <a href="https://app.arto.joyorogo.com/login">Masuk</a></nav></header>`;
 const footer = () =>
   `<footer><p>JoyoArto oleh JoyoDigitama · <a href="/privasi">Kebijakan privasi</a> · <a href="/syarat">Syarat layanan</a> · <a href="${REPO}">Kode sumber (AGPL)</a> · <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></p></footer>`;
 const wrap = (main: string) => `${nav()}<main>${main}</main>${footer()}`;
@@ -399,6 +421,21 @@ function pricingBody(): string {
     `<h1>Harga JoyoArto</h1>` +
       `<p>Gratis untuk mulai: catat manual, quick add, import CSV dan beberapa import statement sebulan. Joyo Pro, satu langganan per akun yang juga membuka Pro di JoyoRogo dan JoyoFit: import e-statement tanpa batas, konektor Claude (MCP), simulasi rencana yang disimpan, dan lebih banyak anggota. Dibeli di JoyoRogo, harga dalam rupiah.</p>` +
       `<p>Kodenya open source (AGPL), jadi kamu juga bisa host sendiri secara gratis. <a href="https://app.arto.joyorogo.com/login">Mulai gratis</a>.</p>`,
+  );
+}
+
+function claudeBody(): string {
+  const mcp = "https://app.arto.joyorogo.com/mcp";
+  return wrap(
+    `<h1>Sambungkan JoyoArto ke Claude</h1>` +
+      `<p>Tanya Claude soal uangmu pakai bahasa sehari-hari. Claude membaca buku keuangan rumah tanggamu di JoyoArto lewat konektor MCP, hanya setelah kamu menyambungkan dan menyetujuinya. Alamat server MCP: <code>${mcp}</code>.</p>` +
+      `<h2>Yang kamu perlukan</h2><ul><li>Akun JoyoArto dan Joyo Pro (konektor Claude termasuk di Pro).</li><li>Akun Claude: claude.ai, Claude Desktop, aplikasi HP, atau Claude Code.</li></ul>` +
+      `<h2>Cara menyambungkan</h2><ol><li>Di Claude, buka Customize → Connectors.</li><li>Cari JoyoArto di direktori, atau pilih Add custom connector dan isi <code>${mcp}</code>.</li><li>Klik Connect, masuk ke JoyoArto, baca izinnya, lalu Allow.</li></ol>` +
+      `<p>Claude Code: <code>claude mcp add --transport http joyoarto ${mcp}</code>, lalu /mcp untuk masuk.</p>` +
+      `<h2>Izin: baca dan tulis</h2><p>Baca (finance:read): rekening, transaksi, anggaran, ringkasan dan simulasi. Tulis (finance:write): mencatat, meng-import dan mengkategorikan transaksi, aturan, anggaran, skenario. Kamu bisa memilih akses hanya-baca. Alat yang mengubah atau menghapus data ditandai destruktif, jadi Claude bertanya dulu.</p>` +
+      `<h2>Data apa yang dilihat Claude</h2><p>Hanya hasil alat yang dipanggil untuk permintaanmu, dari rumah tangga yang aktif. Foto struk tidak pernah dikirim. JoyoArto mencatat pemanggilan alat (bukan hasilnya) selama 90 hari dan tidak membaca percakapanmu dengan Claude. <a href="/privasi">Kebijakan privasi</a>.</p>` +
+      `<h2>Cara memutuskan</h2><p>Di JoyoArto: Settings → Data &amp; privacy → Connected AI apps → Disconnect (langsung berlaku). Di Claude: Customize → Connectors → JoyoArto → Remove.</p>` +
+      `<p>Bantuan: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>`,
   );
 }
 

@@ -46,8 +46,15 @@ export type ToolDef = {
    */
   chat?: "read" | "propose";
   input?: () => z.ZodObject;
+  /**
+   * MCP tool annotations (Claude's connectors directory requires them; Claude auto-allows read-only tools and always asks
+   * before destructive ones). readOnly: changes nothing. destructive: may change or remove data that already exists
+   * (false = only adds rows). Every write tool sets destructive explicitly (tools.test.ts checks).
+   */
   readOnly?: boolean;
   destructive?: boolean;
+  /** Calling it again with the same arguments changes nothing more. */
+  idempotent?: boolean;
   /** Arguments filled in when the caller leaves them out. */
   defaults?: Record<string, unknown>;
 };
@@ -61,7 +68,6 @@ const TOOLS: () => ToolDef[] = () => [
     scope: "finance:read",
     procedure: () => appRouter.accounts.list,
     input: () => z.object({ includeArchived: z.boolean().optional() }),
-    
     readOnly: true,
   },
   {
@@ -180,6 +186,7 @@ const TOOLS: () => ToolDef[] = () => [
     description: "Saves a plan scenario for the household: name plus plan (items and any baseline overrides, exactly as simulate_plan takes them). With id it updates that scenario; without, a scenario of the same name is replaced, else a new one is created (at most 50). Everyone in the household sees it. Only when the user asks to keep a scenario.",
     scope: "finance:write",
     procedure: () => appRouter.plan.scenarios.save,
+    destructive: true,
   },
   {
     name: "delete_scenario",
@@ -188,6 +195,7 @@ const TOOLS: () => ToolDef[] = () => [
     scope: "finance:write",
     procedure: () => appRouter.plan.scenarios.delete,
     destructive: true,
+    idempotent: true,
   },
   {
     name: "household_info",
@@ -241,6 +249,8 @@ const TOOLS: () => ToolDef[] = () => [
     description: "Marks money-out transactions as reimbursable by an employer profile (draft; default: the most recently used profile), or reimbursable=false to make them ordinary spending again. Items already in a claim cannot be changed here.",
     scope: "finance:write",
     procedure: () => appRouter.reimburse.mark,
+    destructive: true,
+    idempotent: true,
   },
   {
     name: "set_claim_status",
@@ -249,6 +259,8 @@ const TOOLS: () => ToolDef[] = () => [
     description: "paid: the employer paid the claim (pass paymentTransactionId, a money-in transaction, to mark it as the payment so it is not income; rejectIds for items they did not pay). rejected: the whole claim was refused (its items count as household spending again). submitted: undo.",
     scope: "finance:write",
     procedure: () => appRouter.reimburse.claims.setStatus,
+    destructive: true,
+    idempotent: true,
   },
   {
     name: "add_transaction",
@@ -256,6 +268,8 @@ const TOOLS: () => ToolDef[] = () => [
     description: "Records one transaction by hand (cash spending, something not on a statement yet). Amount is signed minor units. Idempotent: the same account, date, amount and description is not added twice.",
     scope: "finance:write",
     procedure: () => appRouter.transactions.add,
+    destructive: false,
+    idempotent: true,
   },
   {
     name: "quick_add",
@@ -266,6 +280,7 @@ const TOOLS: () => ToolDef[] = () => [
     scope: "finance:write",
     procedure: () => appRouter.transactions.quickAdd,
     defaults: { capturedVia: "mcp" },
+    destructive: false,
   },
   {
     name: "update_transaction",
@@ -274,7 +289,8 @@ const TOOLS: () => ToolDef[] = () => [
     description: "Changes the category, merchant name or note of one transaction. A statement's description, date and amount never change; on pending (quick-add) rows they can also be corrected.",
     scope: "finance:write",
     procedure: () => appRouter.transactions.update,
-    readOnly: false,
+    destructive: true,
+    idempotent: true,
   },
   {
     name: "categorize",
@@ -283,6 +299,7 @@ const TOOLS: () => ToolDef[] = () => [
     description: "Sets one category (and optionally a merchant name) on many transactions. With createRule, also remembers it for future imports and applies it to past uncategorised matches. Prefer field=merchant, match=equals for recurring merchants; use description contains for bank codes.",
     scope: "finance:write",
     procedure: () => appRouter.transactions.categorize,
+    destructive: true,
   },
   {
     name: "create_rule",
@@ -291,6 +308,7 @@ const TOOLS: () => ToolDef[] = () => [
     description: "A rule that sets a category and/or merchant name on transactions whose merchant or description matches (case-insensitive), optionally only for one account, direction or amount range. Applies to past uncategorised transactions too unless applyToExisting=false.",
     scope: "finance:write",
     procedure: () => appRouter.rules.create,
+    destructive: true,
   },
   {
     name: "set_budget",
@@ -299,6 +317,8 @@ const TOOLS: () => ToolDef[] = () => [
     description: "Sets the monthly limit of an expense category (its subcategories count toward it). Amount in minor units; 0 removes it.",
     scope: "finance:write",
     procedure: () => appRouter.budgets.set,
+    destructive: true,
+    idempotent: true,
   },
   {
     name: "create_account",
@@ -306,6 +326,7 @@ const TOOLS: () => ToolDef[] = () => [
     description: "Adds a bank account, credit card, e-wallet or cash wallet. Ask the user before creating one.",
     scope: "finance:write",
     procedure: () => appRouter.accounts.create,
+    destructive: false,
   },
   {
     name: "create_category",
@@ -313,6 +334,7 @@ const TOOLS: () => ToolDef[] = () => [
     description: 'Adds a category: "pets" or a subcategory "food/snacks" (the parent must exist).',
     scope: "finance:write",
     procedure: () => appRouter.categories.create,
+    destructive: false,
   },
   {
     name: "import_transactions",
@@ -320,6 +342,8 @@ const TOOLS: () => ToolDef[] = () => [
     description: "Imports transactions read from a bank, card or e-wallet statement into one account. Always call with commit=false first: it returns the new rows (duplicates of earlier imports are skipped), totals, a running-balance check and uncategorised count without saving. Then call again with the same rows and commit=true. At most 2000 rows per call; send rows in statement order.",
     scope: "finance:write",
     procedure: () => appRouter.imports.transactions,
+    destructive: false,
+    idempotent: true,
   },
   {
     name: "import_statement_text",
@@ -327,6 +351,8 @@ const TOOLS: () => ToolDef[] = () => [
     description: "For Bank Jago monthly statements and GoPay e-statements only: pass the PDF's extracted text and JoyoArto parses it itself, one account per Jago pocket, every running balance verified, and GoPay merchants merged into Jago payments. Preview with commit=false first. For other banks use import_transactions.",
     scope: "finance:write",
     procedure: () => appRouter.imports.statement,
+    destructive: false,
+    idempotent: true,
   },
   {
     name: "list_imports",
@@ -344,6 +370,7 @@ const TOOLS: () => ToolDef[] = () => [
     scope: "finance:write",
     procedure: () => appRouter.imports.undo,
     destructive: true,
+    idempotent: true,
   },
 ];
 

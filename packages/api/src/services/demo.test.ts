@@ -12,7 +12,7 @@ import { appRouter } from "../routers/index";
 import { testAccount, testDb, testPrincipal } from "../test/d1";
 import { savings } from "./savings";
 import { userPlan } from "./billing";
-import { demoLogin, demoRows, seedDemo, wibDate } from "./demo";
+import { demoLogin, demoRows, pruneDemoConnections, seedDemo, wibDate } from "./demo";
 import { principalFromToken } from "./tokens";
 
 let db: Database;
@@ -212,4 +212,25 @@ test("demo data has habits for Where to save", async () => {
   const r = await savings(db, { userId: DEMO_USER_ID, householdId: DEMO_HOUSEHOLD_ID, scopes: ["finance:read"], via: "session" }, { effect: false } as never);
   const keys = r.habits.filter((h) => h.suggestion).map((h) => h.key);
   expect(keys).toEqual(expect.arrayContaining(["food/coffee", "food/dining", "minimarket"]));
+});
+
+describe("AI connections to the demo", () => {
+  test("the daily reset drops consents and refresh tokens approved over a week ago, and keeps newer ones", async () => {
+    await seedDemo(db, NOW);
+    const day = 86_400_000;
+    await db.insert(schema.oauthClient).values({ id: "c", clientId: "claude", redirectUris: "[]" } as never);
+    const at = (daysAgo: number) => new Date(NOW.getTime() - daysAgo * day);
+    await db.insert(schema.oauthConsent).values([
+      { id: "old", clientId: "claude", userId: DEMO_USER_ID, scopes: "finance:read", createdAt: at(10) },
+      { id: "renewed", clientId: "claude", userId: DEMO_USER_ID, scopes: "finance:read", createdAt: at(10), updatedAt: at(1) },
+      { id: "new", clientId: "claude", userId: DEMO_USER_ID, scopes: "finance:read", createdAt: at(2) },
+    ]);
+    await db.insert(schema.oauthRefreshToken).values([
+      { id: "r-old", token: "t1", clientId: "claude", userId: DEMO_USER_ID, scopes: "finance:read", expiresAt: at(-20), createdAt: at(10) },
+      { id: "r-new", token: "t2", clientId: "claude", userId: DEMO_USER_ID, scopes: "finance:read", expiresAt: at(-20), createdAt: at(2) },
+    ]);
+    await pruneDemoConnections(db, NOW);
+    expect((await db.select({ id: schema.oauthConsent.id }).from(schema.oauthConsent)).map((r) => r.id).sort()).toEqual(["new", "renewed"]);
+    expect((await db.select({ id: schema.oauthRefreshToken.id }).from(schema.oauthRefreshToken)).map((r) => r.id)).toEqual(["r-new"]);
+  });
 });
