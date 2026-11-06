@@ -71,6 +71,12 @@ function DownloadData() {
   );
 }
 
+/** How much an AI app may do, from what the member approved. */
+function accessLabel(a: { scopes: string[]; readOnly: boolean }): string {
+  if (!a.scopes.some((s) => s.startsWith("finance:"))) return "no finance access";
+  return a.readOnly ? "read-only" : "read and make changes";
+}
+
 function ConnectedApps() {
   const qc = useQueryClient();
   const apps = useQuery(orpc.account.connections.queryOptions());
@@ -91,7 +97,7 @@ function ConnectedApps() {
           {list.map((a) => (
             <li key={a.clientId} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
               <span className="font-medium">{a.name}</span>
-              <span className="text-xs text-muted-foreground">{a.scopes.filter((s) => s.startsWith("finance:")).join(" ") || "no finance access"}</span>
+              <span className="text-xs text-muted-foreground">{accessLabel(a)}</span>
               <span className="text-xs text-muted-foreground">connected {date(a.connectedAt)}</span>
               {a.lastAuthorizedAt && <span className="text-xs text-muted-foreground">last refreshed {date(a.lastAuthorizedAt)}</span>}
               <button

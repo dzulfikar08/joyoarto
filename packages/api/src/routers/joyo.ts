@@ -67,7 +67,8 @@ function failureMessage(kind: AiErrorKind, engine: Engine): string {
 async function personOf(context: Context & { principal: Principal }) {
   const [u] = await context.db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, context.principal.userId));
   const [h] = await context.db.select({ name: schema.household.name }).from(schema.household).where(eq(schema.household.id, context.principal.householdId));
-  return { name: u?.name?.split(/\s+/)[0] ?? null, household: h?.name ?? null, today: todayWib() };
+  const { readOnly } = await joyo.getJoyoSettings(context.db, context.principal);
+  return { name: u?.name?.split(/\s+/)[0] ?? null, household: h?.name ?? null, today: todayWib(), readOnly };
 }
 
 export const joyoRouter = {
@@ -82,9 +83,20 @@ export const joyoRouter = {
       /** free: the hosted cap is Free's; Pro gets the server's (JOYO_AI_DAILY_CAP). */
       plan,
       voice: !!context.ai && (!!context.ai.workersAi || context.ai.fakeTranscript),
+      /** The member's Joyo AI read-only setting in this household (joyo.settings). */
+      readOnly: (await joyo.getJoyoSettings(context.db, context.principal)).readOnly,
       byokProviders: BYOK_PROVIDERS.map((id) => ({ id, label: PROVIDERS[id].label, defaultModel: PROVIDERS[id].defaultModel, suggested: PROVIDERS[id].suggested, keyUrl: PROVIDERS[id].keyUrl, keyPlaceholder: PROVIDERS[id].keyPlaceholder })),
     };
   }),
+
+  /**
+   * Read-only: Joyo AI only reads and explains. It is offered no write tools (nothing to confirm), and confirming a
+   * proposal from before is refused while it is on. Per member and household, so the web and the phone agree.
+   */
+  settings: writeProcedure
+    .route({ method: "PUT", path: "/joyo/settings", tags: ["joyo"], summary: "Set your Joyo AI settings (read-only) in the active household" })
+    .input(joyo.joyoSettingsInput)
+    .handler(({ context, input }) => joyo.setJoyoSettings(context.db, context.principal, input)),
 
   conversations: {
     list: readProcedure
@@ -213,7 +225,9 @@ export const joyoRouter = {
       if (!proposal) throw new ORPCError("NOT_FOUND", { message: "That suggestion is gone." });
       if (proposal.status === "done" || proposal.status === "dismissed") return { proposal };
       if (input.action === "dismiss") proposal.status = "dismissed";
-      else {
+      else if ((await joyo.getJoyoSettings(context.db, context.principal)).readOnly) {
+        throw new ORPCError("FORBIDDEN", { message: "Joyo AI is read-only. Turn off Read-only in Joyo's menu to make this change, or make it yourself in the app.", data: { reason: "readOnly" } });
+      } else {
         try {
           const result = await runProposal(proposal, context);
           proposal.status = "done";

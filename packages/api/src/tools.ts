@@ -382,6 +382,23 @@ export function toolCatalog(): ToolDef[] {
   return cached;
 }
 
+/**
+ * The tools a connection may see: those its scopes allow. A read-only connection (no finance:write) is never shown a
+ * write tool, so the model does not try one; the MCP server still checks the scope on every call.
+ */
+export function toolsForScopes(scopes: readonly Scope[]): ToolDef[] {
+  return toolCatalog().filter((t) => scopes.includes(t.scope));
+}
+
+const READ_ONLY_NOTE = `
+
+This connection is read-only: the user approved reading their data, not changing it. You cannot add, import, categorise or edit anything. When the user asks for a change, explain how they can make it themselves in the JoyoArto app, or tell them they can reconnect JoyoArto and choose "Read and make changes".`;
+
+/** The MCP server's instructions for a connection with these scopes. */
+export function mcpInstructions(scopes: readonly Scope[]): string {
+  return scopes.includes("finance:write") ? MCP_INSTRUCTIONS : MCP_INSTRUCTIONS + READ_ONLY_NOTE;
+}
+
 /** The zod object a tool's procedure validates its input with, so every client advertises the same schema. */
 export function toolInput(def: ToolDef): z.ZodObject | undefined {
   if (def.input) return def.input();

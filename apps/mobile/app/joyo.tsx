@@ -4,7 +4,7 @@
 // confirming runs the stored proposal on the server. The member's own API key is optional (secure store).
 // A detail page pushed on the root stack (the Joyo AI tab opens it), so the tab bar never covers the composer.
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { fetch as expoFetch } from "expo/fetch";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
@@ -14,7 +14,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 import { invalidateLedger } from "@/components/data";
 import { AssistantTurn, UserBubble } from "@/components/joyo/message";
-import { Button, EmptyState, ErrorState, FieldLabel, Icon, IconButton, Input, ListRow, Segmented, Sheet, SkeletonRows, Text } from "@/components/ui";
+import { Button, EmptyState, ErrorState, FieldLabel, Icon, IconButton, Input, ListRow, Segmented, Sheet, SkeletonRows, SwitchRow, Text } from "@/components/ui";
 import type { FetchLike } from "@/src/lib/api";
 import { currentCredentials } from "@/src/lib/auth";
 import { errorMessage } from "@/src/lib/errors";
@@ -169,7 +169,9 @@ export default function JoyoScreen() {
 
   const empty = items.length === 0;
   const title = view.conversationId ? (view.messages.find((m) => m.role === "user")?.content.slice(0, 60) ?? "Joyo AI") : "Joyo AI";
-  const subtitle = avail.kind === "ready" ? avail.subtitle : avail.kind === "loading" ? " " : avail.kind === "off" ? "Off on this server" : "Today's questions are used up";
+  const baseSubtitle = avail.kind === "ready" ? avail.subtitle : avail.kind === "loading" ? " " : avail.kind === "off" ? "Off on this server" : "Today's questions are used up";
+  const readOnly = status.data?.readOnly ?? false;
+  const subtitle = readOnly && avail.kind === "ready" ? `${baseSubtitle} · Read-only` : baseSubtitle;
 
   const renderItem = ({ item }: { item: Item }) => {
     switch (item.kind) {
@@ -211,7 +213,7 @@ export default function JoyoScreen() {
             {subtitle}
           </Text>
         </View>
-        <IconButton name="key-outline" label="Your API key" onPress={() => setKeyOpen(true)} />
+        <IconButton name="options-outline" label="Joyo AI settings" onPress={() => setKeyOpen(true)} />
         <IconButton name="time-outline" label="Conversations" onPress={() => setHistoryOpen(true)} />
         <IconButton name="create-outline" label="New chat" onPress={newChat} />
       </View>
@@ -230,7 +232,7 @@ export default function JoyoScreen() {
             <View style={{ gap: 6, marginBottom: 8 }}>
               <Text variant="title">Tanya soal uangmu</Text>
               <Text tone="muted">
-                Joyo reads your household's ledger to answer: spending, cashflow, budgets, and whether a plan is affordable. It suggests changes; you confirm them.
+                Joyo reads your household's ledger to answer: spending, cashflow, budgets, and whether a plan is affordable. {readOnly ? "It's set to read-only, so it explains changes instead of making them." : "It suggests changes; you confirm them."}
               </Text>
             </View>
           }
@@ -319,7 +321,7 @@ export default function JoyoScreen() {
       </View>
 
       <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} current={view.conversationId} onPick={(id) => void openConversation(id)} onDeleted={(id) => id === view.conversationId && newChat()} />
-      <KeySheet open={keyOpen} onClose={() => setKeyOpen(false)} settings={byok ?? null} providers={status.data?.byokProviders ?? []} hostedModel={status.data?.hosted?.model ?? null} />
+      <KeySheet open={keyOpen} onClose={() => setKeyOpen(false)} settings={byok ?? null} providers={status.data?.byokProviders ?? []} hostedModel={status.data?.hosted?.model ?? null} readOnly={readOnly} />
     </SafeAreaView>
   );
 }
@@ -373,7 +375,44 @@ type ProviderInfo = { id: ByokProvider; label: string; defaultModel: string; key
 
 const PROVIDER_LABEL: Record<ByokProvider, string> = { anthropic: "Anthropic", openrouter: "OpenRouter", openai: "OpenAI" };
 
-function KeySheet({ open, onClose, settings, providers, hostedModel }: { open: boolean; onClose: () => void; settings: ByokSettings | null; providers: readonly ProviderInfo[]; hostedModel: string | null }) {
+/** The member's read-only switch: saved on the server, so the web app follows it too. */
+function ReadOnlySetting({ value }: { value: boolean }) {
+  const qc = useQueryClient();
+  const save = useMutation({
+    mutationFn: (readOnly: boolean) => client.joyo.settings({ readOnly }),
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: orpc.joyo.status.key() });
+      toast.success(r.readOnly ? "Joyo is read-only" : "Joyo can suggest changes again");
+    },
+    onError: (e) => toast.error("Couldn't change the setting", errorMessage(e, { storeSafe })),
+  });
+  const shown = save.isPending && save.variables !== undefined ? save.variables : value;
+  return (
+    <SwitchRow
+      label="Read-only"
+      hint="Joyo only reads and explains; it won't suggest changes for you to confirm."
+      value={shown}
+      disabled={save.isPending}
+      onValueChange={(v) => save.mutate(v)}
+    />
+  );
+}
+
+function KeySheet({
+  open,
+  onClose,
+  settings,
+  providers,
+  hostedModel,
+  readOnly,
+}: {
+  open: boolean;
+  onClose: () => void;
+  settings: ByokSettings | null;
+  providers: readonly ProviderInfo[];
+  hostedModel: string | null;
+  readOnly: boolean;
+}) {
   const [provider, setProvider] = useState<ByokProvider>(settings?.provider ?? "anthropic");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState(settings?.model ?? "");
@@ -403,9 +442,10 @@ function KeySheet({ open, onClose, settings, providers, hostedModel }: { open: b
     <Sheet
       open={open}
       onClose={onClose}
-      title="Your own API key"
-      subtitle={hostedModel ? `Optional. Without one, Joyo uses JoyoArto's ${hostedModel} with a daily limit.` : "Joyo AI isn't set up on this server: add your own key to use it."}
+      title="Joyo AI settings"
+      subtitle={hostedModel ? `Your own API key is optional. Without one, Joyo uses JoyoArto's ${hostedModel} with a daily limit.` : "Joyo AI isn't set up on this server: add your own key to use it."}
     >
+      <ReadOnlySetting value={readOnly} />
       <Segmented label="Provider" value={provider} onChange={setProvider} options={BYOK_PROVIDERS.map((p) => ({ value: p, label: providers.find((x) => x.id === p)?.label ?? PROVIDER_LABEL[p] }))} />
       <FieldLabel label="API key" hint={settings && settings.provider === provider ? `Saved: ${maskKey(settings.apiKey)}. Leave blank to keep it.` : undefined}>
         <Input value={apiKey} onChangeText={setApiKey} placeholder={info?.keyPlaceholder ?? ""} secureTextEntry autoCapitalize="none" autoCorrect={false} accessibilityLabel="API key" />

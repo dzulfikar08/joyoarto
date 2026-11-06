@@ -182,11 +182,14 @@ export async function listConnections(db: Database, p: Pick<Principal, "userId">
       const consent = consents.find((x) => x.clientId === clientId);
       const latest = tokens.find((x) => x.clientId === clientId);
       const client = clients.get(clientId);
+      const scopes = (consent?.scopes ?? "").split(/[\s,]+/).filter(Boolean);
       return {
         clientId,
         name: client?.name || "Unnamed app",
         uri: client?.uri ?? null,
-        scopes: (consent?.scopes ?? "").split(/[\s,]+/).filter(Boolean),
+        scopes,
+        /** Approved without finance:write (or no consent left): it can look but not change anything. */
+        readOnly: !scopes.includes("finance:write"),
         connectedAt: consent?.createdAt ?? latest?.createdAt ?? null,
         lastAuthorizedAt: latest?.createdAt ?? null,
         hasConsent: Boolean(consent),

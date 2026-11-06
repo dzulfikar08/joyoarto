@@ -365,6 +365,10 @@ editable draft, then Save, which is `transactions.quickAdd` (pending, as before)
   create_rule, set_budget, save_scenario) never run in the answer loop: they become a card with Confirm and Dismiss, and
   `joyo.proposal` runs the stored arguments (never the client's) when the member confirms. A quick add's `clientRef` is
   the proposal id, so a double confirm adds one row.
+- **Read-only** (`joyo.settings`, `PUT /api/joyo/settings`, `household_member.joyo_read_only`, default off): per member
+  and household, so web and phone agree (switch in Joyo AI settings). When on, the model gets only `chat: "read"` tools
+  and a prompt saying it can only explain how the member could make a change; a write tool it names anyway gets an
+  error, never a card, and `joyo.proposal` refuses to confirm (dismiss still works) while the setting is on.
 - **Engines.** Hosted: Claude through `@anthropic-ai/sdk` with `ANTHROPIC_API_KEY` (default `claude-opus-5-5`,
   `JOYO_AI_MODEL`, effort `JOYO_AI_EFFORT`, server-side refusal fallback on), optionally through Cloudflare AI Gateway
   (`ANTHROPIC_BASE_URL`); without a key, the Workers AI binding (`JOYO_WORKERS_AI_MODEL`) through JoyoRogo's OpenAI-format
@@ -526,6 +530,12 @@ domain means updating the four URL vars in wrangler.jsonc, `SITE_URL`/`APP_ORIGI
 ## Connecting Claude
 
 - **claude.ai / Desktop:** add a custom connector with URL `<api origin>/mcp`; you sign in and approve on `/connect`.
+  When the app asks for both `finance:read` and `finance:write` (claude.ai asks for what the `WWW-Authenticate` challenge
+  advertises), the page offers **Read only** (default) or **Read and make changes**. Read only approves the request
+  without `finance:write` (the `scope` field of better-auth's `/oauth2/consent`), so the consent, the JWT and every
+  refresh lack it; `/mcp` then lists only the read tools and adds a read-only note to its instructions
+  (`toolsForScopes`, `mcpInstructions` in `packages/api/src/tools.ts`). Reconnecting asks again. Settings shows each
+  connection and token as read-only or read and write; tokens can be created read-only.
 - **Claude Code:** create a token in Settings, then
   `claude mcp add --transport http joyoarto <api origin>/mcp --header "Authorization: Bearer brk_..."`.
 

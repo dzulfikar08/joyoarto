@@ -41,3 +41,19 @@ export function parseOAuthRequest(query: string, nowMs = Date.now()): OAuthReque
   const scopes = (params.get("scope") ?? "").split(/\s+/).filter(Boolean);
   return { ok: true, query, clientId, scopes, redirectHost };
 }
+
+export type AccessChoice = "read" | "write";
+
+/** The consent page offers Read only vs Read and make changes when the app asked for both finance scopes. */
+export function offersAccessChoice(scopes: readonly string[]): boolean {
+  return scopes.includes("finance:read") && scopes.includes("finance:write");
+}
+
+/**
+ * The scopes to approve for a choice: read-only drops finance:write and keeps the rest (offline_access, so the
+ * connection still refreshes). Undefined = approve everything requested.
+ */
+export function grantedScopes(scopes: readonly string[], choice: AccessChoice): string | undefined {
+  if (!offersAccessChoice(scopes) || choice === "write") return undefined;
+  return scopes.filter((s) => s !== "finance:write").join(" ");
+}
