@@ -48,8 +48,20 @@ export type McpServerOptions = {
 };
 
 /** One request's MCP server: the tools this principal's scopes allow, run under its own context. */
+/** What MCP clients show for this server (serverInfo); the directory listing and docs page say the same. */
+export const SERVER_INFO = {
+  name: "joyoarto",
+  title: "JoyoArto",
+  version: "1.0.0",
+  websiteUrl: "https://arto.joyorogo.com/claude",
+  icons: [
+    { src: "https://arto.joyorogo.com/icon-512.png", mimeType: "image/png", sizes: ["512x512"] },
+    { src: "https://arto.joyorogo.com/icon.svg", mimeType: "image/svg+xml", sizes: ["any"] },
+  ],
+};
+
 export function createMcpServer({ db, billing, principal, clientId, waitUntil, connectorAllowed, limiter }: McpServerOptions): McpServer {
-  const server = new McpServer({ name: "joyoarto", title: "JoyoArto", version: "0.1.0" }, { instructions: mcpInstructions(principal.scopes) });
+  const server = new McpServer(SERVER_INFO, { instructions: mcpInstructions(principal.scopes) });
   const context: ApiContext = { db, principal, ...(billing ? { billing } : {}) };
 
   // Only the tools this connection's scopes allow are listed: a read-only connection never sees a write tool.
@@ -63,8 +75,9 @@ export function createMcpServer({ db, billing, principal, clientId, waitUntil, c
         ...(input ? { inputSchema: input.shape } : {}),
         annotations: {
           readOnlyHint: def.readOnly ?? false,
-          destructiveHint: def.destructive ?? false,
-          idempotentHint: def.readOnly ?? false,
+          // The MCP default for a write tool is destructive; read-only tools have no destructive hint to give.
+          destructiveHint: def.readOnly ? false : (def.destructive ?? true),
+          idempotentHint: Boolean(def.readOnly || def.idempotent),
           openWorldHint: false,
         },
       },

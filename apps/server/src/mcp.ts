@@ -1,6 +1,6 @@
 import type { Principal, Scope } from "@baroka/api/context";
 import { SCOPES } from "@baroka/api/context";
-import { isDemoUser } from "@baroka/api/lib/demo";
+import { DEMO_TOKEN_DAYS, isDemoUser } from "@baroka/api/lib/demo";
 import { ensureHousehold } from "@baroka/api/lib/household";
 import { userPlan } from "@baroka/api/services/billing";
 import { principalFromToken } from "@baroka/api/services/tokens";
@@ -12,6 +12,7 @@ import { and, eq } from "drizzle-orm";
 import type { Context, Hono } from "hono";
 import { cors } from "hono/cors";
 
+import { isAnthropicEgress } from "./anthropic-egress";
 import { billing } from "./billing";
 import { env } from "./env";
 import { createMcpServer } from "./mcp-server";
@@ -38,15 +39,18 @@ async function authenticate(request: Request): Promise<{ principal: Principal; c
   }
   try {
     const p = await verifyMcpAccessToken(getAuth(), request, env.BETTER_AUTH_URL);
-    // The demo account (store reviewers) cannot keep a connection alive past its daily reset.
-    if (isDemoUser(p.userId)) return challenge(401, "demo", "The demo account cannot connect AI apps.");
     // A JWT cannot be revoked, so the consent is checked on every request: removing a connection works at once.
     const [consent] = await db
-      .select({ id: schema.oauthConsent.id })
+      .select({ id: schema.oauthConsent.id, createdAt: schema.oauthConsent.createdAt, updatedAt: schema.oauthConsent.updatedAt })
       .from(schema.oauthConsent)
       .where(and(eq(schema.oauthConsent.userId, p.userId), eq(schema.oauthConsent.clientId, p.clientId)))
       .limit(1);
     if (!consent) return challenge(401, "revoked", "This connection was removed. Connect JoyoArto again.");
+    // The demo account (store and connector-directory reviewers): its made-up data resets daily, and a connection to it
+    // lasts DEMO_TOKEN_DAYS, like the phone app's demo token. The daily reset removes older demo consents too.
+    if (isDemoUser(p.userId) && Date.now() - ((consent.updatedAt ?? consent.createdAt)?.getTime() ?? 0) > DEMO_TOKEN_DAYS * 86_400_000) {
+      return challenge(401, "demo", `Demo connections last ${DEMO_TOKEN_DAYS} days. Connect JoyoArto again with the demo code.`);
+    }
     return {
       principal: {
         userId: p.userId,
@@ -88,8 +92,11 @@ export function registerMcpRoutes(app: Hono) {
   };
 
   app.use("/api/auth/oauth2/register", async (c, next) => {
-    if (env.OAUTH_REGISTER_LIMITER && c.req.method === "POST") {
-      const { success } = await env.OAUTH_REGISTER_LIMITER.limit({ key: `register:${c.req.header("CF-Connecting-IP") ?? "unknown"}` });
+    const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
+    // claude.ai registers a client (DCR) for every new connection from Anthropic's few egress addresses, so a per-IP
+    // limit there would be shared by every Claude user; each of those registrations follows a person's Connect click.
+    if (env.OAUTH_REGISTER_LIMITER && c.req.method === "POST" && !isAnthropicEgress(ip)) {
+      const { success } = await env.OAUTH_REGISTER_LIMITER.limit({ key: `register:${ip}` });
       if (!success) return c.json({ error: "temporarily_unavailable", error_description: "Too many registrations; try again in a minute." }, 429);
     }
     await next();

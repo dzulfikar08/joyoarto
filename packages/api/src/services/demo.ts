@@ -11,7 +11,7 @@
 import { schema } from "@baroka/db";
 import type { Database } from "@baroka/db";
 import { ORPCError } from "@orpc/server";
-import { and, count, eq, lt, ne } from "drizzle-orm";
+import { and, count, eq, lt, ne, sql } from "drizzle-orm";
 
 import type { Principal } from "../context";
 import { chunk, rowsPerInsert } from "../lib/d1";
@@ -192,7 +192,8 @@ async function clearDemoHouseholds(db: Database) {
 
 /**
  * Creates or resets the demo: the user (kept, with its sessions and tokens) and a freshly rebuilt household. Never
- * touches a household that has a member other than the demo user.
+ * touches a household that has a member other than the demo user. AI connections to the demo (reviewers of Claude's
+ * connectors directory) older than DEMO_TOKEN_DAYS are removed, as the MCP endpoint refuses them by then anyway.
  */
 export async function seedDemo(db: Database, now = new Date()): Promise<{ householdId: string; accounts: number; transactions: number; pending: number }> {
   const today = wibDate(now);
@@ -200,6 +201,8 @@ export async function seedDemo(db: Database, now = new Date()): Promise<{ househ
     .insert(schema.user)
     .values({ id: DEMO_USER_ID, name: DEMO_NAME, email: DEMO_EMAIL, emailVerified: true })
     .onConflictDoUpdate({ target: schema.user.id, set: { name: DEMO_NAME, email: DEMO_EMAIL, image: null } });
+
+  await pruneDemoConnections(db, now);
 
   const fresh = [
     db.insert(schema.household).values({ id: DEMO_HOUSEHOLD_ID, name: DEMO_HOUSEHOLD_NAME }),
@@ -277,6 +280,17 @@ export async function seedDemo(db: Database, now = new Date()): Promise<{ househ
 
   const pending = rows.filter((r) => r.status === "pending").length;
   return { householdId: DEMO_HOUSEHOLD_ID, accounts: ACCOUNTS.length, transactions: rows.length, pending };
+}
+
+/** Drops the demo user's AI connections (consents and refresh tokens) last approved over DEMO_TOKEN_DAYS ago. */
+export async function pruneDemoConnections(db: Database, now = new Date()): Promise<void> {
+  const cutoff = new Date(now.getTime() - DEMO_TOKEN_DAYS * DAY_MS);
+  const c = schema.oauthConsent;
+  const r = schema.oauthRefreshToken;
+  await db.batch([
+    db.delete(c).where(and(eq(c.userId, DEMO_USER_ID), lt(sql`coalesce(${c.updatedAt}, ${c.createdAt})`, cutoff.getTime()))),
+    db.delete(r).where(and(eq(r.userId, DEMO_USER_ID), lt(r.createdAt, cutoff))),
+  ]);
 }
 
 // ------------------------------------------------------------------------------------------------ signing in

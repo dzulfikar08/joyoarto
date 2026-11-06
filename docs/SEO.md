@@ -1,13 +1,13 @@
 # Search and link previews
 
-Only the public site, **https://arto.joyorogo.com** (`/`, `/demo`, `/pricing`, `/privasi`, `/syarat`), is meant for
+Only the public site, **https://arto.joyorogo.com** (`/`, `/demo`, `/pricing`, `/claude`, `/privasi`, `/syarat`), is meant for
 search results and share previews. The app host (app.arto.joyorogo.com), the old baroka.by.dzulfikar.com and
 workers.dev are `noindex`.
 
 | What | Where |
 | --- | --- |
 | Titles, descriptions, share copy, FAQ, JSON-LD, crawler body | `apps/web/src/lib/seo.ts` (Indonesian; the English toggle has no URL of its own, so no hreflang) |
-| Per-page HTML + `sitemap.xml` | `apps/web/scripts/prerender.ts`, run by `vite build` (plugin in `vite.config.ts`). Writes `dist/index.html`, `demo.html`, `pricing.html`, `privasi.html`, `syarat.html`; Workers assets serve `demo.html` at `/demo`. |
+| Per-page HTML + `sitemap.xml` | `apps/web/scripts/prerender.ts`, run by `vite build` (plugin in `vite.config.ts`). Writes `dist/index.html`, `demo.html`, `pricing.html`, `claude.html`, `privasi.html`, `syarat.html`; Workers assets serve `demo.html` at `/demo`. |
 | Head on client-side navigation | `apps/web/src/lib/head.ts` (`syncHead`, called from the root route); 404s: `components/not-found.tsx` (noindex) |
 | Share cards (1200×630 PNG) | `apps/web/public/og/*.png` and `public/og.png`, drawn by `bun run og` in apps/web (`scripts/og.ts`: satori + resvg, Plus Jakarta Sans from @fontsource, no network). Checked in; rerun after changing `OG` in seo.ts. |
 | `X-Robots-Tag` on static files | `apps/web/public/_headers` (host rules) |
@@ -31,7 +31,7 @@ names the FAQ entry to copy into seo.ts.
    `google-site-verification=…` TXT record into Cloudflare DNS for joyorogo.com (name `@`). Verify. That one
    property covers arto. and app. (app. stays out of results through noindex).
 2. **Sitemap:** Search Console → Sitemaps → submit `https://arto.joyorogo.com/sitemap.xml`.
-3. **URL Inspection** for `https://arto.joyorogo.com/` → *Request indexing* (then `/demo`, `/pricing`).
+3. **URL Inspection** for `https://arto.joyorogo.com/` → *Request indexing* (then `/demo`, `/pricing`, `/claude`).
 4. Optional: Bing Webmaster Tools → *Import from Google Search Console* (also feeds DuckDuckGo/Yahoo).
 
 ## Validators
