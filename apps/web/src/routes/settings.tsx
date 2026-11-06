@@ -4,6 +4,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@baroka/ui/components/button";
+import { Disclosure } from "@baroka/ui/components/disclosure";
+import { KeyRound, Sparkles } from "lucide-react";
 import { Checkbox } from "@baroka/ui/components/checkbox";
 import { Input } from "@baroka/ui/components/input";
 
@@ -51,7 +53,7 @@ function Settings() {
   const mcpUrl = `${SERVER_URL}/mcp`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader title="Settings" />
       <section className="card flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
         <Avatar name={me.data?.user.name} image={me.data?.user.image} className="size-11" />
@@ -70,10 +72,6 @@ function Settings() {
 
       <BillingSettings />
 
-      <EmailImportSettings />
-
-      <ReimburseSettings />
-
       <section className="card flex flex-wrap items-center justify-between gap-3 text-sm">
         <div>
           <h2 className="text-base font-bold tracking-tight">Appearance</h2>
@@ -82,8 +80,11 @@ function Settings() {
         <ThemeSwitch />
       </section>
 
-      <section className="card space-y-3 text-sm">
-        <h2 className="text-base font-bold tracking-tight">Connect Claude</h2>
+      <h2 className="px-1 pt-2 text-sm font-semibold text-muted-foreground">More</h2>
+      <EmailImportSettings />
+      <ReimburseSettings />
+
+      <Disclosure id="claude" icon={<Sparkles />} title="Connect Claude" description="claude.ai, Claude Desktop and Claude Code" bodyClassName="space-y-3 text-foreground">
         {billing.data && !billing.data.limits.mcpConnector && <ProNotice feature="mcpConnector" />}
         <p>
           <b>claude.ai / Claude Desktop:</b> Customize → Connectors → Add custom connector, URL <code className="rounded-md bg-muted px-1.5 py-0.5 text-xs break-all">{mcpUrl}</code>. You
@@ -105,10 +106,9 @@ function Settings() {
           </a>{" "}
           with the same token.
         </p>
-      </section>
+      </Disclosure>
 
-      <section className="card space-y-3">
-        <h2 className="text-base font-bold tracking-tight">API tokens</h2>
+      <Disclosure id="tokens" icon={<KeyRound />} title="API tokens" description="For Claude Code, scripts and iOS Shortcuts" bodyClassName="space-y-3 text-foreground">
         {create.data && (
           <div className="space-y-1 rounded-2xl bg-warning-soft p-3 text-sm text-warning-ink">
             <div>Copy it now; it is not shown again:</div>
@@ -150,7 +150,7 @@ function Settings() {
             </li>
           ))}
         </ul>
-      </section>
+      </Disclosure>
 
       <DataPrivacySettings />
     </div>

@@ -1,6 +1,8 @@
 // Settings → Reimbursement: the companies that pay expenses back, and what their claim reports print about you.
 
 import { Button } from "@baroka/ui/components/button";
+import { Disclosure } from "@baroka/ui/components/disclosure";
+import { BriefcaseBusiness } from "lucide-react";
 import { Input } from "@baroka/ui/components/input";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -45,9 +47,8 @@ export function ReimburseSettings() {
   const list = (profiles.data?.profiles ?? []).filter((p) => !p.archived);
 
   return (
-    <section id="reimburse" className="card scroll-mt-24 space-y-3 text-sm">
+    <Disclosure id="reimburse" icon={<BriefcaseBusiness />} title="Reimbursement · Diganti kantor" description="Companies that pay work expenses back" bodyClassName="space-y-3 text-foreground">
       <div>
-        <h2 className="text-base font-bold tracking-tight">Reimbursement · Diganti kantor</h2>
         <p className="text-muted-foreground">
           Who pays work expenses back, and what your claim reports print. Make reports on the{" "}
           <Link to="/reimburse" className="font-semibold text-primary underline">
@@ -89,7 +90,7 @@ export function ReimburseSettings() {
           Add a company
         </Button>
       )}
-    </section>
+    </Disclosure>
   );
 }
 

@@ -79,7 +79,8 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
   }, []);
 
   useLayoutEffect(() => {
-    if (followRef.current) toBottom();
+    // Nothing to follow before the first message: keep the welcome screen at the top.
+    if (followRef.current && (messages.length || live !== null || pendingQuestion)) toBottom();
   }, [messages, live, pendingQuestion, toBottom]);
 
   const streaming = live !== null;
@@ -188,7 +189,8 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
   const back = () => (canGoBack ? router.history.back() : void router.navigate({ to: "/" }));
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-3xl flex-col px-4">
+    // On desktop the page sits under the 4rem top bar; a full-height page would overflow by that much and scroll.
+    <div className="mx-auto flex min-h-dvh max-w-3xl flex-col px-4 sm:min-h-[calc(100dvh-4rem)]">
       <header className="sticky top-0 z-20 -mx-4 flex items-center gap-2 border-b border-border/60 bg-background/90 px-4 py-2.5 pt-[calc(0.625rem+env(safe-area-inset-top))] backdrop-blur sm:top-16 sm:pt-2.5">
         <Button type="button" variant="ghost" size="icon-sm" aria-label="Back" title="Back" className="sm:hidden" onClick={back}>
           <ArrowLeft aria-hidden />
@@ -220,8 +222,8 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
             <div>
               <h2 className="text-2xl font-extrabold tracking-tight">Tanya soal uangmu</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Joyo reads your household's ledger to answer: spending, cashflow, budgets, and whether a plan is affordable.{" "}
-                {status.data?.readOnly ? "It's set to read-only, so it explains changes instead of making them." : "It suggests changes; you confirm them."}
+                Answers from your own ledger.{" "}
+                {status.data?.readOnly ? "Read-only: it explains changes instead of making them." : "It suggests changes; you confirm them."}
               </p>
             </div>
             <ul className="grid gap-2 sm:grid-cols-2">
