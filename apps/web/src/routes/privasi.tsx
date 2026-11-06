@@ -455,6 +455,76 @@ const sections: Section[] = [
     },
   },
   {
+    id: "akses-pengelola",
+    title: { id: "Akses pengelola layanan", en: "What the operator can access" },
+    body: {
+      id: (
+        <>
+          <P>
+            {N} membaca datamu di server: untuk membaca mutasi rekening, menjawab Joyo AI, menjalankan konektor Claude dan impor lewat email. Karena itu datamu
+            tidak dienkripsi ujung ke ujung, dan secara teknis pengelola layanan ({CONTROLLER.name}) bisa mengaksesnya. Kami membatasinya begini:
+          </P>
+          <UL>
+            <li>
+              <b>Dienkripsi dengan kunci di luar database:</b> catatan transaksi, foto struk, percakapan Joyo AI (judul, pesan, langkah dan usulan), data profil
+              reimburse (nama pengaju, NIK karyawan, departemen, nama dan email atasan), catatan dan isi laporan klaim, skenario rencana yang disimpan, nama file
+              mutasi yang diimpor, subjek dan hasil email impor, serta argumen panggilan konektor AI. Kuncinya disimpan sebagai rahasia Cloudflare Worker yang
+              tidak bisa dibaca kembali dari dasbor, jadi isi database, ekspor dan cadangannya hanya menampilkan teks acak untuk data ini.
+            </li>
+            <li>
+              <b>Tidak dienkripsi:</b> tanggal, jumlah, saldo, deskripsi bank dan nama merchant transaksi, nama rekening dan kategori, serta 4 digit terakhir
+              rekening. Data ini dipakai untuk pencarian, aturan kategori dan pencegah duplikat langsung di database.
+            </li>
+            <li>
+              <b>Tidak dijelajahi:</b> tidak ada halaman atau API admin yang menampilkan data keuangan anggota, dan kami tidak membuka datamu kecuali kamu
+              memintanya (misalnya untuk dukungan) atau diwajibkan hukum.
+            </li>
+            <li>
+              <b>Tercatat:</b> kode {N} terbuka untuk umum, dan perubahan ke layanan dipasang lewat proses otomatis yang tercatat di riwayat publiknya. Kueri
+              langsung ke database lewat akun Cloudflare dan perubahan kunci tercatat di log audit akun Cloudflare.
+            </li>
+          </UL>
+          <P>
+            Batasnya: pengelola yang sengaja memasang kode untuk membuka data, atau yang diwajibkan hukum, tetap bisa membacanya. Penjelasan teknisnya ada di
+            dokumen <A href="https://github.com/dzulfikar08/joyoarto/blob/main/docs/operator-access.md">operator-access.md</A>.
+          </P>
+        </>
+      ),
+      en: (
+        <>
+          <P>
+            {N} reads your data on the server: to read statements, answer Joyo AI, run the Claude connector and import by email. So your data is not end-to-end
+            encrypted, and the operator ({CONTROLLER.name}) can technically reach it. This is how that is limited:
+          </P>
+          <UL>
+            <li>
+              <b>Encrypted with a key kept outside the database:</b> transaction notes, receipt photos, Joyo AI conversations (titles, messages, steps and
+              proposals), reimbursement profile details (claimant name, employee ID, department, approver name and email), claim report notes and contents, saved
+              plan scenarios, imported statement file names, the subject and outcome of import emails, and the arguments of AI connector calls. The key is a
+              Cloudflare Worker secret that cannot be read back from the dashboard, so the database, its exports and backups show only scrambled text for these.
+            </li>
+            <li>
+              <b>Not encrypted:</b> transaction dates, amounts, balances, bank descriptions and merchant names, account and category names, and the last 4 digits of
+              account numbers. These are used for search, category rules and duplicate detection inside the database.
+            </li>
+            <li>
+              <b>Not browsed:</b> no admin page or API shows members&apos; finance data, and we do not open your data unless you ask (for support, say) or the law
+              requires it.
+            </li>
+            <li>
+              <b>Traceable:</b> {N}&apos;s code is public, and changes reach the service through an automated deploy recorded in its public history. Direct database
+              queries through the Cloudflare account and key changes are recorded in the Cloudflare account&apos;s audit log.
+            </li>
+          </UL>
+          <P>
+            The limit: an operator who deliberately deploys code that decrypts, or who is compelled by law, can still read it. The technical details are in{" "}
+            <A href="https://github.com/dzulfikar08/joyoarto/blob/main/docs/operator-access.md">operator-access.md</A>.
+          </P>
+        </>
+      ),
+    },
+  },
+  {
     id: "keamanan",
     title: { id: "Keamanan dan kebocoran data", en: "Security and data breaches" },
     body: {
@@ -462,8 +532,8 @@ const sections: Section[] = [
         <>
           <P>
             Semua koneksi memakai HTTPS. Token API dan link undangan disimpan sebagai hash. Data dipisah per rumah tangga dan setiap permintaan diperiksa
-            keanggotaannya. Aplikasi AI hanya bisa mengakses setelah kamu menyetujuinya, dan langsung terputus saat kamu mencabutnya. Hanya pengelola layanan yang
-            punya akses ke database, dan hanya untuk menjalankan layanan atau memenuhi permintaanmu. Tidak ada sistem yang sepenuhnya aman, dan kami tidak
+            keanggotaannya. Aplikasi AI hanya bisa mengakses setelah kamu menyetujuinya, dan langsung terputus saat kamu mencabutnya. Siapa yang bisa
+            mengakses data di server, dan bagaimana aksesnya dibatasi, ada di bagian <A href="#akses-pengelola">Akses pengelola layanan</A>. Tidak ada sistem yang sepenuhnya aman, dan kami tidak
             mengklaim sertifikasi keamanan apa pun.
           </P>
           <P>
@@ -476,8 +546,8 @@ const sections: Section[] = [
         <>
           <P>
             Every connection uses HTTPS. API tokens and invite links are stored as hashes. Data is separated per household and every request is checked against
-            membership. AI apps get access only after you approve them, and lose it as soon as you disconnect them. Only the operator has access to the database, and
-            only to run the service or handle your requests. No system is perfectly secure, and we do not claim any security certification.
+            membership. AI apps get access only after you approve them, and lose it as soon as you disconnect them. Who can reach data on the server, and how that is
+            limited, is under <A href="#akses-pengelola">What the operator can access</A>. No system is perfectly secure, and we do not claim any security certification.
           </P>
           <P>
             If a failure to protect your personal data happens, we will notify you and the personal data protection authority in writing within 3 × 24 hours of

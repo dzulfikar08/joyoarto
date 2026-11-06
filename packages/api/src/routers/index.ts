@@ -12,6 +12,7 @@ import * as attachments from "../services/attachments";
 import * as reimburse from "../services/reimburse";
 import * as dashboard from "../services/dashboard";
 import * as demo from "../services/demo";
+import * as encryption from "../services/encryption";
 import { billingRouter } from "./billing";
 import { householdRouter } from "./household";
 import { captureRouter, joyoRouter } from "./joyo";
@@ -467,6 +468,20 @@ export const appRouter = {
     reset: adminProcedure
       .route({ method: "POST", path: "/admin/demo/reset", tags: ["demo"], summary: "Create or reset the demo account's data (operators)" })
       .handler(({ context }) => demo.seedDemo(context.db)),
+  },
+
+  /** Operators only. Never answers with member data: counts and the key id (docs/operator-access.md). */
+  admin: {
+    encryptionBackfill: adminProcedure
+      .route({
+        method: "POST",
+        path: "/admin/encryption/backfill",
+        tags: ["admin"],
+        summary: "Encrypt rows and receipt photos stored before DATA_KEY was set, a few per call; repeat until done (operators)",
+        description: "Answers with counts per column only. Safe to repeat. 412 when DATA_KEY is not set.",
+      })
+      .input(encryption.backfillInput)
+      .handler(({ context, input }) => encryption.backfill(context.db, context.files, input)),
   },
 };
 

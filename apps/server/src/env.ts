@@ -62,6 +62,14 @@ export type Env = BillingEnv & {
   ATUR_INGEST_KEY?: string;
   /** Optional: Atur's base URL (default https://app.diatur.com). */
   ATUR_BASE_URL?: string;
+  /**
+   * Secret. 32 random bytes, base64 (`openssl rand -base64 32`): member data columns and receipt photos are encrypted
+   * with it (docs/operator-access.md). Unset = stored as plaintext, as before. Losing it loses that data: keep a copy
+   * outside Cloudflare. `wrangler secret put DATA_KEY`.
+   */
+  DATA_KEY?: string;
+  /** Secret, only during a key rotation: earlier DATA_KEY values (comma-separated) that can still be read. */
+  DATA_KEY_PREVIOUS?: string;
 };
 
 export const env = workerEnv as unknown as Env;

@@ -3,6 +3,7 @@
 
 import type { Context as ApiContext, Principal } from "@baroka/api/context";
 import type { BillingConfig } from "@baroka/api/lib/billing/config";
+import { sealText } from "@baroka/api/lib/data-key";
 import { pruneMcpAudit } from "@baroka/api/services/account";
 import { mcpInstructions, toolInput, toolsForScopes } from "@baroka/api/tools";
 import { schema } from "@baroka/db";
@@ -85,20 +86,22 @@ export function createMcpServer({ db, billing, principal, clientId, waitUntil, c
         const started = Date.now();
         const log = (outcome: string) =>
           waitUntil(
-            db
-              .insert(schema.mcpAudit)
-              .values({
-                id: crypto.randomUUID(),
-                userId: principal.userId,
-                clientId,
-                tool: def.name,
-                // Arguments only (ids, dates, filters); import rows are summarised, never stored.
-                // A notification body (rawText) is read once and never kept, not even here.
-                args: JSON.stringify(args, (k, v) => (k === "rows" && Array.isArray(v) ? `[${v.length} rows]` : k === "rawText" ? "[omitted]" : v)).slice(0, 500),
-                outcome,
-                ms: Date.now() - started,
-                createdAt: started,
-              })
+            // Arguments only (ids, dates, filters); import rows are summarised, never stored.
+            // A notification body (rawText) is read once and never kept, not even here. Sealed at rest (DATA_KEY):
+            // search text and quick-add descriptions are member data.
+            sealText(JSON.stringify(args, (k, v) => (k === "rows" && Array.isArray(v) ? `[${v.length} rows]` : k === "rawText" ? "[omitted]" : v)).slice(0, 500))
+              .then((sealedArgs) =>
+                db.insert(schema.mcpAudit).values({
+                  id: crypto.randomUUID(),
+                  userId: principal.userId,
+                  clientId,
+                  tool: def.name,
+                  args: sealedArgs,
+                  outcome,
+                  ms: Date.now() - started,
+                  createdAt: started,
+                }),
+              )
               // Retention (privacy policy: 90 days). No cron trigger yet, so about one call in 50 prunes old rows.
               .then(() => (Math.random() < 0.02 ? pruneMcpAudit(db) : 0))
               .catch((e: unknown) => console.error("[mcp] audit failed", e)),

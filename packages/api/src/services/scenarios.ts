@@ -9,6 +9,7 @@ import { z } from "zod";
 import type { Principal } from "../context";
 import type { BillingConfig } from "../lib/billing/config";
 import { chunk } from "../lib/d1";
+import { sealJson, unsealJson } from "../lib/data-key";
 import { savedPlan } from "../lib/plan/schema";
 import type { SavedPlan } from "../lib/plan/schema";
 import { assertScenarioSlot } from "./billing";
@@ -49,6 +50,11 @@ function columns() {
 
 type Row = { id: string; name: string; plan: unknown; view: unknown; createdAt: Date; updatedAt: Date; createdById: string | null; createdByName: string | null; updatedById: string | null; updatedByName: string | null };
 
+/** plan and view are sealed at rest (DATA_KEY). */
+async function opened<T extends { plan: unknown; view?: unknown }>(r: T): Promise<T> {
+  return { ...r, plan: await unsealJson(r.plan), ...("view" in r ? { view: await unsealJson(r.view) } : {}) };
+}
+
 function out(r: Row, withView: boolean) {
   // Rows are validated on save; parsing again applies defaults added to the schema since.
   const parsed = savedPlan.safeParse(r.plan);
@@ -78,13 +84,13 @@ function select(db: Database) {
 
 export async function listScenarios(db: Database, p: Principal) {
   const rows = await select(db).where(eq(ps.householdId, p.householdId)).orderBy(desc(ps.updatedAt)).limit(MAX_SCENARIOS);
-  return { scenarios: rows.map((r) => out(r, false)), max: MAX_SCENARIOS };
+  return { scenarios: (await Promise.all(rows.map(opened))).map((r) => out(r, false)), max: MAX_SCENARIOS };
 }
 
 export async function getScenario(db: Database, p: Principal, id: string) {
   const [row] = await select(db).where(and(eq(ps.householdId, p.householdId), eq(ps.id, id)));
   if (!row) notFound("Scenario");
-  return out(row, true);
+  return out(await opened(row), true);
 }
 
 /** Saved plans by id, in the order asked for; unknown ids (or another household's) are an error. */
@@ -96,7 +102,7 @@ export async function scenariosByIds(db: Database, p: Principal, ids: string[]) 
       .select({ id: ps.id, name: ps.name, plan: ps.plan })
       .from(ps)
       .where(and(eq(ps.householdId, p.householdId), inArray(ps.id, part)));
-    for (const r of rows) found.set(r.id, { id: r.id, name: r.name, plan: savedPlan.parse(r.plan) });
+    for (const r of rows) found.set(r.id, { id: r.id, name: r.name, plan: savedPlan.parse(await unsealJson(r.plan)) });
   }
   const missing = unique.filter((id) => !found.has(id));
   if (missing.length) notFound(`Saved scenario ${missing.join(", ")}`);
@@ -115,7 +121,7 @@ export async function saveScenario(db: Database, p: Principal, input: z.infer<ty
     if (byName && byName.id !== id) throw new ORPCError("CONFLICT", { message: `Another saved scenario is already called "${input.name}".` });
   } else id = byName?.id;
 
-  const values = { name: input.name, plan: input.plan as unknown as Record<string, unknown>, view, updatedBy: p.userId };
+  const values = { name: input.name, plan: await sealJson(input.plan as unknown as Record<string, unknown>), view: await sealJson(view), updatedBy: p.userId };
   if (id) {
     await db
       .update(ps)

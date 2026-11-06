@@ -11,6 +11,8 @@ import { z } from "zod";
 
 import type { FileStore, Principal } from "../context";
 import { purgeHouseholdFiles } from "./attachments";
+import { PROFILE_SEALED } from "./reimburse";
+import { unsealJson, unsealRow, unsealText } from "../lib/data-key";
 import { exponentOf } from "../lib/money";
 import { normalizeEmail } from "../lib/members";
 import { badRequest, notFound } from "./common";
@@ -111,7 +113,7 @@ async function* transactionPages(db: Database, householdId: string) {
       .orderBy(asc(t.date), asc(t.id))
       .limit(EXPORT_PAGE);
     if (!rows.length) return;
-    yield rows;
+    yield await Promise.all(rows.map((r) => unsealRow(r, ["note"])));
     if (rows.length < EXPORT_PAGE) return;
     const last: { date: string; id: string } = rows[rows.length - 1]!;
     after = { date: last.date, id: last.id };
@@ -142,7 +144,7 @@ async function* auditPages(db: Database, userId: string) {
       .orderBy(asc(a.createdAt), asc(a.id))
       .limit(EXPORT_PAGE);
     if (!rows.length) return;
-    yield rows.map((r) => ({ ...r, at: new Date(r.createdAt).toISOString() }));
+    yield await Promise.all(rows.map(async (r) => ({ ...r, args: await unsealText(r.args), at: new Date(r.createdAt).toISOString() })));
     if (rows.length < EXPORT_PAGE) return;
     const last: { createdAt: number; id: string } = rows[rows.length - 1]!;
     after = { createdAt: last.createdAt, id: last.id };
@@ -282,12 +284,12 @@ export async function* exportJsonChunks(db: Database, p: Principal, now = new Da
   yield field("rules", rules);
   yield field("budgets", budgets);
   yield field("tags", tags);
-  yield field("imports", imports);
+  yield field("imports", await Promise.all(imports.map((r) => unsealRow(r, ["fileName"]))));
   yield field("importMappings", mappings.map((m) => ({ ...m, config: safeJson(m.config) })));
   yield field("paymentHints", hints);
-  yield field("planScenarios", scenarios);
+  yield field("planScenarios", await Promise.all(scenarios.map(async (r) => ({ ...r, plan: await unsealJson(r.plan), view: await unsealJson(r.view) }))));
   yield field("emailImport", { enabled: emailImport.length > 0, since: emailImport[0]?.createdAt ?? null });
-  yield field("inboundEmails", inbound);
+  yield field("inboundEmails", await Promise.all(inbound.map(async (r) => ({ ...(await unsealRow(r, ["subject"])), detail: await unsealJson(r.detail) }))));
 
   const [attachments, reimbursementProfiles, claims] = await db.batch([
     db
@@ -306,8 +308,11 @@ export async function* exportJsonChunks(db: Database, p: Principal, now = new Da
     db.select().from(schema.reimbursementClaim).where(eq(schema.reimbursementClaim.householdId, h)),
   ]);
   yield field("attachments", attachments);
-  yield field("reimbursementProfiles", reimbursementProfiles);
-  yield field("reimbursementClaims", claims.map((c) => ({ ...c, snapshot: safeJson(c.snapshot) })));
+  yield field("reimbursementProfiles", await Promise.all(reimbursementProfiles.map((r) => unsealRow(r, PROFILE_SEALED))));
+  yield field(
+    "reimbursementClaims",
+    await Promise.all(claims.map(async (c) => ({ ...c, notes: await unsealText(c.notes), snapshot: safeJson(await unsealText(c.snapshot)) }))),
+  );
 
   // Joyo Pro is sold by JoyoRogo; JoyoArto keeps only its last answer and this user's usage counts.
   const [joyoPro, usage] = await db.batch([
@@ -361,7 +366,10 @@ export async function* exportJsonChunks(db: Database, p: Principal, now = new Da
       .from(schema.joyoMessage)
       .where(eq(schema.joyoMessage.conversationId, conv.id))
       .orderBy(asc(schema.joyoMessage.createdAt));
-    yield `${i ? "," : ""}${JSON.stringify({ ...conv, messages })}`;
+    const open = await Promise.all(
+      messages.map(async (msg) => ({ ...msg, content: await unsealText(msg.content), steps: await unsealJson(msg.steps), proposals: await unsealJson(msg.proposals) })),
+    );
+    yield `${i ? "," : ""}${JSON.stringify({ ...conv, title: await unsealText(conv.title), messages: open })}`;
   }
   yield `],`;
   const u = schema.aiUsage;
