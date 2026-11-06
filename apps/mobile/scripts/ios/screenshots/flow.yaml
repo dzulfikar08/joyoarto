@@ -10,7 +10,10 @@ appId: com.joyodigitama.joyoarto
     visible: "Coba demo / Reviewer"
     timeout: 180000
 - tapOn: "Coba demo / Reviewer"
-- tapOn: "Kode demo / Demo code"
+# The field under the "Kode demo / Demo code" label (tapping the label does not focus it).
+- tapOn:
+    below: "Kode demo / Demo code"
+    index: 0
 - inputText: ${DEMO_CODE}
 - hideKeyboard
 - tapOn: "Masuk ke demo / Open the demo"
