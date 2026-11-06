@@ -83,7 +83,7 @@ export const accountUpdate = z.object({
   type: z.enum(ACCOUNT_TYPES).optional(),
   currency: z.string().length(3).optional(),
   last4: z.string().max(8).optional(),
-  openingBalance: z.number().int().optional(),
+  openingBalance: z.number().int().optional().describe("Minor units, before the first recorded transaction"),
   archived: z.boolean().optional(),
 });
 
