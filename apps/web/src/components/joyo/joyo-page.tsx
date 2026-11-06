@@ -5,14 +5,15 @@ import type { Proposal, Step } from "@baroka/api/lib/joyo-ai/tools";
 import type { JoyoStreamEvent } from "@baroka/api/routers/joyo";
 import type { StoredMessage } from "@baroka/api/services/joyo";
 import { Button } from "@baroka/ui/components/button";
+import { Checkbox } from "@baroka/ui/components/checkbox";
 import { Input } from "@baroka/ui/components/input";
 import { Select } from "@baroka/ui/components/select";
 import { Sheet } from "@baroka/ui/components/sheet";
 import { Textarea } from "@baroka/ui/components/textarea";
 import { cn } from "@baroka/ui/lib/utils";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useCanGoBack, useRouter } from "@tanstack/react-router";
-import { ArrowDown, ArrowLeft, ArrowUp, History, KeyRound, MessageSquarePlus, Sparkles, Square, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, History, MessageSquarePlus, SlidersHorizontal, Sparkles, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -199,10 +200,11 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
           <h1 className="truncate text-lg leading-tight font-extrabold tracking-tight">{conversation.data?.title && conversationId ? conversation.data.title : "Joyo AI"}</h1>
           <p className="truncate text-xs text-muted-foreground">
             {usingKey ? `Your ${byok?.provider} key` : hosted ? `${hosted.model}${status.data ? ` · ${status.data.usedToday}/${status.data.dailyCap} today` : ""}` : status.isPending ? " " : "Off on this server"}
+            {status.data?.readOnly ? " · Read-only" : ""}
           </p>
         </div>
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="Your API key" title="Your API key" onClick={() => setKeyOpen(true)}>
-          <KeyRound aria-hidden />
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="Joyo AI settings" title="Joyo AI settings" onClick={() => setKeyOpen(true)}>
+          <SlidersHorizontal aria-hidden />
         </Button>
         <Button type="button" variant="ghost" size="icon-sm" aria-label="Conversations" title="Conversations" onClick={() => setHistoryOpen(true)}>
           <History aria-hidden />
@@ -218,7 +220,8 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
             <div>
               <h2 className="text-2xl font-extrabold tracking-tight">Tanya soal uangmu</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Joyo reads your household's ledger to answer: spending, cashflow, budgets, and whether a plan is affordable. It suggests changes; you confirm them.
+                Joyo reads your household's ledger to answer: spending, cashflow, budgets, and whether a plan is affordable.{" "}
+                {status.data?.readOnly ? "It's set to read-only, so it explains changes instead of making them." : "It suggests changes; you confirm them."}
               </p>
             </div>
             <ul className="grid gap-2 sm:grid-cols-2">
@@ -351,6 +354,7 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
         }}
         providers={status.data?.byokProviders ?? []}
         hosted={hosted}
+        readOnly={status.data?.readOnly ?? false}
       />
     </div>
   );
@@ -415,6 +419,7 @@ function KeySheet({
   onSave,
   providers,
   hosted,
+  readOnly,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -422,6 +427,7 @@ function KeySheet({
   onSave: (s: ByokSettings | null) => void;
   providers: readonly ProviderInfo[];
   hosted: { provider: string; model: string } | null;
+  readOnly: boolean;
 }) {
   const [provider, setProvider] = useState<ByokProvider>(settings?.provider ?? "anthropic");
   const [apiKey, setApiKey] = useState(settings?.apiKey ?? "");
@@ -437,9 +443,10 @@ function KeySheet({
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
-      title="Your own API key"
-      description={hosted ? `Optional. Without one, Joyo uses JoyoArto's ${hosted.model} with a daily limit.` : "Joyo AI isn't set up on this server: add your own key to use it."}
+      title="Joyo AI settings"
+      description={hosted ? `Your own API key is optional. Without one, Joyo uses JoyoArto's ${hosted.model} with a daily limit.` : "Joyo AI isn't set up on this server: add your own key to use it."}
     >
+      <ReadOnlySetting value={readOnly} />
       <form
         className="space-y-4"
         onSubmit={(e) => {
@@ -496,5 +503,28 @@ function KeySheet({
         </div>
       </form>
     </Sheet>
+  );
+}
+
+/** The member's read-only switch: saved on the server, so the phone app follows it too. */
+function ReadOnlySetting({ value }: { value: boolean }) {
+  const qc = useQueryClient();
+  const save = useMutation({
+    mutationFn: (readOnly: boolean) => client.joyo.settings({ readOnly }),
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: orpc.joyo.status.key() });
+      toast.success(r.readOnly ? "Joyo is read-only" : "Joyo can suggest changes again");
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  const checked = save.isPending && save.variables !== undefined ? save.variables : value;
+  return (
+    <label className="mb-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-muted px-4 py-3">
+      <Checkbox className="mt-0.5" checked={checked} disabled={save.isPending} onCheckedChange={(v) => save.mutate(v)} />
+      <span className="space-y-0.5 text-sm">
+        <span className="block font-semibold">Read-only</span>
+        <span className="block text-muted-foreground">Joyo only reads and explains; it won't suggest changes for you to confirm.</span>
+      </span>
+    </label>
   );
 }

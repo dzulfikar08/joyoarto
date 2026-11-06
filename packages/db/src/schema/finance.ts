@@ -37,6 +37,8 @@ export const householdMember = sqliteTable(
     role: text("role", { enum: HOUSEHOLD_ROLES }).notNull(),
     /** The household this user acts in (web app, API tokens, AI connections). Exactly one per user. */
     isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+    /** Joyo AI in this household is read-only for this member: it is offered no write tools and proposals are refused. */
+    joyoReadOnly: integer("joyo_read_only", { mode: "boolean" }).notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [

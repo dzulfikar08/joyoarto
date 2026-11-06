@@ -93,6 +93,12 @@ function Download() {
   );
 }
 
+/** How much an AI app may do, from what the member approved. */
+function accessLabel(a: { scopes: string[]; readOnly: boolean }): string {
+  if (!a.scopes.some((s) => s.startsWith("finance:"))) return "no finance access";
+  return a.readOnly ? "read-only" : "read and make changes";
+}
+
 function ConnectedApps() {
   const apps = useQuery(orpc.account.connections.queryOptions());
   const disconnect = useMutation({
@@ -117,7 +123,7 @@ function ConnectedApps() {
           <ListRow
             key={a.clientId}
             title={a.name}
-            subtitle={[a.scopes.filter((s) => s.startsWith("finance:")).join(" ") || "no finance access", `connected ${shortDate(a.connectedAt)}`].join(" · ")}
+            subtitle={[accessLabel(a), `connected ${shortDate(a.connectedAt)}`].join(" · ")}
             numberOfLines={2}
             right={
               <Button

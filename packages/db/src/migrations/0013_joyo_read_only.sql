@@ -1,0 +1,1 @@
+ALTER TABLE `household_member` ADD `joyo_read_only` integer DEFAULT false NOT NULL;
