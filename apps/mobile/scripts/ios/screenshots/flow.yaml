@@ -5,6 +5,10 @@ appId: com.joyodigitama.joyoarto
 - launchApp:
     clearState: true
     clearKeychain: true
+# A cold first launch (fonts, the update check) can take a while on a CI simulator.
+- extendedWaitUntil:
+    visible: "Coba demo / Reviewer"
+    timeout: 180000
 - tapOn: "Coba demo / Reviewer"
 - tapOn: "Kode demo / Demo code"
 - inputText: ${DEMO_CODE}

@@ -109,7 +109,11 @@ jobs:
         run: |
           mkdir -p "$OUT"
           maestro --device "$UDID" test -e DEMO_CODE="$DEMO_CODE" -e OUT="$OUT" apps/mobile/scripts/ios/screenshots/flow.yaml \
-            || { xcrun simctl io "$UDID" screenshot "$OUT/zz-failure.png"; exit 1; }
+            || { xcrun simctl io "$UDID" screenshot "$OUT/zz-failure.png"
+                 xcrun simctl spawn "$UDID" log show --last 10m --style compact \
+                   --predicate 'process == "JoyoArto"' > "$OUT/app.log" 2>&1 || true
+                 grep -iE "error|exception|fatal|warn" "$OUT/app.log" | tail -n 60 || true
+                 exit 1; }
 
       - name: Check the sizes
         if: always()
@@ -120,6 +124,8 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ios-screenshots-${{ github.run_number }}
-          path: dist/screenshots/*.png
+          path: |
+            dist/screenshots/*.png
+            dist/screenshots/app.log
           if-no-files-found: warn
           retention-days: 30
