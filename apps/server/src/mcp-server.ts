@@ -31,10 +31,6 @@ function describeError(error: unknown): string {
   return "JoyoArto had an internal error; try again in a moment.";
 }
 
-/** What a Free household's connector answers to every tool call (tools stay listed, so Claude can explain it). */
-const UPGRADE_MESSAGE =
-  "The Claude connector is part of JoyoArto Pro, and this household is on the Free plan. Tell the user they can upgrade in JoyoArto (Settings → Billing, or /pricing); everything else in the app keeps working on Free.";
-
 export type McpServerOptions = {
   db: Database;
   billing?: BillingConfig;
@@ -42,7 +38,7 @@ export type McpServerOptions = {
   /** OAuth client id, or "api-token". */
   clientId: string;
   waitUntil: (p: Promise<unknown>) => void;
-  /** False on the Free plan: every tool answers with the upgrade message. */
+  /** False on the Free plan: the connection gets the read tools only (making changes from Claude is Pro). */
   connectorAllowed: boolean;
   limiter?: RateLimit;
 };
@@ -61,11 +57,13 @@ export const SERVER_INFO = {
 };
 
 export function createMcpServer({ db, billing, principal, clientId, waitUntil, connectorAllowed, limiter }: McpServerOptions): McpServer {
-  const server = new McpServer(SERVER_INFO, { instructions: mcpInstructions(principal.scopes) });
-  const context: ApiContext = { db, principal, ...(billing ? { billing } : {}) };
+  // Free plan: read tools only, so every listed tool works (the directory counts error answers against the listing).
+  const scopes = connectorAllowed ? principal.scopes : principal.scopes.filter((s) => s !== "finance:write");
+  const server = new McpServer(SERVER_INFO, { instructions: mcpInstructions(scopes, { freePlan: !connectorAllowed }) });
+  const context: ApiContext = { db, principal: { ...principal, scopes }, ...(billing ? { billing } : {}) };
 
-  // Only the tools this connection's scopes allow are listed: a read-only connection never sees a write tool.
-  for (const def of toolsForScopes(principal.scopes)) {
+  // Only the tools this connection's scopes (and plan) allow are listed: a read-only connection never sees a write tool.
+  for (const def of toolsForScopes(scopes)) {
     const input = toolInput(def);
     server.registerTool(
       def.name,
@@ -103,11 +101,7 @@ export function createMcpServer({ db, billing, principal, clientId, waitUntil, c
               .then(() => (Math.random() < 0.02 ? pruneMcpAudit(db) : 0))
               .catch((e: unknown) => console.error("[mcp] audit failed", e)),
           );
-        if (!connectorAllowed) {
-          log("plan");
-          return failure(UPGRADE_MESSAGE);
-        }
-        if (!principal.scopes.includes(def.scope)) {
+        if (!scopes.includes(def.scope)) {
           log("scope");
           return failure(`This connection lacks the "${def.scope}" permission. Reconnect JoyoArto and approve it.`);
         }

@@ -5,7 +5,7 @@ import type { Hono } from "hono";
 /** The public site, the only host that should be indexed (apps/web/src/lib/brand.ts SITE_URL). */
 export const LANDING_HOST = "arto.joyorogo.com";
 /** apps/web/src/lib/brand.ts CONTACT_EMAIL (a web test keeps the two equal). */
-export const SECURITY_CONTACT = "dzulfikar.at@gmail.com";
+export const SECURITY_CONTACT = "support@joyorogo.com";
 
 export function robotsTxt(host: string): string {
   if (host === LANDING_HOST) {
