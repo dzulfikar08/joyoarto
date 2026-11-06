@@ -73,6 +73,8 @@ export function createMcpServer({ db, billing, principal, clientId, waitUntil, c
         description: def.description,
         ...(input ? { inputSchema: input.shape } : {}),
         annotations: {
+          // The directory reads the listing name from annotations.title too.
+          title: def.title,
           readOnlyHint: def.readOnly ?? false,
           // The MCP default for a write tool is destructive; read-only tools have no destructive hint to give.
           destructiveHint: def.readOnly ? false : (def.destructive ?? true),

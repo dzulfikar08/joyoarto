@@ -26,7 +26,7 @@ export const saveScenarioInput = z.object({
   id: z.string().max(64).optional().describe("Update this saved scenario. Without it, a scenario with the same name is replaced, or a new one is created."),
   name: name.describe("Shown in the list; unique in the household"),
   plan: savedPlan.describe("items plus any baseline overrides (monthlyIncome, monthlySpending, existingInstallments, roles, balances, startingBalances, startMonth, horizonMonths, baselineMonths, rules), as simulate_plan takes them"),
-  view: z.unknown().optional().describe("Client layout state (the web page's blocks). Leave out from other clients; it is cleared when not sent."),
+  view: z.record(z.string(), z.unknown()).optional().describe("Client layout state (the web page's blocks, as an object). Leave out from other clients; it is cleared when not sent."),
 });
 export const scenarioIdInput = z.object({ id: z.string().max(64) });
 

@@ -81,3 +81,14 @@ test("a Free household gets the read tools, and they succeed; writes are not lis
   expect(await db.select().from(schema.transaction)).toHaveLength(0);
   await settle();
 });
+
+test("every tool has an annotations.title and every parameter has a type (connectors directory checks)", async () => {
+  const { client } = await connect(["finance:read", "finance:write"]);
+  for (const tool of (await client.listTools()).tools) {
+    expect(tool.annotations?.title).toBeTruthy();
+    for (const [name, schema] of Object.entries((tool.inputSchema.properties ?? {}) as Record<string, Record<string, unknown>>)) {
+      const typed = "type" in schema || "anyOf" in schema || "oneOf" in schema || "allOf" in schema || "$ref" in schema || "enum" in schema || "const" in schema;
+      expect({ tool: tool.name, name, typed }).toEqual({ tool: tool.name, name, typed: true });
+    }
+  }
+});
