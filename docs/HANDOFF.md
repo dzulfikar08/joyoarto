@@ -11,7 +11,7 @@ the Atur project **BRK** (workspace `joyodigitama`).
 | Code | github.com/dzulfikar08/joyoarto (renamed from `baroka`; packages and the Worker are still named `baroka`) |
 | Production | app: https://app.arto.joyorogo.com · landing: https://arto.joyorogo.com · old https://baroka.by.dzulfikar.com redirects |
 | Deploys | GitHub Actions: `ci.yml` → `deploy.yml` (D1 migrations + `wrangler deploy` + smoke test). Secret `CLOUDFLARE_API_TOKEN` in environment `production`. Don't deploy from a laptop. |
-| iOS | `release-ios.yml` (manual, environment `release`, macOS runner) builds the IPA and optionally uploads it to TestFlight; secrets and steps in `docs/ios-release.md`. Not run yet. |
+| iOS | `release-ios.yml` (manual, environment `release`, macOS runner) builds the IPA and optionally uploads it to TestFlight; secrets and steps in `docs/ios-release.md`. TestFlight live (public link in `apps/web/src/lib/app-links.ts`); App Store 1.0.0 being prepared. `ios-screenshots.yml` makes the 6.9" store screenshots from the demo household. |
 | Android | `android.yml` builds the APK artifact `joyoarto-android-apk` (`gh run download <id> -n joyoarto-android-apk`). Release signing secrets (`ANDROID_KEYSTORE_*`) not set yet: debug-signed. |
 | MCP | claude-hub has `joyoarto` (https://app.arto.joyorogo.com/mcp, its own `brk_` token) and `atur`. |
 | Task tracking | Atur project BRK (Backlog/Todo/In Progress/Done/Cancelled). |

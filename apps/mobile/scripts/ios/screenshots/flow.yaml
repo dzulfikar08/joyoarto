@@ -1,0 +1,81 @@
+# App Store screenshots of the iPhone app, from the demo household (made-up data, reset daily). Run by
+# .github/workflows/ios-screenshots.yml on a 6.9" simulator; DEMO_CODE comes from the workflow's secret.
+appId: com.joyodigitama.joyoarto
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+# A cold first launch (fonts, the update check) can take a while on a CI simulator.
+- extendedWaitUntil:
+    visible: "Coba demo / Reviewer"
+    timeout: 180000
+- tapOn: "Coba demo / Reviewer"
+# The field under the "Kode demo / Demo code" label (tapping the label does not focus it).
+- tapOn:
+    below: "Kode demo / Demo code"
+    index: 0
+- inputText: ${DEMO_CODE}
+- hideKeyboard
+- tapOn: "Masuk ke demo / Open the demo"
+- extendedWaitUntil:
+    visible: "Transactions"
+    timeout: 60000
+# Let the dashboard's queries and charts settle.
+- waitForAnimationToEnd:
+    timeout: 15000
+- takeScreenshot: ${OUT}/01-home
+
+- tapOn: "Transactions"
+- waitForAnimationToEnd:
+    timeout: 15000
+- takeScreenshot: ${OUT}/02-transactions
+
+- openLink: joyoarto://accounts
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- waitForAnimationToEnd:
+    timeout: 15000
+- takeScreenshot: ${OUT}/03-accounts
+
+- openLink: joyoarto://plan
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- waitForAnimationToEnd:
+    timeout: 15000
+- takeScreenshot: ${OUT}/04-plan
+
+- openLink: joyoarto://import
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- waitForAnimationToEnd:
+    timeout: 15000
+- takeScreenshot: ${OUT}/05-import
+
+# Quick add: the centre tab button opens the add sheet.
+- openLink: joyoarto://
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "Transactions"
+    timeout: 30000
+- tapOn:
+    point: "50%,94%"
+- extendedWaitUntil:
+    visible: "kopi 25rb gopay"
+    timeout: 15000
+- tapOn: "kopi 25rb gopay"
+- inputText: "kopi 25rb gopay"
+- hideKeyboard
+- takeScreenshot: ${OUT}/06-quick-add

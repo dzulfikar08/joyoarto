@@ -101,7 +101,7 @@ const sections: Section[] = [
             <b>Yang tidak kami simpan:</b> PIN atau password bank ({N} tidak pernah login ke bank-mu), file PDF statement, teks statement, rekaman catatan
             suara dan transkripnya, serta API key milikmu sendiri untuk Joyo AI (tersimpan hanya di browser-mu). Saat import (termasuk PDF yang diunggah
             atau dikirim lewat email), PDF dan teksnya diproses di server lalu dibuang; yang disimpan hanya transaksi hasilnya. Di halaman <Link to="/demo" className="underline">demo</Link>, PDF
-            dibaca di browser-mu dan tidak dikirim ke mana pun. Kami tidak memakai cookie iklan atau analitik; cookie yang ada hanya untuk menjaga kamu tetap masuk.
+            dibaca di browser-mu dan tidak dikirim ke mana pun. Kami tidak memakai cookie iklan atau analitik; cookie yang ada hanya untuk menjaga kamu tetap masuk. Halaman publik di arto.joyorogo.com (bukan aplikasinya) memakai RevKlik untuk statistik pengunjung; lihat bagian pihak lain.
           </P>
         </>
       ),
@@ -162,7 +162,7 @@ const sections: Section[] = [
             <Link to="/demo" className="underline">
               demo
             </Link>{" "}
-            page the PDF is read in your browser and sent nowhere. We use no advertising or analytics cookies; the only cookies keep you signed in.
+            page the PDF is read in your browser and sent nowhere. We use no advertising or analytics cookies; the only cookies keep you signed in. The public pages on arto.joyorogo.com (not the app) use RevKlik for visitor statistics; see who else processes data.
           </P>
         </>
       ),
@@ -283,6 +283,12 @@ const sections: Section[] = [
             privasi Google.
           </li>
           <li>
+            <b>RevKlik</b> (statistik web milik pengembang yang sama), hanya di halaman publik arto.joyorogo.com, bukan di aplikasinya: halaman yang dibuka,
+            tautan yang diklik, seberapa jauh halaman digulir, asal kunjungan, jenis perangkat, browser, bahasa, ukuran layar, zona waktu, dan pengenal acak yang
+            disimpan di browser-mu. Data keuanganmu tidak pernah dikirim ke RevKlik, dan isinya tidak dipakai untuk iklan atau dijual. Kamu bisa mematikannya dengan
+            pemblokir pelacak.
+          </li>
+          <li>
             <b>Anthropic (Claude) untuk Joyo AI dan membaca catatan</b>, sebagai pemroses atas nama kami, <b>hanya saat kamu memakainya</b>. Yang dikirim:
             pertanyaanmu dan potongan percakapan sebelumnya, nama depanmu, nama rumah tangga, tanggal hari ini, dan data buku besar yang dibaca Joyo untuk menjawab
             (misalnya saldo, transaksi, ringkasan pengeluaran, baseline rencana). Untuk catatan di tombol Tambah: teks catatan, serta nama rekening dan kategori
@@ -323,6 +329,11 @@ const sections: Section[] = [
           <li>
             <b>Google</b>: for signing in with your Google account. Google gives us your name, email and profile picture; your use of Google is covered by Google's
             own privacy policy.
+          </li>
+          <li>
+            <b>RevKlik</b> (web statistics run by the same developer), only on the public pages at arto.joyorogo.com, not in the app: pages opened, links
+            clicked, how far you scroll, where the visit came from, device type, browser, language, screen size, time zone, and a random ID kept in your browser.
+            Your financial data is never sent to RevKlik, and it is not used for advertising or sold. You can turn it off with a tracker blocker.
           </li>
           <li>
             <b>Anthropic (Claude) for Joyo AI and reading notes</b>, as a processor on our behalf, <b>only when you use them</b>. What is sent: your question and
