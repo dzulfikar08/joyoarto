@@ -2,12 +2,13 @@ import { DATE_FORMATS, MAPPING_PRESETS, parseCsv } from "@baroka/api/lib/csv";
 import type { CsvMapping } from "@baroka/api/lib/csv";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@baroka/ui/components/button";
+import { Disclosure } from "@baroka/ui/components/disclosure";
 import { Checkbox } from "@baroka/ui/components/checkbox";
 import { Input } from "@baroka/ui/components/input";
 import { Combobox } from "@baroka/ui/components/combobox";
 import { Select } from "@baroka/ui/components/select";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { CircleCheck } from "lucide-react";
+import { CircleCheck, Info } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
@@ -95,17 +96,14 @@ function ImportPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Import a statement"
-        subtitle="Bank Jago and GoPay PDFs are read right here. For CSV exports, map the columns below. For any other bank's PDF, drop it into a Claude chat with JoyoArto connected and ask it to import it: it reads the layout, checks the running balance and shows a preview first."
-      />
+      <PageHeader title="Import a statement" subtitle="PDFs from Bank Jago and GoPay, or a CSV from any bank" />
 
       <StatementImport shared={shared} />
 
       <div className="card space-y-4">
         <div>
           <h2 className="text-base font-bold tracking-tight">CSV or spreadsheet export</h2>
-          <p className="text-sm text-muted-foreground">Pick the account it belongs to, then the file. You map the columns and see a preview before anything is saved.</p>
+          <p className="text-sm text-muted-foreground">Pick the account, then the file. You see a preview before anything is saved.</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Account" htmlFor="csv-account">
@@ -164,8 +162,7 @@ function ImportPage() {
             </Field>
           </div>
 
-          <details className="rounded-2xl bg-muted/50 px-4 py-3 text-xs">
-            <summary className="cursor-pointer text-sm font-semibold text-muted-foreground">Raw file (first rows)</summary>
+          <Disclosure plain title="Raw file (first rows)">
             <div className="mt-2 overflow-x-auto">
               <table className="text-xs">
                 <tbody>
@@ -182,7 +179,7 @@ function ImportPage() {
                 </tbody>
               </table>
             </div>
-          </details>
+          </Disclosure>
 
           <MapSection title="Rows and dates">
             <Field label="Header row" htmlFor="map-header" className="sm:col-span-2" hint="The row with the column names; rows above it are skipped.">
@@ -322,8 +319,7 @@ function ImportPage() {
               <p className="flex items-start gap-1.5 text-sm font-medium text-positive-ink"><CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-positive" /> Amounts match the statement's running balance ({result.balanceCheck.checked} rows checked).</p>
             ))}
           {result.parseErrors?.length ? (
-            <details className="text-sm text-warning-ink">
-              <summary>{result.parseErrors.length} row(s) could not be read</summary>
+            <Disclosure plain className="[&_summary]:text-warning-ink" title={<>{result.parseErrors.length} row(s) could not be read</>}>
               <ul className="mt-1 list-disc pl-5 text-xs">
                 {result.parseErrors.map((e) => (
                   <li key={e.line}>
@@ -331,7 +327,7 @@ function ImportPage() {
                   </li>
                 ))}
               </ul>
-            </details>
+            </Disclosure>
           ) : null}
 
           {result.committed ? (
@@ -372,6 +368,12 @@ function ImportPage() {
           )}
         </div>
       )}
+      <Disclosure title="Another bank's PDF?" icon={<Info />}>
+        <p>
+          Drop it into a Claude chat with JoyoArto connected and ask it to import it. Claude reads the layout, checks the running balance and shows a
+          preview before anything is saved.
+        </p>
+      </Disclosure>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { Card as Surface, CardAction, CardDescription, CardHeader, CardTitle } f
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@baroka/ui/components/empty";
 import { Input } from "@baroka/ui/components/input";
 import { Combobox } from "@baroka/ui/components/combobox";
+import { Disclosure } from "@baroka/ui/components/disclosure";
 import { Skeleton } from "@baroka/ui/components/skeleton";
 import { cn } from "@baroka/ui/lib/utils";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -51,15 +52,10 @@ export default function Home() {
           </button>
         )}
       </div>
-      <QuickAdd collapsible />
       {q.isError && <p className="rounded-2xl bg-destructive-soft px-4 py-3 text-sm text-destructive-ink">{errorMessage(q.error)}</p>}
       {q.isPending && (
         <div className="space-y-4" aria-busy aria-label="Loading">
-          <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
-            {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-24 rounded-3xl" />
-            ))}
-          </div>
+          <Skeleton className="h-52 rounded-3xl" />
           <div className="grid gap-4 md:grid-cols-2">
             <Skeleton className="h-72 rounded-3xl" />
             <Skeleton className="h-72 rounded-3xl" />
@@ -103,7 +99,8 @@ function Body({ d, onMonth }: { d: Dashboard; onMonth: (m: string) => void }) {
   }
   return (
     <>
-      <Kpis d={d} />
+      <Overview d={d} />
+      <QuickAdd collapsible />
       <div className="grid gap-4 md:grid-cols-2">
         <Categories d={d} range={range} />
         <Pace d={d} />
@@ -139,63 +136,94 @@ function periodLabel(d: Dashboard) {
 }
 
 /** Signed change, coloured by whether that direction is good; arrow and sign carry it without colour. */
-function Delta({ pct, points, upIsGood, vs }: { pct?: number | null; points?: number | null; upIsGood: boolean; vs: string }) {
+function Delta({ pct, points, upIsGood, vs, onDark }: { pct?: number | null; points?: number | null; upIsGood: boolean; vs: string; onDark?: boolean }) {
   const v = pct ?? points ?? null;
-  if (v === null || v === undefined) return <p className="text-xs text-muted-foreground">no comparison for {vs}</p>;
+  if (v === null || v === undefined) return <p className={cn("text-xs", onDark ? "opacity-70" : "text-muted-foreground")}>no comparison for {vs}</p>;
   const flat = Math.abs(v) < 0.5;
   const good = flat ? null : v > 0 === upIsGood;
-  const color = good === null ? "text-muted-foreground" : good ? "text-[var(--viz-good-text)]" : "text-[var(--viz-bad-text)]";
+  // On the dark balance card the arrow and sign carry good/bad; status colours would not pass contrast there.
+  const color = onDark ? "" : good === null ? "text-muted-foreground" : good ? "text-[var(--viz-good-text)]" : "text-[var(--viz-bad-text)]";
   const text = points !== undefined ? `${v > 0 ? "+" : ""}${v} pts` : `${v > 0 ? "+" : ""}${Math.abs(v) >= 1000 ? ">999" : v}%`;
   return (
     <p className="text-xs">
       <span className={`font-medium tabular-nums ${color}`}>
         {flat ? "→" : v > 0 ? "▲" : "▼"} {flat ? "same" : text}
       </span>{" "}
-      <span className="text-muted-foreground">vs {vs}</span>
+      <span className={onDark ? "opacity-70" : "text-muted-foreground"}>vs {vs}</span>
     </p>
   );
 }
 
-function Kpis({ d }: { d: Dashboard }) {
+/**
+ * The top of the home screen, like a bank app's balance card: everything the household holds today, how it splits
+ * across account types, and this month's income, spending, net and savings rate against the same days last month.
+ */
+function Overview({ d }: { d: Dashboard }) {
   const vs = periodLabel(d);
   const k = d.kpis;
   const sr = k.savingsRate;
-  const tiles: { label: string; value: string; hint?: string; delta: ReactNode }[] = [
-    { label: "Income", value: k.income.display, delta: <Delta pct={k.income.changePct} upIsGood vs={vs} /> },
-    { label: "Spending", value: k.spending.display, delta: <Delta pct={k.spending.changePct} upIsGood={false} vs={vs} /> },
-    {
-      label: "Net",
-      value: k.net.display,
-      delta: <Delta pct={k.net.changePct} upIsGood vs={vs} />,
-    },
+  const positive = d.accounts.groups.filter((g) => g.total.amount > 0);
+  const sum = positive.reduce((s, g) => s + g.total.amount, 0);
+  const shades = ["bg-white", "bg-white/60", "bg-white/35", "bg-white/20"];
+  const stats: { label: string; value: string; title?: string; delta: ReactNode }[] = [
+    { label: "Income", value: k.income.display, delta: <Delta onDark pct={k.income.changePct} upIsGood vs={vs} /> },
+    { label: "Spending", value: k.spending.display, delta: <Delta onDark pct={k.spending.changePct} upIsGood={false} vs={vs} /> },
+    { label: "Net", value: k.net.display, delta: <Delta onDark pct={k.net.changePct} upIsGood vs={vs} /> },
     {
       label: "Savings rate",
       value: sr.value === null ? "–" : `${sr.value}%`,
-      hint:
+      title:
         sr.note === "too-early"
           ? "Too early in the month: not enough income yet for a meaningful savings rate"
           : sr.note === "out-of-range"
             ? "Spending is more than twice the income so far, so the rate says little"
             : undefined,
       delta: sr.note ? (
-        <p className="text-xs text-muted-foreground">{sr.note === "too-early" ? "too early in the month" : "spending far above income"}</p>
+        <p className="text-xs opacity-70">{sr.note === "too-early" ? "too early in the month" : "spending far above income"}</p>
       ) : (
-        <Delta points={sr.value !== null && sr.previous !== null ? Math.round((sr.value - sr.previous) * 10) / 10 : null} upIsGood vs={vs} />
+        <Delta onDark points={sr.value !== null && sr.previous !== null ? Math.round((sr.value - sr.previous) * 10) / 10 : null} upIsGood vs={vs} />
       ),
     },
   ];
   return (
-    <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
-      {tiles.map((t) => (
-        <Surface key={t.label} className="min-w-0 space-y-1 p-3.5 sm:p-5">
-          <p className="text-xs font-semibold text-muted-foreground">{t.label}</p>
-          <p className="truncate text-lg font-extrabold tracking-tight tabular-nums sm:text-[1.375rem]" title={t.hint ?? t.value}>
-            {t.value}
-          </p>
-          {t.delta}
-        </Surface>
-      ))}
-    </div>
+    <section className="grid gap-6 rounded-3xl bg-primary p-5 text-primary-foreground shadow-float dark:bg-primary-soft dark:text-foreground sm:p-7 lg:grid-cols-[1.1fr_1fr] lg:gap-10">
+      <div className="min-w-0">
+        <p className="text-sm font-medium opacity-75">Total balance</p>
+        <p className="mt-1 truncate text-[2rem] leading-tight font-extrabold tracking-tight tabular-nums sm:text-[2.5rem]">{d.accounts.total.display}</p>
+        <p className="text-xs opacity-70">
+          {d.accounts.groups.reduce((n, g) => n + g.accounts.length, 0)} accounts · today
+        </p>
+        {sum > 0 && (
+          <>
+            <div className="mt-5 flex h-2 gap-0.5 overflow-hidden rounded-full" aria-hidden>
+              {positive.map((g, i) => (
+                <div key={g.type} className={shades[Math.min(i, shades.length - 1)]} style={{ width: `${(g.total.amount / sum) * 100}%` }} />
+              ))}
+            </div>
+            <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs">
+              {positive.map((g, i) => (
+                <li key={g.type} className="flex items-center gap-1.5">
+                  <span aria-hidden className={cn("size-2 rounded-full", shades[Math.min(i, shades.length - 1)])} />
+                  <span className="opacity-75">{g.label}</span>
+                  <span className="font-semibold tabular-nums">{g.total.display}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-2 self-start">
+        {stats.map((s) => (
+          <div key={s.label} className="min-w-0 rounded-2xl bg-white/10 p-3 sm:p-3.5">
+            <p className="text-xs font-medium opacity-75">{s.label}</p>
+            <p className="mt-0.5 truncate text-base font-extrabold tracking-tight tabular-nums sm:text-lg" title={s.title ?? s.value}>
+              {s.value}
+            </p>
+            {s.delta}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -343,8 +371,7 @@ function Pace({ d }: { d: Dashboard }) {
         ]}
       />
       <CumulativeChart points={points} currentLabel={monthLabel(d.month)} previousLabel={monthLabel(d.previousMonth)} monthShort={cur} prevShort={prev} />
-      <details className="text-xs">
-        <summary className="cursor-pointer text-muted-foreground">Table</summary>
+      <Disclosure plain title="Table">
         <table className="mt-2 w-full tabular-nums">
           <thead className="text-muted-foreground">
             <tr>
@@ -363,7 +390,7 @@ function Pace({ d }: { d: Dashboard }) {
             ))}
           </tbody>
         </table>
-      </details>
+      </Disclosure>
     </Card>
   );
 }
@@ -388,8 +415,7 @@ function Cashflow({ d, onMonth }: { d: Dashboard; onMonth: (m: string) => void }
         ]}
       />
       <CashflowChart months={months} selected={d.month} onSelect={onMonth} />
-      <details className="text-xs">
-        <summary className="cursor-pointer text-muted-foreground">Table</summary>
+      <Disclosure plain title="Table">
         <div className="overflow-x-auto">
           <table className="mt-2 w-full tabular-nums">
             <thead className="text-muted-foreground">
@@ -412,7 +438,7 @@ function Cashflow({ d, onMonth }: { d: Dashboard; onMonth: (m: string) => void }
             </tbody>
           </table>
         </div>
-      </details>
+      </Disclosure>
     </Card>
   );
 }

@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Badge } from "@baroka/ui/components/badge";
+import { Disclosure } from "@baroka/ui/components/disclosure";
 import { Button } from "@baroka/ui/components/button";
 import { cn } from "@baroka/ui/lib/utils";
 import { CircleCheck, FileUp, LoaderCircle, TriangleAlert, X } from "lucide-react";
@@ -235,10 +236,7 @@ export function StatementImport({ shared }: { shared?: string }) {
     >
       <div>
         <h2 className="text-base font-bold tracking-tight">Statement PDFs (Bank Jago, GoPay)</h2>
-        <p className="text-sm text-muted-foreground">
-          Add every month at once, Jago and GoPay mixed. Each Jago pocket becomes an account and every running balance is checked; the GoPay
-          e-statements name the merchants behind “Gopay - Generic”. Statements already imported add nothing twice.
-        </p>
+        <p className="text-sm text-muted-foreground">Add every month at once. Each balance is checked, and nothing is added twice.</p>
         {importsLeft !== null && importUsage && (
           <p className="mt-1 text-xs text-muted-foreground">
             Free plan: {importsLeft} of {importUsage.limit} statement imports left this month.{" "}
@@ -360,8 +358,7 @@ function FileRow({ item: x, status, cross, onRemove }: { item: Item; status: Sta
       )}
       <FileCheck item={x} status={status} result={r} />
       {r?.kind === "jago" && (
-        <details className="text-xs">
-          <summary className="cursor-pointer text-muted-foreground select-none">Pockets</summary>
+        <Disclosure plain title="Pockets">
           <div className="mt-1 overflow-x-auto">
             <table className="w-full min-w-max">
               <thead className="text-left text-muted-foreground">
@@ -389,7 +386,7 @@ function FileRow({ item: x, status, cross, onRemove }: { item: Item; status: Sta
               </tbody>
             </table>
           </div>
-        </details>
+        </Disclosure>
       )}
     </li>
   );
@@ -495,9 +492,11 @@ function BatchResult({ saved, notSaved }: { saved: Result[]; notSaved: string[] 
 
 function ImportHelp() {
   return (
-    <details className="rounded-2xl bg-muted/60 p-3 text-sm sm:px-4">
-      <summary className="cursor-pointer font-semibold select-none">Getting the PDFs from your phone</summary>
-      <div className="mt-2 space-y-2 text-muted-foreground">
+    <Disclosure plain title="Getting the PDFs from your phone">
+      <p>
+        Each Jago pocket becomes its own account, and the GoPay e-statements name the merchants behind “Gopay - Generic”.
+      </p>
+      <div className="space-y-2">
         <p>
           Download the monthly statement from the Jago app and the e-statement from GoPay for each month, and keep them together (on iPhone, Share →
           Save to Files, one folder for all of them). A password-protected or scanned PDF can't be read here.
@@ -511,6 +510,6 @@ function ImportHelp() {
           select the PDFs in Files, Gmail or the bank app, tap Share and pick JoyoArto: they open here, ready to check.
         </p>
       </div>
-    </details>
+    </Disclosure>
   );
 }

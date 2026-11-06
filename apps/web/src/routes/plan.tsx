@@ -3,6 +3,7 @@ import type { AccountRole, ScenarioItemInput } from "@baroka/api/lib/plan/schema
 import { defaultResalePct } from "@baroka/api/lib/plan/resale";
 import { babyTemplate, carTemplate } from "@baroka/api/lib/plan/templates";
 import { Button } from "@baroka/ui/components/button";
+import { Disclosure } from "@baroka/ui/components/disclosure";
 import { Checkbox } from "@baroka/ui/components/checkbox";
 import { Input } from "@baroka/ui/components/input";
 import { Label } from "@baroka/ui/components/label";
@@ -631,8 +632,7 @@ function BaselineCard({ b, state, update }: { b: Baseline; state: PlanState; upd
         </ul>
       </div>
 
-      <details className="text-sm">
-        <summary className="cursor-pointer text-xs text-muted-foreground hover:underline">How these were worked out</summary>
+      <Disclosure plain title="How these were worked out">
         <div className="mt-3 grid gap-4 md:grid-cols-2">
           <div className="space-y-1">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Income sources</h3>
@@ -675,7 +675,7 @@ function BaselineCard({ b, state, update }: { b: Baseline; state: PlanState; upd
             <li key={n}>{n}</li>
           ))}
         </ul>
-      </details>
+      </Disclosure>
     </section>
   );
 }
@@ -833,8 +833,7 @@ function LoanEditor({ item, terms, onChange, onRemove }: { item: LoanIn; terms?:
           <Choice value={item.fundedFrom ?? "goal"} onValueChange={(v) => set({ fundedFrom: v })} items={FUNDED_ITEMS} />
         </Field>
       </div>
-      <details>
-        <summary className="cursor-pointer text-xs text-muted-foreground hover:underline">Insurance, fees and running costs (estimates)</summary>
+      <Disclosure plain title="Insurance, fees and running costs (estimates)">
         <div className={cn(EDITOR_GRID, "mt-2")}>
           <Field label="Insurance yr 1 (% of price)">
             <NumInput label="Insurance first year percent" value={item.insuranceFirstYearPct} step={0.1} onChange={(v) => set({ insuranceFirstYearPct: v, insuranceFirstYear: undefined })} />
@@ -874,7 +873,7 @@ function LoanEditor({ item, terms, onChange, onRemove }: { item: LoanIn; terms?:
             <li key={e}>{e}</li>
           ))}
         </ul>
-      </details>
+      </Disclosure>
       <SaleEditor item={item} sale={terms?.sale ?? null} set={set} />
       {terms && item.price > 0 && (
         <dl className={TERMS_GRID}>
@@ -973,8 +972,7 @@ function BabyEditor({ b, onChange, onRemove }: { b: Extract<Block, { kind: "baby
           <Check label="Caregiver / nanny" on={b.caregiver} set={(v) => regenerate(b.caesar, v)} />
         </div>
       </div>
-      <details>
-        <summary className="cursor-pointer text-xs text-muted-foreground hover:underline">{b.items.length} costs (estimates you can edit)</summary>
+      <Disclosure plain title={<>{b.items.length} costs (estimates you can edit)</>}>
         <ul className="mt-2 space-y-2">
           {b.items.map((it, i) => (
             <li key={i} className="grid grid-cols-[1fr_auto] items-center gap-2 text-xs">
@@ -994,7 +992,7 @@ function BabyEditor({ b, onChange, onRemove }: { b: Extract<Block, { kind: "baby
             <li key={e}>{e}</li>
           ))}
         </ul>
-      </details>
+      </Disclosure>
     </BlockShell>
   );
 }
@@ -1192,8 +1190,7 @@ function CompareView({ c, scenarios }: { c: Compare; scenarios: Scenario[] }) {
                 <li key={r}>{r}</li>
               ))}
             </ul>
-            <details>
-              <summary className="cursor-pointer text-xs text-muted-foreground hover:underline">All checks</summary>
+            <Disclosure plain title="All checks">
               <ul className="mt-2 space-y-1.5 text-xs">
                 {s.rules.map((r) => (
                   <li key={r.id} className="flex gap-2">
@@ -1206,7 +1203,7 @@ function CompareView({ c, scenarios }: { c: Compare; scenarios: Scenario[] }) {
                   </li>
                 ))}
               </ul>
-            </details>
+            </Disclosure>
           </section>
         ))}
       </div>
