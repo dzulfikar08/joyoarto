@@ -1,5 +1,6 @@
 import type { AiConfig, RequestInfo, ServerConfig } from "@baroka/api/context";
 import { DEFAULT_CHAT_MODEL, DEFAULT_WORKERS_AI_MODEL } from "@baroka/api/lib/joyo-ai/chat";
+import { configureDataKey } from "@baroka/api/lib/data-key";
 import { capFrom } from "@baroka/api/lib/joyo-ai/limits";
 import { appRouter } from "@baroka/api/routers/index";
 import { seedDemo } from "@baroka/api/services/demo";
@@ -18,15 +19,20 @@ import { logger } from "hono/logger";
 import { billing } from "./billing";
 import { isProtectedPath, passesCsrfCheck } from "./csrf";
 import { handleEmail } from "./email";
+import { stripQuery } from "./log";
 import { env } from "./env";
 import { registerMcpPublicCors, registerMcpRoutes } from "./mcp";
 import { resolvePrincipal } from "./principal";
 import { registerSeoRoutes } from "./seo";
 import { getAuth, getDb } from "./services";
 
+// Member data is sealed with DATA_KEY when it is set (docs/operator-access.md); unset = plaintext, as before.
+configureDataKey(env.DATA_KEY, (env.DATA_KEY_PREVIOUS ?? "").split(","));
+
 const app = new Hono();
 
-app.use(logger());
+// Method, path and status only: query strings carry search text, dates and amounts, which stay out of the logs.
+app.use(logger((line, ...rest) => console.log(stripQuery(line), ...rest)));
 registerSeoRoutes(app);
 registerMcpPublicCors(app);
 app.use(

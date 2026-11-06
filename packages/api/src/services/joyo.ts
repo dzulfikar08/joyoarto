@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import type { Principal } from "../context";
 import { chunk } from "../lib/d1";
+import { sealJson, sealText, unsealJson, unsealText } from "../lib/data-key";
 import type { Proposal, Step } from "../lib/joyo-ai/tools";
 import { notFound } from "./common";
 
@@ -42,21 +43,22 @@ function own(p: Principal) {
 
 export async function listConversations(db: Database, p: Principal) {
   const rows = await db.select({ id: c.id, title: c.title, updatedAt: c.updatedAt }).from(c).where(own(p)).orderBy(desc(c.updatedAt)).limit(MAX_CONVERSATIONS);
-  return { conversations: rows };
+  return { conversations: await Promise.all(rows.map(async (r) => ({ ...r, title: await unsealText(r.title) }))) };
 }
 
 export async function getConversationRow(db: Database, p: Principal, id: string) {
   const [row] = await db.select().from(c).where(and(own(p), eq(c.id, id)));
-  return row ?? notFound("Conversation");
+  return row ? { ...row, title: await unsealText(row.title) } : notFound("Conversation");
 }
 
-function toStored(r: typeof m.$inferSelect): StoredMessage {
+/** content, steps and proposals are sealed at rest (DATA_KEY); this opens them. */
+async function toStored(r: typeof m.$inferSelect): Promise<StoredMessage> {
   return {
     id: r.id,
     role: r.role,
-    content: r.content,
-    steps: (r.steps as Step[] | null) ?? [],
-    proposals: (r.proposals as Proposal[] | null) ?? [],
+    content: await unsealText(r.content),
+    steps: ((await unsealJson(r.steps)) as Step[] | null) ?? [],
+    proposals: ((await unsealJson(r.proposals)) as Proposal[] | null) ?? [],
     model: r.model,
     createdAt: r.createdAt,
   };
@@ -65,7 +67,7 @@ function toStored(r: typeof m.$inferSelect): StoredMessage {
 export async function getConversation(db: Database, p: Principal, id: string) {
   const conv = await getConversationRow(db, p, id);
   const rows = await db.select().from(m).where(eq(m.conversationId, id)).orderBy(asc(m.createdAt), asc(m.id));
-  return { id: conv.id, title: conv.title, updatedAt: conv.updatedAt, messages: rows.map(toStored) };
+  return { id: conv.id, title: conv.title, updatedAt: conv.updatedAt, messages: await Promise.all(rows.map(toStored)) };
 }
 
 export async function deleteConversation(db: Database, p: Principal, id: string) {
@@ -78,7 +80,7 @@ export async function deleteConversation(db: Database, p: Principal, id: string)
 export async function createConversation(db: Database, p: Principal, firstMessage: string) {
   const id = crypto.randomUUID();
   const now = new Date();
-  await db.insert(c).values({ id, householdId: p.householdId, userId: p.userId, title: titleOf(firstMessage) || "Chat", createdAt: now, updatedAt: now });
+  await db.insert(c).values({ id, householdId: p.householdId, userId: p.userId, title: await sealText(titleOf(firstMessage) || "Chat"), createdAt: now, updatedAt: now });
   const extra = await db.select({ id: c.id }).from(c).where(own(p)).orderBy(desc(c.updatedAt)).limit(1000).offset(MAX_CONVERSATIONS);
   for (const ids of chunk(extra.map((r) => r.id), 90)) await db.delete(c).where(inArray(c.id, ids));
   return id;
@@ -100,7 +102,7 @@ export async function appendMessage(
     model: msg.model ?? null,
     createdAt: now,
   };
-  await db.insert(m).values(row);
+  await db.insert(m).values({ ...row, content: await sealText(row.content), steps: await sealJson(row.steps), proposals: await sealJson(row.proposals) });
   await db.update(c).set({ updatedAt: now }).where(eq(c.id, conversationId));
   return toStored(row);
 }
@@ -108,7 +110,7 @@ export async function appendMessage(
 /** The turns the model reads next, oldest first (the newest {@link MAX_MESSAGES}). */
 export async function historyOf(db: Database, conversationId: string): Promise<StoredMessage[]> {
   const rows = await db.select().from(m).where(eq(m.conversationId, conversationId)).orderBy(desc(m.createdAt), desc(m.id)).limit(MAX_MESSAGES);
-  return rows.reverse().map(toStored);
+  return Promise.all(rows.reverse().map(toStored));
 }
 
 /** One message of the member's own conversation, with its conversation. */
@@ -122,7 +124,7 @@ export async function ownMessage(db: Database, p: Principal, messageId: string) 
 }
 
 export async function saveProposals(db: Database, messageId: string, proposals: Proposal[]) {
-  await db.update(m).set({ proposals }).where(eq(m.id, messageId));
+  await db.update(m).set({ proposals: await sealJson(proposals) }).where(eq(m.id, messageId));
 }
 
 const hm = schema.householdMember;

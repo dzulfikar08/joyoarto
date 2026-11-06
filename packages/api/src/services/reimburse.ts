@@ -21,6 +21,7 @@ import { wibMonth } from "../lib/billing/entitlement";
 import { CLAIM_REPORT_METRIC } from "../lib/billing/plans";
 import { claimPdf } from "../lib/claim-pdf";
 import { chunk } from "../lib/d1";
+import { sealText, unsealBytes, unsealRow } from "../lib/data-key";
 import { todayWib } from "../lib/dashboard";
 import { buildSnapshot, claimCsv, claimNumber, nextClaimSequence } from "../lib/reimburse";
 import type { ClaimSnapshot } from "../lib/reimburse";
@@ -52,6 +53,22 @@ export const profileInput = z.object({
 export const profileUpdate = profileInput.partial().extend({ id: z.string() });
 
 type ProfileRow = typeof rp.$inferSelect;
+
+/** Profile columns sealed at rest (DATA_KEY): the claimant's and approver's personal details. */
+export const PROFILE_SEALED = ["claimantName", "employeeId", "department", "approverName", "approverEmail"] as const;
+
+const openProfile = (r: ProfileRow) => unsealRow(r, PROFILE_SEALED);
+
+async function sealProfile<T extends Partial<Record<(typeof PROFILE_SEALED)[number], string | null | undefined>>>(v: T): Promise<T> {
+  const out = { ...v };
+  for (const k of PROFILE_SEALED) if (k in out) out[k] = (await sealText(out[k])) as T[typeof k];
+  return out;
+}
+
+type ClaimRow = typeof rc.$inferSelect;
+
+/** Claim notes and the printed snapshot are sealed at rest (DATA_KEY). */
+const openClaim = (r: ClaimRow) => unsealRow(r, ["notes", "snapshot"]);
 
 function profileView(r: ProfileRow, open?: { draft: number; draftCount: number; submitted: number; submittedCount: number }) {
   return {
@@ -109,7 +126,7 @@ export async function receivableBalances(db: Database, householdId: string): Pro
 export async function listProfiles(db: Database, p: Principal, input: { includeArchived?: boolean } = {}) {
   const where = input.includeArchived ? eq(rp.householdId, p.householdId) : and(eq(rp.householdId, p.householdId), isNull(rp.archivedAt));
   const [rows, open] = await Promise.all([db.select().from(rp).where(where).orderBy(desc(rp.lastUsedAt), asc(rp.createdAt)), openTotals(db, p.householdId)]);
-  const profiles = rows.map((r) => profileView(r, open.get(r.id)));
+  const profiles = (await Promise.all(rows.map(openProfile))).map((r) => profileView(r, open.get(r.id)));
   return { profiles, defaultProfileId: profiles.find((x) => !x.archived)?.id ?? null };
 }
 
@@ -118,7 +135,7 @@ async function ownProfile(db: Database, householdId: string, id: string) {
     .select()
     .from(rp)
     .where(and(eq(rp.id, id), eq(rp.householdId, householdId)));
-  return row ?? notFound(`Reimbursement profile ${id}`);
+  return row ? openProfile(row) : notFound(`Reimbursement profile ${id}`);
 }
 
 /** A profile and its receivable account (named after the company). */
@@ -133,11 +150,13 @@ export async function createProfile(db: Database, p: Principal, input: z.infer<t
       id,
       householdId: p.householdId,
       companyName: input.companyName,
-      claimantName: input.claimantName?.trim() || u?.name || "—",
-      employeeId: input.employeeId || null,
-      department: input.department || null,
-      approverName: input.approverName || null,
-      approverEmail: input.approverEmail || null,
+      ...(await sealProfile({
+        claimantName: input.claimantName?.trim() || u?.name || "—",
+        employeeId: input.employeeId || null,
+        department: input.department || null,
+        approverName: input.approverName || null,
+        approverEmail: input.approverEmail || null,
+      })),
       currency,
       accountId,
       createdBy: p.userId,
@@ -153,7 +172,7 @@ export async function updateProfile(db: Database, p: Principal, input: z.infer<t
   for (const [k, v] of Object.entries(rest)) if (v !== undefined) (patch as Record<string, unknown>)[k] = v === "" ? null : v;
   if (patch.currency) patch.currency = patch.currency.toUpperCase();
   if (!Object.keys(patch).length) badRequest("Nothing to change.");
-  await db.update(rp).set(patch).where(eq(rp.id, id));
+  await db.update(rp).set(await sealProfile(patch)).where(eq(rp.id, id));
   if (row.accountId && (patch.companyName || patch.currency)) {
     await db
       .update(a)
@@ -194,7 +213,7 @@ async function defaultProfile(db: Database, householdId: string) {
     .where(and(eq(rp.householdId, householdId), isNull(rp.archivedAt)))
     .orderBy(desc(rp.lastUsedAt), asc(rp.createdAt))
     .limit(1);
-  return row ?? badRequest("Add a reimbursement profile first (Settings → Reimbursement): the company that pays it back.");
+  return row ? openProfile(row) : badRequest("Add a reimbursement profile first (Settings → Reimbursement): the company that pays it back.");
 }
 
 // ------------------------------------------------------------------------------------------------ items
@@ -335,6 +354,7 @@ export async function createClaim(db: Database, p: Principal, input: z.infer<typ
     if (rows.length !== new Set(input.transactionIds).size) badRequest("Every item must be a draft reimbursable expense of this profile (not already in a claim).");
   } else rows.push(...(await db.select().from(t).where(and(...where)).limit(200)));
   if (!rows.length) badRequest("No draft items to claim for this profile in that period.");
+  for (const [i, r] of rows.entries()) rows[i] = await unsealRow(r, ["note"]);
   const currencies = new Set(rows.map((r) => r.currency));
   if (currencies.size > 1) badRequest(`A claim is in one currency; these items are in ${[...currencies].join(", ")}. Make one claim per currency.`);
   await assertClaimReport(db, p.userId, billing);
@@ -394,8 +414,8 @@ export async function createClaim(db: Database, p: Principal, input: z.infer<typ
         total: saved.total,
         currency: saved.currency,
         itemCount: saved.items.length,
-        notes: saved.notes,
-        snapshot: JSON.stringify(saved),
+        notes: await sealText(saved.notes),
+        snapshot: await sealText(JSON.stringify(saved)),
         createdBy: p.userId,
       })
       .onConflictDoNothing()
@@ -431,13 +451,13 @@ export async function createClaim(db: Database, p: Principal, input: z.infer<typ
     const saved: ClaimSnapshot = { ...snapshotOf(claimed), number };
     await db
       .update(rc)
-      .set({ total: saved.total, itemCount: saved.items.length, snapshot: JSON.stringify(saved) })
+      .set({ total: saved.total, itemCount: saved.items.length, snapshot: await sealText(JSON.stringify(saved)) })
       .where(eq(rc.id, id));
   }
   await db.update(rp).set({ lastUsedAt: new Date() }).where(eq(rp.id, profile.id));
   await countClaimReport(db, p.userId);
   const [row] = await db.select().from(rc).where(eq(rc.id, id));
-  return { claim: claimView(row!, profile) };
+  return { claim: claimView(await openClaim(row!), profile) };
 }
 
 export const claimsInput = z.object({ profileId: z.string().optional(), limit: z.number().int().min(1).max(100).default(50) });
@@ -449,7 +469,7 @@ export async function listClaims(db: Database, p: Principal, input: z.infer<type
     db.select({ id: rp.id, companyName: rp.companyName }).from(rp).where(eq(rp.householdId, p.householdId)),
   ]);
   const byId = new Map(profiles.map((x) => [x.id, x]));
-  return { claims: rows.map((r) => claimView(r, byId.get(r.profileId))) };
+  return { claims: (await Promise.all(rows.map(openClaim))).map((r) => claimView(r, byId.get(r.profileId))) };
 }
 
 async function ownClaim(db: Database, householdId: string, id: string) {
@@ -457,7 +477,7 @@ async function ownClaim(db: Database, householdId: string, id: string) {
     .select()
     .from(rc)
     .where(and(eq(rc.id, id), eq(rc.householdId, householdId)));
-  return row ?? notFound(`Claim ${id}`);
+  return row ? openClaim(row) : notFound(`Claim ${id}`);
 }
 
 /** A claim, its items as they are now (status may have changed since), and the payments recorded for it. */
@@ -491,7 +511,7 @@ export async function claimPdfFile(db: Database, files: FileStore | undefined, p
       .where(and(eq(at.id, attachmentId), eq(at.householdId, p.householdId)));
     if (!ref) return null;
     const obj = await store.get(ref.key);
-    return obj ? { bytes: obj.body, mime: ref.mime } : null;
+    return obj ? { bytes: await unsealBytes(obj.body), mime: ref.mime } : null;
   });
   return new File([bytes as unknown as ArrayBuffer], `${row.number}.pdf`, { type: "application/pdf" });
 }

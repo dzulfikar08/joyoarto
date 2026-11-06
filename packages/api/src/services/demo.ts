@@ -15,6 +15,7 @@ import { and, count, eq, lt, ne, sql } from "drizzle-orm";
 
 import type { Principal } from "../context";
 import { chunk, rowsPerInsert } from "../lib/d1";
+import { sealText } from "../lib/data-key";
 import {
   DEMO_EMAIL,
   DEMO_HOUSEHOLD_ID,
@@ -232,6 +233,8 @@ export async function seedDemo(db: Database, now = new Date()): Promise<{ househ
   );
 
   const rows = demoRows(today);
+  // Sealed like any member's notes (DATA_KEY), so a reset leaves nothing for the encryption backfill.
+  const notes = await Promise.all(rows.map((r) => sealText(r.note ?? null)));
   const values = rows.map((r, i) => ({
     id: crypto.randomUUID(),
     householdId: DEMO_HOUSEHOLD_ID,
@@ -241,7 +244,7 @@ export async function seedDemo(db: Database, now = new Date()): Promise<{ househ
     currency: "IDR",
     description: r.description,
     merchant: r.merchant,
-    note: r.note ?? null,
+    note: notes[i] ?? null,
     categoryId: r.category ? (catId.get(r.category) ?? null) : null,
     categorySource: r.category ? ("manual" as const) : null,
     dedupeKey: `demo:${i}`,

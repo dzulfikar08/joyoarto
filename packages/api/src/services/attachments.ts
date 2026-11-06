@@ -11,6 +11,7 @@ import { z } from "zod";
 
 import type { FileStore, Principal } from "../context";
 import { chunk } from "../lib/d1";
+import { dataKeyEnabled, sealBytes, unsealBytes } from "../lib/data-key";
 import { MAX_RECEIPT_BYTES, imageSize } from "../lib/receipt";
 import { badRequest, notFound } from "./common";
 
@@ -26,8 +27,11 @@ export function householdPrefix(householdId: string): string {
   return `h/${householdId}/`;
 }
 
-export function receiptKey(householdId: string, id: string): string {
-  return `${householdPrefix(householdId)}r/${id}`;
+/** Objects stored encrypted (DATA_KEY) end in this, so the backfill finds plain ones from the rows alone. */
+export const SEALED_SUFFIX = ".enc";
+
+export function receiptKey(householdId: string, id: string, sealed = false): string {
+  return `${householdPrefix(householdId)}r/${id}${sealed ? SEALED_SUFFIX : ""}`;
 }
 
 export function requireFiles(files: FileStore | undefined): FileStore {
@@ -47,8 +51,10 @@ export async function storeImage(db: Database, files: FileStore, p: Principal, b
   const info = imageSize(bytes);
   if (!info) badRequest("Send a JPEG or PNG photo.");
   const id = crypto.randomUUID();
-  const key = receiptKey(p.householdId, id);
-  await files.put(key, bytes, info.mime);
+  const sealed = dataKeyEnabled();
+  const key = receiptKey(p.householdId, id, sealed);
+  // Sealed objects are opaque bytes in R2; the row keeps the photo's real type for serving.
+  await files.put(key, sealed ? await sealBytes(bytes) : bytes, sealed ? "application/octet-stream" : info.mime);
   const row = { id, householdId: p.householdId, transactionId, r2Key: key, mime: info.mime, size: bytes.byteLength, width: info.width || null, height: info.height || null, createdBy: p.userId };
   try {
     await db.insert(at).values(row);
@@ -107,7 +113,8 @@ export async function getAttachmentFile(db: Database, files: FileStore | undefin
   const row = await ownAttachment(db, p.householdId, id);
   const obj = await store.get(row.r2Key);
   if (!obj) notFound(`Photo ${id}`);
-  return new File([obj.body as unknown as ArrayBuffer], `${row.id}.${row.mime === "image/png" ? "png" : "jpg"}`, { type: row.mime });
+  const body = await unsealBytes(obj.body);
+  return new File([body as unknown as ArrayBuffer], `${row.id}.${row.mime === "image/png" ? "png" : "jpg"}`, { type: row.mime });
 }
 
 export async function deleteAttachment(db: Database, files: FileStore | undefined, p: Principal, id: string) {

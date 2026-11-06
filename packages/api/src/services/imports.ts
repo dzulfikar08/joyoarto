@@ -9,6 +9,7 @@ import { MAPPING_PRESETS, applyMapping, csvMapping, parseCsv } from "../lib/csv"
 import type { ParsedRow, RowError } from "../lib/csv";
 import { addDays } from "../lib/dashboard";
 import { chunk, rowsPerInsert } from "../lib/d1";
+import { sealText, unsealRow } from "../lib/data-key";
 import { dedupeKeys } from "../lib/dedupe";
 import { cleanMerchant } from "../lib/merchant";
 import { isGenericMerchant, matchPending, MATCH_WINDOW_DAYS } from "../lib/reconcile";
@@ -201,7 +202,7 @@ export async function importTransactions(db: Database, p: Principal, input: z.in
       householdId: p.householdId,
       accountId: account.id,
       source: input.source,
-      fileName: input.fileName ?? null,
+      fileName: (await sealText(input.fileName)) ?? null,
       rowCount: input.rows.length,
       insertedCount: 0,
       duplicateCount: input.rows.length - fresh.length,
@@ -399,7 +400,7 @@ export async function listImports(db: Database, p: Principal) {
     .where(eq(schema.importBatch.householdId, p.householdId))
     .orderBy(desc(schema.importBatch.createdAt))
     .limit(50);
-  return { imports: rows };
+  return { imports: await Promise.all(rows.map((r) => unsealRow(r, ["fileName"]))) };
 }
 
 /** Removes every transaction an import added (to redo it with a better mapping). */

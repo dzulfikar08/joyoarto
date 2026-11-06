@@ -10,6 +10,7 @@ import { counterpartyInText, quickAddAmount } from "../lib/amount-text";
 import { addDays, todayWib } from "../lib/dashboard";
 import { chunk } from "../lib/d1";
 import { dedupeKeys } from "../lib/dedupe";
+import { dataKeyEnabled, sealText, unsealText } from "../lib/data-key";
 import { cleanMerchant } from "../lib/merchant";
 import { applyRule, firstMatch } from "../lib/rules";
 import {
@@ -86,8 +87,11 @@ export async function searchTransactions(db: Database, p: Principal, input: z.in
   if (input.uncategorized) where.push(isNull(t.categoryId));
   if (input.q?.trim()) {
     // D1 limits LIKE patterns to 50 bytes; the input is capped at 40 characters.
-    const pattern = `%${input.q.trim().replace(/[%_]/g, "")}%`;
-    where.push(or(like(t.description, pattern), like(t.merchant, pattern), like(t.note, pattern)));
+    const needle = input.q.trim().replace(/[%_]/g, "");
+    const pattern = `%${needle}%`;
+    // An encrypted note cannot be matched in SQL: the household's noted rows are opened here and matched in the Worker.
+    const noteMatch = dataKeyEnabled() ? await noteMatchSql(db, p.householdId, needle) : like(t.note, pattern);
+    where.push(or(like(t.description, pattern), like(t.merchant, pattern), noteMatch));
   }
   if (input.status) where.push(eq(t.status, input.status));
   if (input.reimburse === "any") where.push(inArray(t.reimburseStatus, ["draft", "submitted", "paid", "rejected"]));
@@ -121,13 +125,29 @@ export async function searchTransactions(db: Database, p: Principal, input: z.in
   };
 }
 
+/**
+ * `t.id in (…)` for the household's rows whose note contains `needle` (case-insensitive, like SQLite's LIKE for ASCII).
+ * The ids travel as one JSON parameter (json_each), so any number of matches stays within D1's 100-parameter limit.
+ */
+async function noteMatchSql(db: Database, householdId: string, needle: string): Promise<SQL> {
+  const rows = await db
+    .select({ id: t.id, note: t.note })
+    .from(t)
+    .where(and(eq(t.householdId, householdId), sql`${t.note} is not null and ${t.note} <> ''`));
+  const lower = needle.toLowerCase();
+  const ids: string[] = [];
+  for (const r of rows) if ((await unsealText(r.note))?.toLowerCase().includes(lower)) ids.push(r.id);
+  return sql`${t.id} in (select value from json_each(${JSON.stringify(ids)}))`;
+}
+
 export async function viewRows(db: Database, householdId: string, rows: (typeof t.$inferSelect)[]): Promise<TxView[]> {
   const [cats, accounts, photos] = await Promise.all([
     categoriesById(db, householdId),
     accountsById(db, householdId, [...new Set(rows.map((r) => r.accountId))]),
     rows.length ? attachmentsByTransaction(db, householdId, rows.map((r) => r.id)) : new Map<string, AttachmentView[]>(),
   ]);
-  return rows.map((r) => {
+  const notes = await Promise.all(rows.map((r) => unsealText(r.note)));
+  return rows.map((r, i) => {
     const cat = r.categoryId ? cats.get(r.categoryId) : undefined;
     return {
       id: r.id,
@@ -141,7 +161,7 @@ export async function viewRows(db: Database, householdId: string, rows: (typeof 
       category: cat?.slug ?? null,
       categoryName: cat?.name ?? null,
       categorySource: r.categorySource,
-      note: r.note,
+      note: notes[i] ?? null,
       status: r.status,
       capturedVia: r.capturedVia,
       capturedAt: r.capturedAt?.toISOString() ?? null,
@@ -184,7 +204,7 @@ export async function addTransaction(db: Database, p: Principal, input: z.infer<
     currency: account.currency,
     description: input.description,
     merchant: ruled.merchant,
-    note: input.note ?? null,
+    note: (await sealText(input.note)) ?? null,
     categoryId: explicit?.id ?? ruled.categoryId,
     categorySource: explicit ? ("manual" as const) : ruled.categoryId ? ("rule" as const) : null,
     ruleId: explicit ? null : ruled.ruleId,
@@ -221,7 +241,7 @@ export async function updateTransaction(db: Database, p: Principal, input: z.inf
     patch.ruleId = null;
   }
   if (input.merchant !== undefined) patch.merchant = input.merchant;
-  if (input.note !== undefined) patch.note = input.note;
+  if (input.note !== undefined) patch.note = await sealText(input.note);
   const capturedEdit = input.date !== undefined || input.amount !== undefined || input.description !== undefined || input.accountId !== undefined;
   if (capturedEdit && row.status !== "pending") badRequest("Date, amount, description and account come from the statement and cannot be edited.");
   if (input.date !== undefined) patch.date = input.date;
@@ -384,7 +404,7 @@ export async function quickAdd(db: Database, p: Principal, input: z.infer<typeof
       currency: account.currency,
       description,
       merchant: input.merchant?.trim() ? merchant : ruled.merchant,
-      note: input.note ?? null,
+      note: (await sealText(input.note)) ?? null,
       categoryId: explicit?.id ?? ruled.categoryId,
       categorySource: explicit ? "manual" : ruled.categoryId ? "rule" : null,
       ruleId: explicit ? null : ruled.ruleId,

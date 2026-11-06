@@ -487,6 +487,12 @@ Settings → Data & privacy, all browser-session only (`packages/api/src/service
 - Joyo AI conversations and `ai_usage` rows are in the export (`joyoConversations`, `aiUsage`) and go with the account or
   household.
 - MCP audit rows are kept 90 days: about one MCP call in 50 prunes older rows (no cron trigger yet).
+- **Encryption at rest** (optional Worker secret `DATA_KEY`, 32 bytes base64): notes, receipt photos, Joyo AI chats,
+  reimbursement personal details and claims, saved plans, import file names, the email-import log and MCP audit
+  arguments are stored as AES-256-GCM ciphertext (`enc:v1:…`); services seal on write and open on read, and the export
+  is plaintext. Descriptions, merchants and amounts stay plaintext (SQL uses them). Old rows: operators call
+  `POST /api/admin/encryption/backfill` until `done`. Threat model, owner settings and key custody:
+  [docs/operator-access.md](docs/operator-access.md).
 - `/privasi` and `/syarat` are the privacy policy and terms; the operator and contact live in `apps/web/src/lib/brand.ts`.
   Keep them true when changing what is stored or shared.
 
@@ -518,7 +524,7 @@ bun run deploy              # builds apps/web, deploys the worker
 Receipt photos need the R2 bucket `joyoarto-receipts` (binding `RECEIPTS`); `deploy.yml` creates it when missing, so the
 deploy token needs Workers R2 Storage:Edit. Secrets (`wrangler secret put`, in apps/server): `BETTER_AUTH_SECRET` (set), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
 `ANTHROPIC_API_KEY` (optional), and for Joyo Pro `JOYO_INTERNAL_KEY` (the same value as on JoyoRogo's server; unset = billing
-off). `DEMO_LOGIN_CODE` (optional) turns on the store reviewers' demo account. No payment secrets: JoyoRogo sells Joyo Pro.
+off). `DEMO_LOGIN_CODE` (optional) turns on the store reviewers' demo account. `DATA_KEY` (optional, `openssl rand -base64 32`) encrypts member data at rest; keep an offline copy, since losing it loses that data (docs/operator-access.md). No payment secrets: JoyoRogo sells Joyo Pro.
 `ALLOWED_EMAILS` and `ADMIN_EMAILS` (comma-separated) are not in wrangler.jsonc: `deploy.yml` passes them with
 `wrangler deploy --var` from the `production` environment's variables (GitHub → Settings → Environments), and refuses
 to deploy without them. Deploying by hand: `bunx wrangler deploy --var ALLOWED_EMAILS:you@example.com --var ADMIN_EMAILS:you@example.com`.

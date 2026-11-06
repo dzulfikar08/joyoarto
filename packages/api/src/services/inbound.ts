@@ -13,6 +13,7 @@ import type { Attachment, RawEmail } from "postal-mime";
 
 import type { Principal } from "../context";
 import type { BillingConfig } from "../lib/billing/config";
+import { sealJson, sealText, unsealJson, unsealText } from "../lib/data-key";
 import { mailbox, senderAuth } from "../lib/mime";
 import type { SenderAuth } from "../lib/mime";
 import { MAX_PDF_BYTES, pdfText } from "../lib/pdf/extract";
@@ -60,12 +61,13 @@ export async function emailImportStatus(db: Database, p: Principal, domain: stri
     .where(eq(inbound.householdId, p.householdId))
     .orderBy(desc(inbound.createdAt))
     .limit(10);
+  const opened = await Promise.all(recent.map(async (r) => ({ ...r, subject: await unsealText(r.subject), detail: await unsealJson(r.detail) })));
   return {
     available: !!domain,
     enabled: !!row && !!domain,
     address: row && domain ? importAddress(row.token, domain) : null,
     since: row?.createdAt ?? null,
-    recent,
+    recent: opened,
   };
 }
 
@@ -126,7 +128,7 @@ function bytesOf(a: Attachment): Uint8Array {
 }
 
 async function logInbound(db: Database, householdId: string, row: { fromAddress: string; userId: string | null; subject: string | null; status: InboundStatus; detail: unknown }) {
-  await db.insert(inbound).values({ id: crypto.randomUUID(), householdId, ...row, subject: row.subject?.slice(0, 200) ?? null });
+  await db.insert(inbound).values({ id: crypto.randomUUID(), householdId, ...row, subject: (await sealText(row.subject?.slice(0, 200))) ?? null, detail: await sealJson(row.detail) });
   // Keep the newest rows only; the import batches themselves stay in import_batch.
   const keep = db.select({ id: inbound.id }).from(inbound).where(eq(inbound.householdId, householdId)).orderBy(desc(inbound.createdAt)).limit(KEEP_INBOUND);
   await db.delete(inbound).where(and(eq(inbound.householdId, householdId), notInArray(inbound.id, keep)));
