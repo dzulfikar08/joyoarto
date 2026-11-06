@@ -11,6 +11,7 @@ import { addDays, todayWib } from "../lib/dashboard";
 import { chunk } from "../lib/d1";
 import { dedupeKeys } from "../lib/dedupe";
 import { dataKeyEnabled, sealText, unsealText } from "../lib/data-key";
+import { categoryIn } from "../lib/capture-parse";
 import { cleanMerchant } from "../lib/merchant";
 import { applyRule, firstMatch } from "../lib/rules";
 import {
@@ -358,6 +359,34 @@ export function wibDay(occurredAt: string | undefined, now: Date): string {
 }
 
 /**
+ * A category for a capture that brought none and matched no rule: the one this household last chose (by hand or by a
+ * rule) for the same merchant in the same direction, else the keyword guess quick add uses (kopi, gofood, indomaret...).
+ */
+export async function suggestCategory(
+  db: Database,
+  householdId: string,
+  tx: { merchant: string; description: string; amount: number },
+): Promise<string | null> {
+  const [last] = await db
+    .select({ categoryId: t.categoryId })
+    .from(t)
+    .where(
+      and(
+        eq(t.householdId, householdId),
+        sql`lower(${t.merchant}) = ${tx.merchant.trim().toLowerCase()}`,
+        inArray(t.categorySource, ["manual", "rule"]),
+        tx.amount < 0 ? lt(t.amount, 0) : gte(t.amount, 0),
+      ),
+    )
+    .orderBy(desc(t.date), desc(t.createdAt))
+    .limit(1);
+  if (last?.categoryId) return last.categoryId;
+  const cats = [...(await categoriesById(db, householdId)).values()];
+  const slug = categoryIn(`${tx.merchant} ${tx.description}`, cats, tx.amount < 0 ? "out" : "in");
+  return slug ? (cats.find((c) => c.slug === slug)?.id ?? null) : null;
+}
+
+/**
  * A provisional row from a quick capture (web box, Shortcut, notification, voice, Claude). It counts in reports at
  * once; the next statement import that has the same amount within a day replaces it. Idempotent with clientRef.
  */
@@ -392,6 +421,9 @@ export async function quickAdd(db: Database, p: Principal, input: z.infer<typeof
   const target = { accountId: account.id, amount, description, merchant };
   const ruled = applyRule(firstMatch(await loadRules(db, p.householdId), target), target);
   const explicit = input.category ? await resolveCategory(db, p.householdId, input.category) : null;
+  // No category given and no rule: suggest one (source "import", like a statement's suggestion, so a later statement
+  // row or the member can still override it).
+  const suggested = explicit || ruled.categoryId ? null : await suggestCategory(db, p.householdId, { merchant, description, amount });
   const id = crypto.randomUUID();
   const inserted = await db
     .insert(t)
@@ -405,8 +437,8 @@ export async function quickAdd(db: Database, p: Principal, input: z.infer<typeof
       description,
       merchant: input.merchant?.trim() ? merchant : ruled.merchant,
       note: (await sealText(input.note)) ?? null,
-      categoryId: explicit?.id ?? ruled.categoryId,
-      categorySource: explicit ? "manual" : ruled.categoryId ? "rule" : null,
+      categoryId: explicit?.id ?? ruled.categoryId ?? suggested,
+      categorySource: explicit ? "manual" : ruled.categoryId ? "rule" : suggested ? "import" : null,
       ruleId: explicit ? null : ruled.ruleId,
       dedupeKey: `pending:${id}`,
       status: "pending",

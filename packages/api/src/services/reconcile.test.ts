@@ -42,6 +42,25 @@ test("quick add: rawText is parsed, never stored", async () => {
   expect(JSON.stringify(row)).not.toContain("998877");
 });
 
+test("quick add: a capture with no category or rule gets a suggested one", async () => {
+  // Nothing learned yet: the keyword guess.
+  const kopi = await quick({ accountId: bca, rawText: "Pembayaran berhasil! Kamu bayar Rp25.000 di Kopi Kenangan pakai GoPay.", capturedVia: "notification" });
+  expect(kopi.transaction).toMatchObject({ category: "food/coffee", categorySource: "import" });
+
+  // A merchant the member categorised before wins over keywords, in the same direction only.
+  const first = await quick({ accountId: bca, amountText: "40rb", description: "Sego Bakar Bu Sri" });
+  expect(first.transaction.category).toBeNull();
+  await updateTransaction(db, p, { id: first.transaction.id, category: "food/dining" });
+  const again = await quick({ accountId: bca, amountText: "20rb", merchant: "sego bakar bu sri", description: "Pembayaran ke Sego Bakar Bu Sri (GoPay)", capturedVia: "notification" });
+  expect(again.transaction).toMatchObject({ category: "food/dining", categorySource: "import" });
+  const money_in = await quick({ accountId: bca, amountText: "20rb", direction: "in", merchant: "Sego Bakar Bu Sri" });
+  expect(money_in.transaction.category).toBeNull();
+
+  // An explicit category is still the member's.
+  const explicit = await quick({ accountId: bca, amountText: "25rb", description: "Kopi Kenangan", category: "food" });
+  expect(explicit.transaction).toMatchObject({ category: "food", categorySource: "manual" });
+});
+
 test("quick add: most used account by default, clear error without accounts", async () => {
   const gopay = await testAccount(db, p, "GoPay");
   await importRows(gopay, [{ date: "2026-11-01", amount: -100, description: "A" }, { date: "2026-11-02", amount: -100, description: "B" }], true);
