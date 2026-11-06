@@ -1,0 +1,123 @@
+# App Store screenshots of the iPhone app (docs/ios-release.md "From TestFlight to the App Store"): a Release build for
+# the simulator (no signing), a 6.9" iPhone simulator (1320x2868, the one size App Store Connect needs), the demo
+# household, and a Maestro flow (apps/mobile/scripts/ios/screenshots/flow.yaml). The PNGs come out as an artifact.
+#
+# Manual only:  gh workflow run ios-screenshots.yml -R dzulfikar08/joyoarto
+# Needs the repository secret JOYOARTO_DEMO_CODE (the store reviewers' demo code). Demo data only, never a real household.
+name: iOS screenshots
+
+on:
+  # Also on a pull request that changes the flow or this file, so a change is proven before it merges.
+  pull_request:
+    paths:
+      - .github/workflows/ios-screenshots.yml
+      - apps/mobile/scripts/ios/screenshots/**
+  workflow_dispatch:
+    inputs:
+      device:
+        description: "Simulator device type name (6.9-inch)"
+        type: string
+        default: iPhone 17 Pro Max
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-screenshots
+  cancel-in-progress: true
+
+jobs:
+  shots:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      DEVICE: ${{ inputs.device || 'iPhone 17 Pro Max' }}
+      OUT: ${{ github.workspace }}/dist/screenshots
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Cache bun and CocoaPods downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/Library/Caches/CocoaPods
+          key: ios-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: ios-${{ runner.os }}-
+
+      - name: Check the demo code is set
+        env:
+          DEMO_CODE: ${{ secrets.JOYOARTO_DEMO_CODE }}
+        run: '[ -n "$DEMO_CODE" ] || { echo "::error::repository secret JOYOARTO_DEMO_CODE is missing"; exit 1; }'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Prebuild and pods
+        working-directory: apps/mobile
+        run: |
+          bunx expo prebuild --platform ios --clean --no-install 2>&1 | tail -n 3
+          cd ios && EXPO_PRECOMPILED_FLAVOR=release pod install > "$RUNNER_TEMP/pod-install.log" 2>&1 || { tail -n 40 "$RUNNER_TEMP/pod-install.log"; exit 1; }
+
+      - name: Build for the simulator (Release, unsigned)
+        working-directory: apps/mobile/ios
+        run: |
+          set -o pipefail
+          xcodebuild build -workspace JoyoArto.xcworkspace -scheme JoyoArto -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/dd" \
+            CODE_SIGNING_ALLOWED=NO > "$RUNNER_TEMP/xcodebuild.log" 2>&1 \
+            || { grep -E 'error:|BUILD FAILED' "$RUNNER_TEMP/xcodebuild.log" | head -n 30; exit 1; }
+          app="$(find "$RUNNER_TEMP/dd/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' | head -1)"
+          [ -n "$app" ] || { echo "no .app built"; exit 1; }
+          echo "APP_PATH=$app" >> "$GITHUB_ENV"
+
+      - name: Boot the simulator
+        run: |
+          xcrun simctl list devicetypes | grep -i "pro max" || true
+          runtime="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; r=[x for x in json.load(sys.stdin)["runtimes"] if x["platform"]=="iOS" and x["isAvailable"]]; print(r[-1]["identifier"])')"
+          udid="$(xcrun simctl create shots "$DEVICE" "$runtime")"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl status_bar "$udid" override --time 9:41 --dataNetwork wifi --wifiMode active --wifiBars 3 \
+            --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
+          xcrun simctl install "$udid" "$APP_PATH"
+          echo "UDID=$udid" >> "$GITHUB_ENV"
+
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Take the screenshots
+        env:
+          DEMO_CODE: ${{ secrets.JOYOARTO_DEMO_CODE }}
+          MAESTRO_CLI_NO_ANALYTICS: "1"
+        run: |
+          mkdir -p "$OUT"
+          maestro --device "$UDID" test -e DEMO_CODE="$DEMO_CODE" -e OUT="$OUT" apps/mobile/scripts/ios/screenshots/flow.yaml \
+            || { xcrun simctl io "$UDID" screenshot "$OUT/zz-failure.png"; exit 1; }
+
+      - name: Check the sizes
+        if: always()
+        run: for f in "$OUT"/*.png; do [ -f "$f" ] && echo "$(basename "$f") $(sips -g pixelWidth -g pixelHeight "$f" | awk '/pixel/{printf "%s ", $2}')"; done | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-screenshots-${{ github.run_number }}
+          path: dist/screenshots/*.png
+          if-no-files-found: warn
+          retention-days: 30
