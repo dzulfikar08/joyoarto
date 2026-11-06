@@ -102,3 +102,44 @@ export function updateInput(a: AccountRow, f: AccountForm): UpdateInput | null {
   if (opening !== a.openingBalance.amount) patch.openingBalance = opening;
   return Object.keys(patch).length > 1 ? patch : null;
 }
+
+/** "Jago · Main Pocket" shows as "Main Pocket": the bank is already on the badge and in the line below. */
+export function shortName(name: string, institution: string): string {
+  const prefix = `${institutionLabel(institution)} · `;
+  return name.toLowerCase().startsWith(prefix.toLowerCase()) && name.length > prefix.length ? name.slice(prefix.length) : name;
+}
+
+/** Two letters for the institution badge: "BC", "JA", "GO". */
+export function institutionBadge(institution: string): string {
+  return institutionLabel(institution).replace(/[^\p{L}\p{N}]/gu, "").slice(0, 2).toUpperCase() || "··";
+}
+
+/** Display order of account groups and their plural labels (the web's accounts page). */
+export const GROUP_ORDER = ["bank", "ewallet", "credit_card", "cash", "investment", "loan", "receivable"] as const;
+const GROUP_LABEL: Record<string, string> = {
+  bank: "Bank accounts",
+  ewallet: "E-wallets",
+  credit_card: "Credit cards",
+  cash: "Cash",
+  investment: "Investments",
+  loan: "Loans",
+  receivable: "Owed by a company",
+  other: "Other",
+};
+export const groupLabel = (type: string) => GROUP_LABEL[type] ?? accountTypeLabel(type);
+
+export type AccountGroup<T> = { type: string; label: string; items: T[]; total: number };
+
+/** Accounts grouped by type in display order; unknown types fold into "Other". Totals count IDR accounts only. */
+export function groupByType<T extends { type: string; currency: string; balance: { amount: number } }>(list: readonly T[]): AccountGroup<T>[] {
+  const known = new Set<string>(GROUP_ORDER);
+  const make = (type: string, items: T[]): AccountGroup<T> => ({ type, label: groupLabel(type), items, total: idrTotal(items) });
+  const groups = GROUP_ORDER.map((type) => make(type, list.filter((a) => a.type === type))).filter((g) => g.items.length);
+  const other = list.filter((a) => !known.has(a.type));
+  return other.length ? [...groups, make("other", other)] : groups;
+}
+
+/** Sum of the IDR balances (other currencies are not added into a rupiah total). */
+export function idrTotal(list: readonly { currency: string; balance: { amount: number } }[]): number {
+  return list.reduce((s, a) => (a.currency === "IDR" ? s + a.balance.amount : s), 0);
+}

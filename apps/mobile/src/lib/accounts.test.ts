@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { accountFacts, accountFormErrors, accountSpan, createInput, EMPTY_ACCOUNT_FORM, formFromAccount, splitArchived, updateInput, type AccountRow } from "./accounts";
+import { accountFacts, accountFormErrors, accountSpan, createInput, EMPTY_ACCOUNT_FORM, formFromAccount, groupByType, idrTotal, institutionBadge, shortName, splitArchived, updateInput, type AccountRow } from "./accounts";
 
 const acc = (p: Partial<AccountRow> = {}): AccountRow => ({
   id: "a1",
@@ -49,4 +49,28 @@ test("create input and validation", () => {
   expect(accountFormErrors(EMPTY_ACCOUNT_FORM)?.name).toBeTruthy();
   expect(accountFormErrors({ ...EMPTY_ACCOUNT_FORM, name: "x", last4: "12ab", opening: "1,2,3" })).toEqual({ last4: "Up to 8 digits.", opening: expect.any(String) });
   expect(accountFormErrors({ ...EMPTY_ACCOUNT_FORM, name: "x" })).toBeNull();
+});
+
+test("short names drop the repeated institution prefix", () => {
+  expect(shortName("Jago · Main Pocket", "jago")).toBe("Main Pocket");
+  expect(shortName("jago · Tabungan", "jago")).toBe("Tabungan");
+  expect(shortName("Jago · ", "jago")).toBe("Jago · ");
+  expect(shortName("BCA Tahapan", "bca")).toBe("BCA Tahapan");
+  expect(shortName("GoPay · Wallet", "bca")).toBe("GoPay · Wallet");
+  expect(institutionBadge("bca")).toBe("BC");
+  expect(institutionBadge("shopeepay")).toBe("SH");
+  expect(institutionBadge("weird")).toBe("WE");
+});
+
+test("accounts grouped by type in display order, IDR totals", () => {
+  const a = (type: string, amount: number, currency = "IDR") => ({ type, currency, balance: { amount } });
+  const groups = groupByType([a("ewallet", 100), a("bank", 500), a("mystery", 7), a("bank", 200), a("credit_card", -300), a("bank", 999, "USD")]);
+  expect(groups.map((g) => [g.type, g.label, g.items.length, g.total])).toEqual([
+    ["bank", "Bank accounts", 3, 700],
+    ["ewallet", "E-wallets", 1, 100],
+    ["credit_card", "Credit cards", 1, -300],
+    ["other", "Other", 1, 7],
+  ]);
+  expect(idrTotal([a("bank", 5), a("bank", 9, "USD"), a("loan", -2)])).toBe(3);
+  expect(groupByType([])).toEqual([]);
 });

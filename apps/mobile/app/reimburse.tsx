@@ -12,7 +12,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 import { invalidateLedger } from "@/components/data";
 import { AuthImage, useReimburseProfiles } from "@/components/receipts/receipts";
-import { Button, Card, DateField, EmptyState, ErrorState, Field, Icon, Picker, Pill, Row, Screen, SkeletonCard, SwitchRow, Text } from "@/components/ui";
+import { Button, Card, DateField, EmptyState, ErrorState, Field, Icon, Money, Picker, Pill, Row, Screen, SkeletonCard, SwitchRow, Text } from "@/components/ui";
 import { currentCredentials } from "@/src/lib/auth";
 import { errorMessage } from "@/src/lib/errors";
 import { formatMoney } from "@/src/lib/format";
@@ -89,7 +89,7 @@ export default function ReimburseScreen() {
         <Picker label="Company" value={profile.id} groups={[{ label: null, options: list.map((p) => ({ value: p.id, label: p.companyName })) }]} onChange={(v) => v && setProfileId(v)} />
       ) : null}
       <Card title={profile.companyName} subtitle="Owed · Piutang" action={<Button title="Edit" small variant="ghost" onPress={() => router.push("/reimburse-profiles")} />}>
-        <Text variant="title">{profile.owed.display}</Text>
+        <Money amount={profile.owed.amount} display={profile.owed.display} variant="title" />
         <Text variant="caption" tone="muted">
           {profile.draft.count} not claimed yet ({profile.draft.display}) · {profile.submitted.count} submitted ({profile.submitted.display})
         </Text>

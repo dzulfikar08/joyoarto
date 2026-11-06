@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-import { Button, Card, Icon, Pill, Text } from "@/components/ui";
+import { Button, Card, Disclosure, Icon, Pill, Text } from "@/components/ui";
 import { formatMoney, monthLabel } from "@/src/lib/format";
 import { effectiveBaseline, resetBaseline, ROLE_LABEL, ROLES, setRole, type PlanState } from "@/src/lib/plan-state";
 import type { AppRouterClient, Out } from "@/src/lib/rpc";
@@ -124,9 +124,9 @@ export function BaselineCard({ b, state, update }: { b: Baseline; state: PlanSta
                 </Text>
               </View>
             ))}
-            <Text variant="caption" tone="muted">
+            <Disclosure plain title="How income is counted">
               Crossed out: irregular, not counted. Regular sources use the lower of average and median; salary uses its median.
-            </Text>
+            </Disclosure>
           </View>
           <View style={{ gap: 4 }}>
             <Text variant="caption" tone="muted" style={styles.upper}>
