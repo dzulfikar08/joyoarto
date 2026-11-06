@@ -1,5 +1,5 @@
 # App Store screenshots of the iPhone app (docs/ios-release.md "From TestFlight to the App Store"): a Release build for
-# the simulator (no signing), a 6.9" iPhone simulator (1320x2868, the one size App Store Connect needs), the demo
+# the simulator (ad hoc signed), a 6.9" iPhone simulator (1320x2868, the one size App Store Connect needs), the demo
 # household, and a Maestro flow (apps/mobile/scripts/ios/screenshots/flow.yaml). The PNGs come out as an artifact.
 #
 # Manual only:  gh workflow run ios-screenshots.yml -R dzulfikar08/joyoarto
@@ -78,13 +78,15 @@ jobs:
           bunx expo prebuild --platform ios --clean --no-install 2>&1 | tail -n 3
           cd ios && EXPO_PRECOMPILED_FLAVOR=release pod install > "$RUNNER_TEMP/pod-install.log" 2>&1 || { tail -n 40 "$RUNNER_TEMP/pod-install.log"; exit 1; }
 
-      - name: Build for the simulator (Release, unsigned)
+      # Ad hoc signed ("Sign to Run Locally", as Xcode does for simulators): an unsigned app has no keychain
+      # entitlement, and the app waits on its first SecureStore read with a blank white screen.
+      - name: Build for the simulator (Release, ad hoc signed)
         working-directory: apps/mobile/ios
         run: |
           set -o pipefail
           xcodebuild build -workspace JoyoArto.xcworkspace -scheme JoyoArto -configuration Release \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/dd" \
-            CODE_SIGNING_ALLOWED=NO > "$RUNNER_TEMP/xcodebuild.log" 2>&1 < /dev/null \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= > "$RUNNER_TEMP/xcodebuild.log" 2>&1 < /dev/null \
             || { grep -E 'error:|BUILD FAILED' "$RUNNER_TEMP/xcodebuild.log" | head -n 30; exit 1; }
           app="$(find "$RUNNER_TEMP/dd/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' | head -1)"
           [ -n "$app" ] || { echo "no .app built"; exit 1; }
