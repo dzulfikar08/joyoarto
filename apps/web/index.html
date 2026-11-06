@@ -30,6 +30,17 @@
           location.replace("https://app.arto.joyorogo.com" + p + location.search + location.hash);
       })();
     </script>
+    <!-- RevKlik visitor stats on the public site only (arto.joyorogo.com), never in the app: it shares JoyoRogo's site so
+         visits from landing to Joyo Pro checkout on joyorogo.com read as one funnel. Disclosed in /privasi. -->
+    <script>
+      if (location.hostname === "arto.joyorogo.com") {
+        var rk = document.createElement("script");
+        rk.defer = true;
+        rk.src = "https://app.revklik.com/klikapa.js";
+        rk.setAttribute("data-site-id", "88069ee9-6eac-4dc9-a23b-f5757a4b948e");
+        document.head.appendChild(rk);
+      }
+    </script>
     <!-- Theme before first paint; matches @baroka/ui use-theme (class + colorScheme, key "baroka.theme"). -->
     <script>
       try {
