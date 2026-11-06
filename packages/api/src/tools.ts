@@ -329,6 +329,15 @@ const TOOLS: () => ToolDef[] = () => [
     destructive: false,
   },
   {
+    name: "update_account",
+    title: "Update an account",
+    description: "Renames an account or changes its institution, type, last digits, opening balance (minor units, the balance before its first recorded transaction) or archived state. Confirm with the user first.",
+    scope: "finance:write",
+    procedure: () => appRouter.accounts.update,
+    destructive: true,
+    idempotent: true,
+  },
+  {
     name: "create_category",
     title: "Create a category",
     description: 'Adds a category: "pets" or a subcategory "food/snacks" (the parent must exist).',
