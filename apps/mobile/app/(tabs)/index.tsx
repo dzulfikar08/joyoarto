@@ -145,10 +145,13 @@ function Body({ d, onMonth, openTransactions }: { d: Dashboard; onMonth: (m: str
 function HeroDelta({ value, vs, unit }: { value: number | null | undefined; vs: string; unit?: "pct" | "pts" }) {
   const dl = delta(value, true, unit);
   return (
-    <HeroText numberOfLines={1}>
+    // A row, not nested Text: opacity (faint) does not apply to nested text spans.
+    <Row gap={4}>
       {dl ? <HeroText strong>{dl.text}</HeroText> : null}
-      <HeroText faint>{dl ? ` vs ${vs}` : `no comparison for ${vs}`}</HeroText>
-    </HeroText>
+      <HeroText faint numberOfLines={1} style={{ flexShrink: 1 }}>
+        {dl ? `vs ${vs}` : `no comparison for ${vs}`}
+      </HeroText>
+    </Row>
   );
 }
 
