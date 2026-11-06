@@ -38,7 +38,7 @@ Requirements researched on 2026-11-06. Anthropic changes these pages; re-read th
 | Responses reasonably sized, tokens used economically | S2, S4 | ✅ paginated search (`nextCursor`), summaries instead of dumps |
 | No conversation data beyond the tool's need; no access to Claude memory/chat history/files | S2, S4 | ✅ the server only sees tool arguments. The audit log keeps tool name, arguments (≤500 chars, import rows summarised, `rawText` omitted), outcome and duration for 90 days |
 | Must not steer Claude to other tools, override instructions, hide instructions or promote products | S2, S4 | ✅ descriptions describe behaviour. `MCP_INSTRUCTIONS` (server instructions) gives domain conventions and import steps only. The Free-plan refusal tells the user where Pro is; it only appears to Free households |
-| Every tool returns success with valid parameters | S2 | ⚠️ true for Pro households (the demo account is Pro). A **Free** household gets `isError` "connector is part of Pro" on every call: see [Open issues](#open-issues) |
+| Every tool returns success with valid parameters | S2 | ✅ every listed tool works for the connection: a Free household (or a read-only consent) is only offered the read tools, so no tool answers "needs Pro" |
 | Reads and writes in separate tools; no catch-all request tool | S2 | ✅ 34 purpose-built tools |
 
 ### Tool annotations and names
@@ -76,7 +76,7 @@ Requirements researched on 2026-11-06. Anthropic changes these pages; re-read th
 | --- | --- | --- |
 | Public documentation: setup, usage, troubleshooting, **at least three example prompts** | S1, S2, S4 | ✅ https://arto.joyorogo.com/claude (Indonesian + English toggle; five example prompts). Live after this branch is deployed |
 | Privacy policy URL that covers collection, use, storage, sharing, retention, contact | S1, S4 | ✅ https://arto.joyorogo.com/privasi already covers the connector: connected apps and the MCP log (§ data), consent as the basis for connecting AI, Anthropic receiving what a request needs "only if you connect it", MCP log 90 days, withdrawing consent, contact. No legal text was changed on this branch |
-| Verified support contact and channel for product and security issues | S1, S4 | ⚠️ `dzulfikar.at@gmail.com` (also in `/.well-known/security.txt`). A role address such as support@joyorogo.com would read better; owner's call |
+| Verified support contact and channel for product and security issues | S1, S4 | ✅ `support@joyorogo.com` (Cloudflare Email Routing to the owner); also on the connector guide |
 | Icon | S1 | ✅ `apps/web/public/icon-512.png` (512×512 PNG), `apps/web/public/icon.svg` (vector). The portal doesn't publish a size; upload the 512 PNG |
 | Test account: fully populated, with sample data | S1, S2, S4 | ✅ since this branch: the store reviewers' demo account can connect AI apps (it was refused before). See [Test & launch](#8-test--launch) |
 | Tested every tool via MCP Inspector or as a custom connector | S1, S2 | ⚠️ owner confirms this in the portal; it needs a signed-in Claude account |
@@ -109,7 +109,7 @@ once this branch is deployed. If the portal flags anything, fix it in `packages/
 | Categories | 1–5 | Finance (primary). Add Productivity if the portal offers it. Pick from the portal's list; these are guesses |
 | Documentation URL | | `https://arto.joyorogo.com/claude` |
 | Privacy policy URL | | `https://arto.joyorogo.com/privasi` |
-| Support contact | | `dzulfikar.at@gmail.com` |
+| Support contact | | `support@joyorogo.com` |
 | Icon | | `apps/web/public/icon-512.png` (512×512 PNG; JoyoArto "J" with the gold coin on arto blue `#3752ae`) |
 | URL slug | permanent | `joyoarto` |
 
@@ -133,15 +133,15 @@ Description (EN, about 1,350 characters):
 > it is not financial advice.
 >
 > JoyoArto never asks for bank logins and cannot move money. You can grant read-only access. Tools that change or
-> delete data are marked so Claude asks first, and you can disconnect at any time in JoyoArto or in Claude. The
-> connector is part of Joyo Pro; JoyoArto is open source (AGPL).
+> delete data are marked so Claude asks first, and you can disconnect at any time in JoyoArto or in Claude. Reading
+> and asking is free; adding and changing data from Claude is part of Joyo Pro. JoyoArto is open source (AGPL).
 
 ### 4. Use cases
 
 - Primary use cases: spending questions over Indonesian bank/e-wallet history; importing and categorising statements;
   budgets; affordability planning (car loan, baby, moving house); reimbursable expenses.
 - What users need first: a JoyoArto account (free sign-up with Google or Apple at https://app.arto.joyorogo.com) and
-  **Joyo Pro** (the connector is a Pro feature; Free households get an upgrade message from every tool). Statements
+  for writes, **Joyo Pro** (Free households get the read tools only). Statements
   imported, or imported through Claude.
 - Reads or writes: **both** (the user can grant read-only at consent).
 
@@ -149,7 +149,7 @@ Description (EN, about 1,350 characters):
 
 - Company: JoyoDigitama (Dzulfikar Ats Tsauri, Indonesia)
 - Website: https://arto.joyorogo.com
-- Primary contact: dzulfikar.at@gmail.com
+- Primary contact: support@joyorogo.com
 
 ### 6. Authentication
 
@@ -200,11 +200,7 @@ Things this branch could not close, and why:
    is merged and deployed.
 2. **Read-only choice.** The docs page says the user can choose read-only access on the consent page. That ships with
    `feat/read-only-choice` (another branch). Merge it before submitting, or the docs overstate the consent page.
-3. **Free plan answers `isError`.** A Free household's every tool call returns "the connector is part of JoyoArto
-   Pro". Review uses the Pro demo, so it passes. After listing, those calls count in the directory error rate (S7:
-   above 2% "Worth a look", above 5% "Degraded"), and S2 asks that tools succeed with valid parameters. Options:
-   answer with a normal (non-error) result explaining the upgrade, or let Free households use the read tools. Product
-   decision for the owner; not changed here.
+3. **Free plan:** resolved 2026-11-06. Free households get the read tools only (writes are Pro), so no tool answers with an error because of the plan.
 4. **Finance as a high-risk use case (S4 → Usage Policy).** The policy asks high-risk software for human-in-the-loop
    measures and consumer disclosure. What is in place is listed in the checklist above. Whether JoyoArto, as a data
    source with a planner that computes rather than advises, needs more (for example a visible "not financial advice"
@@ -218,7 +214,7 @@ Things this branch could not close, and why:
 6. **better-auth's own rate limits** on `/oauth2/token` and `/oauth2/register` (120 and 60 per minute) are per
    isolate and keyed by client IP. All claude.ai refreshes come from Anthropic's range; watch for 429s on
    `/api/auth/oauth2/token` after listing and raise or key them differently if they appear.
-7. **Support address**: consider a role mailbox instead of a personal Gmail before publishing.
+7. **Support address**: support@joyorogo.com (Cloudflare Email Routing, forwards to the owner).
 
 ## Owner steps
 

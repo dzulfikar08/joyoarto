@@ -395,7 +395,13 @@ const READ_ONLY_NOTE = `
 This connection is read-only: the user approved reading their data, not changing it. You cannot add, import, categorise or edit anything. When the user asks for a change, explain how they can make it themselves in the JoyoArto app, or tell them they can reconnect JoyoArto and choose "Read and make changes".`;
 
 /** The MCP server's instructions for a connection with these scopes. */
-export function mcpInstructions(scopes: readonly Scope[]): string {
+const FREE_PLAN_NOTE = `
+
+This household is on JoyoArto's Free plan: through Claude it can read and ask questions, but not change anything. When the user asks for a change, explain how to make it in the JoyoArto app, and mention once that making changes from Claude is part of Joyo Pro.`;
+
+/** Server instructions for a connection. `freePlan`: a Free household gets the read tools only (writes are Pro). */
+export function mcpInstructions(scopes: readonly Scope[], opts: { freePlan?: boolean } = {}): string {
+  if (opts.freePlan) return MCP_INSTRUCTIONS + FREE_PLAN_NOTE;
   return scopes.includes("finance:write") ? MCP_INSTRUCTIONS : MCP_INSTRUCTIONS + READ_ONLY_NOTE;
 }
 
