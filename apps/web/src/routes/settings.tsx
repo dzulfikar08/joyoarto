@@ -132,7 +132,7 @@ function Settings() {
             <li key={t.id} className="flex flex-wrap items-center gap-3 py-2">
               <span className="font-semibold">{t.name}</span>
               <code className="text-xs text-muted-foreground">{t.prefix}…</code>
-              <span className="text-xs text-muted-foreground">{t.scopes}</span>
+              <span className="text-xs text-muted-foreground">{t.readOnly ? "read-only" : "read and write"}</span>
               <span className="text-xs text-muted-foreground">{t.lastUsedAt ? `used ${new Date(t.lastUsedAt).toLocaleDateString()}` : "never used"}</span>
               <button
                 type="button"

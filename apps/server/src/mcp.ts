@@ -1,118 +1,21 @@
-import type { Context as ApiContext, Principal, Scope } from "@baroka/api/context";
+import type { Principal, Scope } from "@baroka/api/context";
 import { SCOPES } from "@baroka/api/context";
 import { isDemoUser } from "@baroka/api/lib/demo";
 import { ensureHousehold } from "@baroka/api/lib/household";
-import { pruneMcpAudit } from "@baroka/api/services/account";
 import { userPlan } from "@baroka/api/services/billing";
 import { principalFromToken } from "@baroka/api/services/tokens";
-import { MCP_INSTRUCTIONS, toolCatalog, toolInput } from "@baroka/api/tools";
 import { MCP_DATA_SCOPES, MCP_PATH } from "@baroka/auth/mcp-scopes";
 import { McpAuthError, verifyMcpAccessToken } from "@baroka/auth/mcp-token";
 import { schema } from "@baroka/db";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { ORPCError, call } from "@orpc/server";
 import { and, eq } from "drizzle-orm";
 import type { Context, Hono } from "hono";
 import { cors } from "hono/cors";
 
 import { billing } from "./billing";
 import { env } from "./env";
+import { createMcpServer } from "./mcp-server";
 import { getAuth, getDb } from "./services";
-
-
-
-function text(data: unknown): CallToolResult {
-  return { content: [{ type: "text", text: JSON.stringify(data) }] };
-}
-
-function failure(message: string): CallToolResult {
-  return { isError: true, content: [{ type: "text", text: message }] };
-}
-
-function describeError(error: unknown): string {
-  if (error instanceof ORPCError) {
-    const issues = (error.data as { issues?: { path?: (string | number)[]; message: string }[] } | undefined)?.issues;
-    if (issues?.length) return `${error.message}: ${issues.map((i) => `${(i.path ?? []).join(".") || "input"}: ${i.message}`).join("; ")}`;
-    return error.message;
-  }
-  console.error("[mcp] tool failed", error);
-  return "JoyoArto had an internal error; try again in a moment.";
-}
-
-/** What a Free household's connector answers to every tool call (tools stay listed, so Claude can explain it). */
-const UPGRADE_MESSAGE =
-  "The Claude connector is part of JoyoArto Pro, and this household is on the Free plan. Tell the user they can upgrade in JoyoArto (Settings → Billing, or /pricing); everything else in the app keeps working on Free.";
-
-function createMcpServer(principal: Principal, clientId: string, waitUntil: (p: Promise<unknown>) => void, connectorAllowed: boolean): McpServer {
-  const server = new McpServer({ name: "joyoarto", title: "JoyoArto", version: "0.1.0" }, { instructions: MCP_INSTRUCTIONS });
-  const db = getDb();
-  const context: ApiContext = { db, principal, billing };
-
-  for (const def of toolCatalog()) {
-    const input = toolInput(def);
-    server.registerTool(
-      def.name,
-      {
-        title: def.title,
-        description: def.description,
-        ...(input ? { inputSchema: input.shape } : {}),
-        annotations: {
-          readOnlyHint: def.readOnly ?? false,
-          destructiveHint: def.destructive ?? false,
-          idempotentHint: def.readOnly ?? false,
-          openWorldHint: false,
-        },
-      },
-      async (args: unknown) => {
-        const started = Date.now();
-        const log = (outcome: string) =>
-          waitUntil(
-            db
-              .insert(schema.mcpAudit)
-              .values({
-                id: crypto.randomUUID(),
-                userId: principal.userId,
-                clientId,
-                tool: def.name,
-                // Arguments only (ids, dates, filters); import rows are summarised, never stored.
-                // A notification body (rawText) is read once and never kept, not even here.
-                args: JSON.stringify(args, (k, v) => (k === "rows" && Array.isArray(v) ? `[${v.length} rows]` : k === "rawText" ? "[omitted]" : v)).slice(0, 500),
-                outcome,
-                ms: Date.now() - started,
-                createdAt: started,
-              })
-              // Retention (privacy policy: 90 days). No cron trigger yet, so about one call in 50 prunes old rows.
-              .then(() => (Math.random() < 0.02 ? pruneMcpAudit(db) : 0))
-              .catch((e: unknown) => console.error("[mcp] audit failed", e)),
-          );
-        if (!connectorAllowed) {
-          log("plan");
-          return failure(UPGRADE_MESSAGE);
-        }
-        if (!principal.scopes.includes(def.scope)) {
-          log("scope");
-          return failure(`This connection lacks the "${def.scope}" permission. Reconnect JoyoArto and approve it.`);
-        }
-        if (env.MCP_LIMITER) {
-          const { success } = await env.MCP_LIMITER.limit({ key: `mcp:${principal.userId}` });
-          if (!success) return failure("Too many requests; wait a minute and try again.");
-        }
-        try {
-          const callInput = { ...def.defaults, ...((args ?? {}) as Record<string, unknown>) };
-          const result = await call(def.procedure() as Parameters<typeof call>[0], callInput as never, { context: context as never });
-          log("ok");
-          return text(result);
-        } catch (error) {
-          log("error");
-          return failure(describeError(error));
-        }
-      },
-    );
-  }
-  return server;
-}
 
 function challenge(status: 401, code: string, description: string): Response {
   const base = env.BETTER_AUTH_URL.replace(/\/$/, "");
@@ -219,7 +122,15 @@ export function registerMcpRoutes(app: Hono) {
       return c.json({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error." }, id: null }, 400);
     }
     const { limits } = await userPlan(getDb(), auth.principal.userId, billing);
-    const server = createMcpServer(auth.principal, auth.clientId, waitUntilOf(c), limits.mcpConnector);
+    const server = createMcpServer({
+      db: getDb(),
+      billing,
+      principal: auth.principal,
+      clientId: auth.clientId,
+      waitUntil: waitUntilOf(c),
+      connectorAllowed: limits.mcpConnector,
+      limiter: env.MCP_LIMITER,
+    });
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     await server.connect(transport);
     const response = await transport.handleRequest(c.req.raw, { parsedBody: body });

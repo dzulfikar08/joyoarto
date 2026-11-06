@@ -47,7 +47,7 @@ export async function listTokens(db: Database, p: Principal) {
     .from(k)
     .where(and(eq(k.userId, p.userId), isNull(k.revokedAt)))
     .orderBy(desc(k.createdAt));
-  return { tokens: rows };
+  return { tokens: rows.map((r) => ({ ...r, readOnly: !r.scopes.split(" ").includes("finance:write") })) };
 }
 
 export async function revokeToken(db: Database, p: Principal, id: string) {

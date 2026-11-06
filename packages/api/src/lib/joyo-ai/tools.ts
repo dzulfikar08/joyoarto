@@ -37,12 +37,15 @@ export type Step = {
   ok: boolean;
 };
 
-export function chatTools(): ToolDef[] {
-  return toolCatalog().filter((t) => t.chat !== undefined);
+/** Read-only (the member's Joyo setting): only the "read" tools exist for the model; nothing can be proposed. */
+export type ChatMode = { readOnly?: boolean };
+
+export function chatTools(mode: ChatMode = {}): ToolDef[] {
+  return toolCatalog().filter((t) => (mode.readOnly ? t.chat === "read" : t.chat !== undefined));
 }
 
-export function chatTool(name: string): ToolDef | undefined {
-  return chatTools().find((t) => t.name === name);
+export function chatTool(name: string, mode: ChatMode = {}): ToolDef | undefined {
+  return chatTools(mode).find((t) => t.name === name);
 }
 
 const PROPOSE_NOTE =
@@ -51,7 +54,7 @@ const PROPOSE_NOTE =
 let specs: ToolSpec[] | null = null;
 
 /** JSON Schemas of the chat tools, from the same zod inputs the procedures validate with. */
-export function chatToolSpecs(): ToolSpec[] {
+export function chatToolSpecs(mode: ChatMode = {}): ToolSpec[] {
   specs ??= chatTools().map((def) => {
     const input = toolInput(def);
     let parameters: ToolSpec["parameters"] = { type: "object", properties: {} };
@@ -65,7 +68,9 @@ export function chatToolSpecs(): ToolSpec[] {
     }
     return { name: def.name, description: def.chat === "propose" ? def.description + PROPOSE_NOTE : def.description, parameters };
   });
-  return specs;
+  if (!mode.readOnly) return specs;
+  const allowed = new Set(chatTools(mode).map((t) => t.name));
+  return specs.filter((s) => allowed.has(s.name));
 }
 
 /** Plain arguments for the steps list: scalars only, short. */
@@ -143,10 +148,14 @@ export type ToolOutcome = { content: string; step: Step; proposal?: Proposal };
  * Runs one tool call. An unknown tool, invalid arguments or a failed procedure answer the model with the reason (it
  * may fix the call); nothing throws.
  */
-export async function runChatTool(toolCall: ToolCall, context: Context): Promise<ToolOutcome> {
-  const def = chatTool(toolCall.name);
+export async function runChatTool(toolCall: ToolCall, context: Context, mode: ChatMode = {}): Promise<ToolOutcome> {
+  const def = chatTool(toolCall.name, mode);
   const step: Step = { id: toolCall.id, tool: toolCall.name, title: def?.title ?? toolCall.name, args: plainArgs(toolCall.args), ok: false };
-  if (!def) return { content: JSON.stringify({ error: `Unknown tool ${toolCall.name}.` }), step };
+  if (!def) {
+    // A model may still name a write tool it was not given: in read-only mode it gets no proposal, only the reason.
+    const error = mode.readOnly && chatTool(toolCall.name) ? "Joyo is read-only for this member: no changes can be proposed. Explain how they can do it themselves in the app." : `Unknown tool ${toolCall.name}.`;
+    return { content: JSON.stringify({ error }), step };
+  }
   const args = { ...def.defaults, ...toolCall.args };
   if (def.name === "quick_add") args.capturedVia = "joyo";
   const input = toolInput(def);

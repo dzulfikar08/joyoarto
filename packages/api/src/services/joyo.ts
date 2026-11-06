@@ -124,3 +124,28 @@ export async function ownMessage(db: Database, p: Principal, messageId: string) 
 export async function saveProposals(db: Database, messageId: string, proposals: Proposal[]) {
   await db.update(m).set({ proposals }).where(eq(m.id, messageId));
 }
+
+const hm = schema.householdMember;
+
+export const joyoSettingsInput = z.object({
+  readOnly: z.boolean().describe("Joyo AI only reads: it is offered no changes to propose, and confirming an older proposal is refused"),
+});
+
+/** The member's Joyo AI settings in the active household. */
+export async function getJoyoSettings(db: Database, p: Principal) {
+  const [row] = await db
+    .select({ readOnly: hm.joyoReadOnly })
+    .from(hm)
+    .where(and(eq(hm.householdId, p.householdId), eq(hm.userId, p.userId)));
+  return { readOnly: row?.readOnly ?? false };
+}
+
+export async function setJoyoSettings(db: Database, p: Principal, input: z.infer<typeof joyoSettingsInput>) {
+  const res = await db
+    .update(hm)
+    .set({ joyoReadOnly: input.readOnly })
+    .where(and(eq(hm.householdId, p.householdId), eq(hm.userId, p.userId)))
+    .returning({ readOnly: hm.joyoReadOnly });
+  if (!res.length) notFound("Membership");
+  return { readOnly: res[0]!.readOnly };
+}

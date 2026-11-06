@@ -158,6 +158,59 @@ describe("joyo router", () => {
   });
 });
 
+describe("read-only", () => {
+  const ctx = (principal: Principal): Context => ({ db, principal });
+
+  test("the setting is per member and household, off by default", async () => {
+    expect((await call(appRouter.joyo.settings, { readOnly: true }, { context: ctx(dewi) })).readOnly).toBe(true);
+    expect((await call(appRouter.joyo.status, undefined, { context: ctx(dewi) })).readOnly).toBe(true);
+    expect((await call(appRouter.joyo.status, undefined, { context: ctx(stranger) })).readOnly).toBe(false);
+    // A read-only token cannot turn it off.
+    await expect(call(appRouter.joyo.settings, { readOnly: false }, { context: ctx({ ...dewi, scopes: ["finance:read"], via: "token" }) })).rejects.toThrow(/finance:write/);
+  });
+
+  test("the model gets no propose tools, is told it is read-only, and a write call proposes nothing", async () => {
+    const { engine, seen } = scripted([
+      reply({ toolCalls: [{ id: "t1", name: "quick_add", args: { amountText: "25rb", description: "kopi" } }, { id: "t2", name: "list_accounts", args: {} }], stop: "tools" }),
+      reply({ text: "Aku cuma bisa membaca; tambahkan lewat tombol +." }),
+    ]);
+    const answer = await runChat({ engine, context: ctx(dewi), person: { ...person, readOnly: true }, turns: [{ role: "user", content: "catat kopi 25rb" }] });
+    const offered = seen[0]!.tools?.map((t) => t.name) ?? [];
+    const propose = toolCatalog().filter((t) => t.chat === "propose").map((t) => t.name);
+    expect(propose.length).toBeGreaterThan(0);
+    for (const name of propose) expect(offered).not.toContain(name);
+    expect(offered).toContain("list_accounts");
+    expect(seen[0]!.system).toContain("read-only");
+    expect(seen[0]!.system).not.toContain("only PROPOSED here");
+    expect(answer.proposals).toHaveLength(0);
+    const refused = seen[1]!.messages.find((m) => m.role === "tool" && m.callId === "t1");
+    expect(refused?.role === "tool" && refused.content).toContain("read-only");
+    expect(await db.select().from(schema.transaction)).toHaveLength(0);
+
+    // Not read-only: the same tools are offered as before.
+    const normal = scripted([reply({ text: "ok" })]);
+    await runChat({ engine: normal.engine, context: ctx(dewi), person, turns: [{ role: "user", content: "halo" }] });
+    expect(normal.seen[0]!.tools?.map((t) => t.name)).toContain("quick_add");
+  });
+
+  test("confirming a proposal is refused while read-only is on; dismissing still works", async () => {
+    const { engine } = scripted([reply({ toolCalls: [{ id: "t1", name: "quick_add", args: { amountText: "25rb", description: "kopi" } }], stop: "tools" }), reply({ text: "Konfirmasi ya." })]);
+    const answer = await runChat({ engine, context: ctx(dewi), person, turns: [{ role: "user", content: "kopi 25rb" }] });
+    const conv = crypto.randomUUID();
+    await db.insert(schema.joyoConversation).values({ id: conv, householdId: dewi.householdId, userId: dewi.userId, title: "kopi" });
+    const messageId = crypto.randomUUID();
+    await db.insert(schema.joyoMessage).values({ id: messageId, conversationId: conv, role: "assistant", content: answer.reply, proposals: answer.proposals });
+    const proposalId = answer.proposals[0]!.id;
+
+    await call(appRouter.joyo.settings, { readOnly: true }, { context: ctx(dewi) });
+    await expect(call(appRouter.joyo.proposal, { messageId, proposalId, action: "confirm" }, { context: ctx(dewi) })).rejects.toThrow(/read-only/);
+    expect(await db.select().from(schema.transaction)).toHaveLength(0);
+    const [stored] = await db.select().from(schema.joyoMessage).where(eq(schema.joyoMessage.id, messageId));
+    expect((stored!.proposals as { status: string }[])[0]!.status).toBe("pending");
+    expect((await call(appRouter.joyo.proposal, { messageId, proposalId, action: "dismiss" }, { context: ctx(dewi) })).proposal.status).toBe("dismissed");
+  });
+});
+
 describe("capture", () => {
   test("parse falls back to rules without a key; transcribe answers the dev transcript without a binding", async () => {
     const context: Context = { db, principal: dewi, ai: aiConfig() };
