@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { arcPath, attentionItems, changeText, delta, donutAngles, donutSlices, monthRange, OTHER, periodLabel } from "./dashboard";
+import { arcPath, attentionItems, balanceSplit, changeText, delta, donutAngles, donutSlices, monthRange, OTHER, periodLabel } from "./dashboard";
 
 const cat = (slug: string | null, amount: number, share: number) => ({
   slug,
@@ -78,4 +78,12 @@ test("donut geometry", () => {
   // A single full slice stays a drawable arc.
   expect(arcPath(50, 50, 50, 30, 0, Math.PI * 2)).toContain("A 50 50 0 1 1");
   expect(arcPath(50, 50, 50, 30, 0, Math.PI / 2)).toBe("M 50 0 A 50 50 0 0 1 100 50 L 80 50 A 30 30 0 0 0 50 20 Z");
+});
+
+test("balance split: positive groups only, shares of their sum", () => {
+  const g = (type: string, amount: number) => ({ type, label: type, total: { amount, display: String(amount) } });
+  const split = balanceSplit([g("bank", 300), g("ewallet", 100), g("credit_card", -50), g("cash", 0)]);
+  expect(split.map((s) => [s.type, s.share])).toEqual([["bank", 75], ["ewallet", 25]]);
+  expect(balanceSplit([g("loan", -10)])).toEqual([]);
+  expect(balanceSplit([])).toEqual([]);
 });

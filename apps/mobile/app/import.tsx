@@ -8,7 +8,7 @@ import { CsvImport } from "@/components/import/csv-import";
 import { EmailIn } from "@/components/import/email-in";
 import { ImportLog } from "@/components/import/import-log";
 import { StatementBatch } from "@/components/import/statement-batch";
-import { Screen, Text } from "@/components/ui";
+import { Disclosure, Screen, Text } from "@/components/ui";
 import { orpc } from "@/src/lib/orpc";
 
 export default function ImportScreen() {
@@ -16,10 +16,10 @@ export default function ImportScreen() {
   const billing = useQuery(orpc.billing.status.queryOptions());
   return (
     <Screen>
-      <Text tone="muted">
-        Bank Jago and GoPay PDFs are read right here. For other banks, use their CSV export. Nothing is saved before you see a preview, and importing the same statement twice adds
-        nothing twice.
-      </Text>
+      <Text tone="muted">Statements, CSV exports and email, all checked before anything is saved.</Text>
+      <Disclosure title="How importing works" icon="information-circle-outline">
+        Bank Jago and GoPay PDFs are read right here. For other banks, use their CSV export. Nothing is saved before you see a preview, and importing the same statement twice adds nothing twice.
+      </Disclosure>
       <StatementBatch billing={billing.data} />
       <CsvImport initialAccountId={accountId} />
       <EmailIn billing={billing.data} />

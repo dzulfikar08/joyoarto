@@ -140,3 +140,16 @@ export function donutAngles(values: number[], gap = 0.02): { a0: number; a1: num
 function round(n: number) {
   return Math.round(n * 100) / 100;
 }
+
+export type BalanceSegment = { type: string; label: string; display: string; share: number };
+
+/**
+ * The balance card's bar: account groups holding money (positive totals), each with its share of their sum in
+ * percent. Debts (cards, loans) are left out of the bar; they are already netted into the total above it.
+ */
+export function balanceSplit(groups: readonly { type: string; label: string; total: { amount: number; display: string } }[]): BalanceSegment[] {
+  const positive = groups.filter((g) => g.total.amount > 0);
+  const sum = positive.reduce((s, g) => s + g.total.amount, 0);
+  if (sum <= 0) return [];
+  return positive.map((g) => ({ type: g.type, label: g.label, display: g.total.display, share: (g.total.amount / sum) * 100 }));
+}

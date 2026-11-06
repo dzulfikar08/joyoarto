@@ -4,10 +4,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
+import { View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 import { AccountFormSheet } from "@/components/accounts/account-form";
-import { Button, EmptyState, ErrorState, IconButton, ListRow, ListSection, Money, Pill, Screen, SkeletonCard, Text } from "@/components/ui";
-import { accountFacts, splitArchived, type AccountRow } from "@/src/lib/accounts";
+import { BalanceCard } from "@/components/accounts/balance-card";
+import { Button, Disclosure, EmptyState, ErrorState, IconButton, ListRow, ListSection, Money, Screen, SkeletonCard, Text } from "@/components/ui";
+import { groupByType, idrTotal, institutionBadge, institutionLabel, shortName, splitArchived, type AccountRow } from "@/src/lib/accounts";
+import { balanceSplit } from "@/src/lib/dashboard";
+import { formatMoney, plural } from "@/src/lib/format";
 import { orpc } from "@/src/lib/orpc";
 
 export default function AccountsScreen() {
@@ -16,18 +21,28 @@ export default function AccountsScreen() {
   const [adding, setAdding] = useState(false);
   // Stable options: a new object each render makes expo-router call setOptions every time.
   const screenOptions = useMemo(() => ({ headerRight: () => <IconButton name="add" label="Add an account" onPress={() => setAdding(true)} /> }), []);
-  const [showArchived, setShowArchived] = useState(false);
   const { active, archived } = splitArchived(q.data?.accounts ?? []);
+  const groups = groupByType(active);
+  const split = balanceSplit(groups.map((g) => ({ type: g.type, label: g.label, total: { amount: g.total, display: formatMoney(g.total) } })));
 
-  const row = (a: AccountRow) => (
-    <ListRow
-      key={a.id}
-      title={a.last4 ? `${a.name} ··${a.last4}` : a.name}
-      subtitle={accountFacts(a)}
-      right={<Money amount={a.balance.amount} display={a.balance.display} tone={a.balance.amount < 0 ? "destructive" : "default"} variant="label" />}
-      onPress={() => router.push({ pathname: "/account/[id]", params: { id: a.id } })}
-    />
-  );
+  const row = (a: AccountRow) => {
+    const name = shortName(a.name, a.institution);
+    return (
+      <ListRow
+        key={a.id}
+        left={
+          <View style={styles.badge}>
+            <Text variant="caption" style={styles.badgeText}>{institutionBadge(a.institution)}</Text>
+          </View>
+        }
+        title={a.last4 ? `${name} ··${a.last4}` : name}
+        subtitle={[institutionLabel(a.institution), plural(a.transactions, "transaction"), a.lastDate ? `last ${a.lastDate}` : null].filter(Boolean).join(" · ")}
+        right={<Money amount={a.balance.amount} display={a.balance.display} tone={a.balance.amount < 0 ? "destructive" : "default"} variant="label" style={styles.balance} />}
+        onPress={() => router.push({ pathname: "/account/[id]", params: { id: a.id } })}
+        accessibilityLabel={`${a.name}, ${a.balance.display}`}
+      />
+    );
+  };
 
   return (
     <Screen refreshing={q.isRefetching} onRefresh={() => void q.refetch()}>
@@ -35,8 +50,8 @@ export default function AccountsScreen() {
       {q.isError && q.data ? <ErrorState error={q.error} onRetry={() => void q.refetch()} compact /> : null}
       {q.isPending ? (
         <>
+          <SkeletonCard height={140} />
           <SkeletonCard lines={3} />
-          <SkeletonCard lines={2} />
         </>
       ) : q.isError && !q.data ? (
         <ErrorState error={q.error} onRetry={() => void q.refetch()} />
@@ -44,34 +59,39 @@ export default function AccountsScreen() {
         <EmptyState
           icon="wallet-outline"
           title="No accounts yet"
-          description="Add each bank account, card and e-wallet, then import its statement. Bank Jago pockets are created for you when you import a Jago statement."
+          description="Add a bank account, card or e-wallet, or import a Bank Jago statement: its pockets become accounts."
           action={<Button title="Add an account" small icon="add" onPress={() => setAdding(true)} />}
         />
       ) : (
         <>
-          {active.length ? <ListSection title="Accounts" footer="Balance = opening balance plus every recorded transaction (pending quick adds too).">{active.map(row)}</ListSection> : null}
+          {active.length ? <BalanceCard total={formatMoney(idrTotal(active))} caption={`${plural(active.length, "account")} · today`} split={split} /> : null}
+          {groups.map((g) => (
+            <ListSection key={g.type} title={`${g.label} · ${formatMoney(g.total)}`}>
+              {g.items.map(row)}
+            </ListSection>
+          ))}
           {archived.length ? (
-            <>
-              <ListSection>
-                <ListRow
-                  icon={showArchived ? "chevron-up" : "archive-outline"}
-                  iconTone="muted"
-                  title={showArchived ? "Hide archived" : `Archived (${archived.length})`}
-                  subtitle={showArchived ? undefined : "Hidden from pickers and Home"}
-                  chevron={false}
-                  right={<Pill label={String(archived.length)} />}
-                  onPress={() => setShowArchived((v) => !v)}
-                  accessibilityLabel={showArchived ? "Hide archived accounts" : `Show ${archived.length} archived accounts`}
-                />
-              </ListSection>
-              {showArchived ? <ListSection title="Archived">{archived.map(row)}</ListSection> : null}
-            </>
+            <Disclosure title={`Archived (${archived.length})`} icon="archive-outline">
+              <Text variant="caption" tone="muted">Hidden from pickers and Home. Open one to unarchive it.</Text>
+              <View style={styles.archived}>
+                <ListSection>{archived.map(row)}</ListSection>
+              </View>
+            </Disclosure>
           ) : null}
           <Button title="Add an account" variant="secondary" icon="add" onPress={() => setAdding(true)} />
-          <Text variant="caption" tone="muted">Tap an account to edit it, archive it or see its transactions.</Text>
+          <Disclosure title="How balances work" icon="information-circle-outline">
+            Balance = opening balance plus every recorded transaction (pending quick adds too). Card and loan balances are negative and lower the total. Tap an account to edit it, archive it or see its transactions.
+          </Disclosure>
         </>
       )}
       <AccountFormSheet open={adding} account={null} onClose={() => setAdding(false)} />
     </Screen>
   );
 }
+
+const styles = StyleSheet.create((theme) => ({
+  badge: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: theme.colors.primarySoft },
+  badgeText: { fontFamily: theme.fonts.heavy, color: theme.colors.primaryInk, letterSpacing: 0.3 },
+  balance: { fontFamily: theme.fonts.bold, fontSize: theme.fontSize.base },
+  archived: { marginHorizontal: -theme.spacing.lg, opacity: 0.75 },
+}));

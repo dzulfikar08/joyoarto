@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-import { Card, Icon, Text } from "@/components/ui";
+import { Card, Disclosure, Icon, Text } from "@/components/ui";
 import { monthLabel } from "@/src/lib/format";
 import { plainVerdict, slotOf, type Scenario } from "@/src/lib/plan-state";
 
@@ -96,10 +96,9 @@ export function CompareView({ c, scenarios }: { c: Compare; scenarios: Scenario[
             • {a}
           </Text>
         ))}
-        <Text variant="caption" tone="muted">
-          Checks: emergency fund ≥ 6 months of the new monthly outflow (warn under 6, risky under 3); all installments ≤ 30% of income and the car ≤ 20% (risky above +10 points);
-          liquid money never below zero; income covers the monthly outflow. Any risky check makes the plan risky; any warning makes it tight.
-        </Text>
+        <Disclosure plain title="How the checks work">
+          Emergency fund ≥ 6 months of the new monthly outflow (warn under 6, risky under 3); all installments ≤ 30% of income and the car ≤ 20% (risky above +10 points); liquid money never below zero; income covers the monthly outflow. Any risky check makes the plan risky; any warning makes it tight.
+        </Disclosure>
         <Text variant="caption" tone="muted">
           Estimates from your own numbers, not financial advice.
         </Text>
