@@ -72,7 +72,7 @@ export function PublicFooter() {
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center">
         <div className="flex items-center gap-2">
           <Wordmark className="text-[0.9375rem] text-foreground" markClassName="size-6" />
-          <span>· {en ? "a family money ledger" : "catatan keuangan keluarga"}</span>
+          <span>· {en ? "personal & family finance" : "keuangan pribadi & keluarga"}</span>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 sm:ml-auto">
           <Link to="/demo" className="hover:underline">

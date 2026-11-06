@@ -1,11 +1,12 @@
-// Public landing page at "/" for visitors who are not signed in. Copy is Bahasa Indonesia first (casual, "kamu"),
-// English via the toggle. Claims stay within what JoyoArto does today; future work is labelled "segera" / "soon".
+// Public landing page at "/" for visitors who are not signed in. Positioning: personal finance in one place (accounts,
+// cash flow, budgets, plans, AI), not an expense tracker. Copy is Bahasa Indonesia first (casual, "kamu"), English via
+// the toggle, and short: one line per idea. Claims stay within what JoyoArto does today.
 
 import { Badge } from "@baroka/ui/components/badge";
 import { buttonVariants } from "@baroka/ui/components/button";
 import { cn } from "@baroka/ui/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Check, LogIn, Plus, Users } from "lucide-react";
+import { ArrowRight, Calculator, Check, Code, Landmark, LockKeyhole, PieChart, Plus, ShieldCheck, Sparkles, TrendingUp, Users } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { PricingPlans } from "@/components/pricing";
@@ -32,14 +33,13 @@ export function Landing() {
       <PublicHeader />
       <main>
         <Hero t={t} />
-        <WhyTrack t={t} />
-        <HowItWorks t={t} />
         <Features t={t} />
+        <Spotlights t={t} />
         <Privacy t={t} />
-        <AndroidTesters t={t} />
-        <IphoneTesters t={t} />
+        <GetTheApp t={t} />
         <Pricing t={t} />
         <Faq t={t} />
+        <FinalCta t={t} />
       </main>
       <PublicFooter />
     </div>
@@ -48,70 +48,70 @@ export function Landing() {
 
 function Section({ id, children, className = "" }: { id?: string; children: ReactNode; className?: string }) {
   return (
-    <section id={id} className={cn("scroll-mt-16 px-4 py-14 sm:py-20", className)}>
+    <section id={id} className={cn("scroll-mt-16 px-4 py-16 sm:py-24", className)}>
       <div className="mx-auto max-w-6xl">{children}</div>
     </section>
   );
 }
 
-function Heading({ eyebrow, title, sub }: { eyebrow: ReactNode; title: ReactNode; sub?: ReactNode }) {
+function Heading({ eyebrow, title, sub, center }: { eyebrow: ReactNode; title: ReactNode; sub?: ReactNode; center?: boolean }) {
   return (
-    <div className="mb-8 max-w-2xl sm:mb-10">
-      <p className="text-sm font-bold text-primary">{eyebrow}</p>
-      <h2 className="mt-1.5 text-[1.75rem] leading-tight font-extrabold tracking-tight text-balance sm:text-4xl">{title}</h2>
-      {sub && <p className="mt-3 text-pretty text-muted-foreground">{sub}</p>}
+    <div className={cn("mb-10 max-w-2xl sm:mb-12", center && "mx-auto text-center")}>
+      <p className="text-sm font-semibold text-primary">{eyebrow}</p>
+      <h2 className="mt-2 text-3xl leading-tight font-extrabold tracking-tight text-balance sm:text-[2.5rem]">{title}</h2>
+      {sub && <p className="mt-3 text-lg text-pretty text-muted-foreground">{sub}</p>}
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// Hero
+
 function Hero({ t }: { t: T }) {
   return (
-    <section className="relative overflow-hidden px-4 pt-10 pb-14 sm:pt-16 sm:pb-20">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 -top-40 -z-10 mx-auto h-96 max-w-4xl rounded-full bg-primary/15 blur-3xl"
-      />
-      <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[1.1fr_1fr]">
+    <section className="relative overflow-hidden px-4 pt-12 pb-16 sm:pt-20 sm:pb-24">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[32rem] bg-gradient-to-b from-primary-soft/70 to-transparent" />
+      <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[1fr_1.05fr] lg:gap-16">
         <div>
-          <h1 className="text-[2.5rem] leading-[1.05] font-extrabold tracking-tight text-balance sm:text-6xl">
-            {t("Mampu nggak beli mobil?", "Can we afford the car?")}{" "}
-            <span className="text-primary">{t("Lihat dulu angkanya.", "Check the numbers first.")}</span>
+          <Badge tone="primary" className="mb-5">
+            {t("Keuangan pribadi & keluarga", "Personal & family finance")}
+          </Badge>
+          <h1 className="text-[2.5rem] leading-[1.05] font-extrabold tracking-tight text-balance sm:text-[3.5rem]">
+            {t("Keputusan uang besar,", "Big money decisions,")} <span className="text-primary">{t("dengan angka yang pasti.", "backed by real numbers.")}</span>
           </h1>
-          <p className="mt-4 max-w-xl text-lg text-muted-foreground text-pretty">
+          <p className="mt-5 max-w-lg text-lg text-pretty text-muted-foreground">
             {t(
-              "Cicilan di brosur dealer selalu kelihatan ringan. JoyoArto baca e-statement Jago dan GoPay-mu, hitung berapa yang benar-benar masuk dan keluar tiap bulan, lalu uji cicilannya: dana darurat masih cukup 6 bulan atau nggak, total cicilan masih di bawah 30% penghasilan atau nggak.",
-              "The installment on the dealer's brochure always looks small. JoyoArto reads your Jago and GoPay statements, works out what really comes in and goes out each month, then tests the loan: is your emergency fund still 6 months, are all installments still under 30% of income?",
+              "Mobil, rumah, anak pertama. JoyoArto merangkum semua rekeningmu dan menjawab dari data aslimu.",
+              "A car, a home, a first baby. JoyoArto brings your accounts together and answers from your own data.",
             )}
           </p>
-          <div className="mt-7 flex flex-col gap-2.5 sm:flex-row">
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link to="/login" className={buttonVariants({ size: "lg" })}>
-              {t("Daftar gratis", "Sign up free")}
+              {t("Mulai gratis", "Start free")} <ArrowRight aria-hidden />
             </Link>
-            <Link to="/demo" className={buttonVariants({ variant: "outline", size: "lg", className: "border-transparent" })}>
-              {t("Coba demo, tanpa akun", "Try the demo, no account")} <ArrowRight aria-hidden />
+            <Link to="/demo" className={buttonVariants({ variant: "outline", size: "lg" })}>
+              {t("Coba demo, tanpa akun", "Try the demo, no account")}
             </Link>
           </div>
-          <div className="mt-2.5 flex flex-col gap-2.5 sm:flex-row">
-            <a href={`#${ANDROID_SECTION_ID}`} className={buttonVariants({ variant: "secondary", size: "lg" })}>
-              <AndroidLogo /> {t("Coba di Android", "Try on Android")}
+          <ul className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
+            {[
+              t("Tanpa login bank", "No bank login"),
+              t("Data nggak dijual", "Data never sold"),
+              t("Open source", "Open source"),
+            ].map((x, i) => (
+              <li key={i} className="flex items-center gap-1.5">
+                <Check aria-hidden className="size-4 text-positive" strokeWidth={2.5} /> {x}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            {t("Web, Android & iPhone", "Web, Android & iPhone")}
+            <a href={`#${ANDROID_SECTION_ID}`} className="inline-flex items-center gap-1.5 font-semibold text-foreground hover:text-primary [&_svg]:size-4">
+              <AndroidLogo /> Android
             </a>
-            <a href={`#${IOS_SECTION_ID}`} className={buttonVariants({ variant: "secondary", size: "lg" })}>
-              <AppleLogo /> {t("Coba di iPhone", "Try on iPhone")}
+            <a href={`#${IOS_SECTION_ID}`} className="inline-flex items-center gap-1.5 font-semibold text-foreground hover:text-primary [&_svg]:size-4">
+              <AppleLogo /> iPhone
             </a>
-          </div>
-          <p className="mt-3 text-xs text-muted-foreground">
-            {t("Simulasinya hitungan dari transaksimu sendiri, bukan nasihat keuangan.", "The simulation is arithmetic on your own transactions, not financial advice.")}
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t("Demo-nya jalan di browser kamu. Statement nggak diunggah ke mana-mana.", "The demo runs in your browser. Your statement is not uploaded anywhere.")}
-            {REPO_URL && (
-              <>
-                {" "}
-                <a href={REPO_URL} target="_blank" rel="noreferrer" className="font-semibold underline hover:text-foreground">
-                  {t("Lihat kodenya di GitHub", "Read the code on GitHub")}
-                </a>
-              </>
-            )}
           </p>
         </div>
         <HeroVisual t={t} />
@@ -120,477 +120,415 @@ function Hero({ t }: { t: T }) {
   );
 }
 
-/** A still life of what JoyoArto does: a verified statement, a named GoPay payment, a question to Claude. */
+/**
+ * The hero picture: a member asks whether they can afford a car and Joyo AI answers from their own ledger with a
+ * 24-month projection (no change vs with the car) against the 6-month emergency fund line. The numbers hang together:
+ * Rp 160 jt saved, Rp 18 jt in and Rp 11 jt out a month; a Rp 250 jt car with 30% down in February, Rp 3,65 jt
+ * installment (20% of income) and Rp 0,8 jt running costs. Lines draw in once; reduced motion shows them still.
+ */
 function HeroVisual({ t }: { t: T }) {
+  // y = 150 - value_jt * 140 / 340, x = month * 320 / 24 (Nov 2026 = month 0, down payment in month 3).
+  const withCar = "M0,84.1 L40,75.5 L40,106.4 L320,84.3";
+  const noChange = "M0,84.1 L320,14.9";
+  const checks = [
+    { k: t("Dana darurat", "Emergency fund"), v: t("6,9 bln", "6.9 mo") },
+    { k: t("Cicilan", "Installments"), v: "20%" },
+    { k: t("Terendah", "Lowest"), v: "Rp 106 jt" },
+  ];
   return (
-    <div aria-hidden="true" className="relative mx-auto w-full max-w-md select-none">
-      <div className="space-y-3 rounded-3xl bg-card p-5 shadow-float">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground">Bank Jago · {t("Oktober", "October")} 2026</p>
-            <p className="font-bold">Main Pocket</p>
-          </div>
-          <Badge tone="positive">
-            <Check aria-hidden strokeWidth={3} /> {t("Saldo cocok", "Balances match")}
-          </Badge>
-        </div>
-        <ul className="divide-y divide-border text-sm">
-          {[
-            { m: "PT Sinar Maju", c: t("Gaji", "Salary"), a: "+12.500.000", pos: true },
-            { m: "Kopi Kenangan", c: t("Kopi & jajan", "Coffee & snacks"), a: "-28.000", from: "Gopay - Generic" },
-            { m: "Indomaret", c: t("Belanja harian", "Groceries"), a: "-187.300", from: "Gopay - Generic" },
-            { m: "PLN", c: t("Listrik", "Electricity"), a: "-302.500" },
-          ].map((r) => (
-            <li key={r.m} className="flex items-center gap-3 py-2">
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">{r.m}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {r.c}
-                  {r.from && <span className="text-muted-foreground/70 line-through decoration-muted-foreground/60"> · {r.from}</span>}
-                </p>
-              </div>
-              <span className={cn("font-semibold tabular-nums", r.pos && "text-positive")}>{r.a}</span>
-            </li>
-          ))}
-        </ul>
+    <div aria-hidden="true" className="hero-anim relative mx-auto w-full max-w-lg select-none">
+      <style>{`
+        @keyframes hero-draw { from { stroke-dashoffset: 1 } to { stroke-dashoffset: 0 } }
+        @keyframes hero-rise { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+        .hero-anim .rise { animation: hero-rise .6s cubic-bezier(.2,.7,.2,1) both }
+        .hero-anim .draw { stroke-dasharray: 1; animation: hero-draw 1.6s cubic-bezier(.4,0,.2,1) both }
+        @media (prefers-reduced-motion: reduce) { .hero-anim .rise, .hero-anim .draw { animation: none } }
+      `}</style>
+      <div className="rise ml-auto w-fit max-w-[85%] rounded-3xl rounded-br-md bg-primary px-4 py-3 text-[0.9375rem] text-primary-foreground shadow-float">
+        {t("Kalau ambil mobil Rp 250 jt bulan Februari, kami masih aman nggak?", "If we buy a Rp 250m car in February, are we still OK?")}
       </div>
-      <div className="relative -mt-4 ml-8 rounded-3xl rounded-tl-md bg-primary p-4 text-sm text-primary-foreground shadow-float sm:ml-16">
-        <p className="text-xs font-semibold opacity-80">{t("Kamu → Claude", "You → Claude")}</p>
-        <p className="mt-0.5">{t("“Kalau ambil mobil Rp 300 jt, tabungan buat si kecil aman nggak?”", "“If we buy a Rp 300m car, is the baby fund still safe?”")}</p>
+      <div className="rise mt-3 rounded-3xl bg-card p-5 shadow-float ring-1 ring-border/60 sm:p-6" style={{ animationDelay: "250ms" }}>
+        <div className="flex items-center gap-2.5">
+          <span className="grid size-8 place-items-center rounded-full bg-primary-soft text-primary-ink">
+            <Sparkles className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-bold">Joyo AI</p>
+            <p className="truncate text-xs text-muted-foreground">{t("Dari 6 bulan transaksi di 5 rekening", "From 6 months of transactions in 5 accounts")}</p>
+          </div>
+        </div>
+        <p className="mt-4 text-lg leading-snug font-bold text-balance">
+          {t("Aman. Tabungan tetap naik, dana darurat di atas 6 bulan.", "Yes. Savings keep growing and the emergency fund stays above 6 months.")}
+        </p>
+        <svg viewBox="0 0 320 160" className="mt-4 w-full overflow-visible">
+          <defs>
+            <linearGradient id="hero-area" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="var(--viz-series-1)" stopOpacity="0.18" />
+              <stop offset="1" stopColor="var(--viz-series-1)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {[30, 70, 110, 150].map((y) => (
+            <line key={y} x1="0" x2="320" y1={y} y2={y} stroke="var(--viz-grid)" strokeWidth="1" />
+          ))}
+          <line x1="0" x2="320" y1="111.8" y2="111.8" stroke="var(--viz-warning)" strokeWidth="1.5" strokeDasharray="4 4" />
+          <text x="318" y="124" textAnchor="end" fontSize="9" fill="var(--viz-muted)">
+            {t("Dana darurat 6 bulan", "6-month emergency fund")}
+          </text>
+          <path d={`${withCar} L320,150 L0,150 Z`} fill="url(#hero-area)" className="rise" style={{ animationDelay: "1.2s" }} />
+          <path d={noChange} pathLength={1} fill="none" stroke="var(--viz-previous)" strokeWidth="2" strokeDasharray="1" className="draw" style={{ animationDelay: "500ms" }} />
+          <path d={withCar} pathLength={1} fill="none" stroke="var(--viz-series-1)" strokeWidth="2.75" strokeLinejoin="round" className="draw" style={{ animationDelay: "700ms" }} />
+          <circle cx="40" cy="106.4" r="4" fill="var(--card)" stroke="var(--viz-series-1)" strokeWidth="2" className="rise" style={{ animationDelay: "1s" }} />
+          <text x="48" y="97" fontSize="9" fontWeight="600" fill="var(--foreground)" className="rise" style={{ animationDelay: "1s" }}>
+            {t("DP mobil", "Down payment")}
+          </text>
+          <text x="318" y="10" textAnchor="end" fontSize="9" fill="var(--viz-muted)">
+            {t("Tanpa mobil · Rp 328 jt", "No car · Rp 328m")}
+          </text>
+          <text x="318" y="72" textAnchor="end" fontSize="9" fontWeight="700" fill="var(--viz-series-1)">
+            {t("Dengan mobil · Rp 160 jt", "With car · Rp 160m")}
+          </text>
+        </svg>
+        <div className="mt-1 flex justify-between text-[0.6875rem] text-muted-foreground">
+          <span>Nov 2026</span>
+          <span>Nov 2027</span>
+          <span>Nov 2028</span>
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {checks.map((c, i) => (
+            <div key={i} className="rounded-2xl bg-muted/70 px-3 py-2.5">
+              <p className="truncate text-[0.6875rem] text-muted-foreground">{c.k}</p>
+              <p className="mt-0.5 flex items-center gap-1 text-sm font-bold whitespace-nowrap tabular-nums">
+                {c.v} <Check className="size-3.5 text-positive" strokeWidth={3} />
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div
+        className="rise absolute -bottom-5 -left-3 hidden items-center gap-2 rounded-full bg-card px-3.5 py-2 text-xs font-semibold shadow-float ring-1 ring-border/60 sm:flex lg:-left-8"
+        style={{ animationDelay: "1.4s" }}
+      >
+        <ShieldCheck className="size-4 text-positive" /> {t("Saldo cocok dengan e-statement", "Balances match your statements")}
       </div>
     </div>
   );
 }
 
-/** Why anyone tracks spending: a decision that needs real averages. The questions are examples, not features. */
-function WhyTrack({ t }: { t: T }) {
-  const questions = [
-    t("Cicilan mobil 4 juta sebulan, masih aman?", "A Rp 4 juta monthly car installment: still safe?"),
-    t("Anak pertama lahir tahun depan, tabungan masih jalan?", "First baby next year: can we keep saving?"),
-    t("Pindah ke kontrakan yang lebih besar, sisa berapa tiap bulan?", "A bigger rental: what's left each month?"),
-    t("Cicilan dan paylater sekarang sudah makan berapa persen gaji?", "How much of my salary do installments and paylater already take?"),
+// ---------------------------------------------------------------------------------------------------------------
+// Features
+
+function Features({ t }: { t: T }) {
+  const items: { icon: ReactNode; title: ReactNode; body: ReactNode }[] = [
+    {
+      icon: <Landmark />,
+      title: t("Semua rekening", "Every account"),
+      body: t("Bank, kartu kredit dan e-wallet dalam satu saldo.", "Banks, credit cards and e-wallets in one balance."),
+    },
+    {
+      icon: <TrendingUp />,
+      title: t("Arus kas", "Cash flow"),
+      body: t("Uang masuk dan keluar tiap bulan, per kategori.", "Money in and out each month, by category."),
+    },
+    {
+      icon: <PieChart />,
+      title: t("Anggaran", "Budgets"),
+      body: t("Pasang batas per kategori dan pantau sisanya.", "Set limits per category and watch what's left."),
+    },
+    {
+      icon: <Calculator />,
+      title: t("Rencana & simulasi", "Plans & simulations"),
+      body: t("Uji cicilan mobil atau biaya bayi sebelum memutuskan.", "Test a car loan or baby costs before you decide."),
+    },
+    {
+      icon: <Sparkles />,
+      title: t("Asisten AI", "AI assistant"),
+      body: t("Tanya Joyo AI atau Claude pakai bahasa sehari-hari.", "Ask Joyo AI or Claude in plain words."),
+    },
+    {
+      icon: <Users />,
+      title: t("Untuk keluarga", "Made for families"),
+      body: t("Satu buku bareng pasangan, akun masing-masing.", "One shared ledger, everyone on their own login."),
+    },
   ];
   return (
-    <Section id="kenapa" className="pt-4 sm:pt-6">
-      <div className="grid gap-8 lg:grid-cols-[1.1fr_1fr] lg:items-start">
-        <div className="max-w-2xl">
-          <h2 className="text-[1.75rem] leading-tight font-extrabold tracking-tight text-balance sm:text-4xl">
-            {t("Nyatat pengeluaran itu membosankan kalau nggak ada tujuannya.", "Tracking spending is boring when it isn't for anything.")}
-          </h2>
-          <p className="mt-3 text-pretty text-muted-foreground">
-            {t(
-              "Tujuannya biasanya datang sendiri: mau beli mobil, anak mau lahir, kontrak rumah mau habis. Saat itu kamu butuh rata-rata pengeluaran dari bulan-bulan yang sudah lewat, bukan perkiraan. JoyoArto mengumpulkannya dari statement, jadi kamu nggak perlu mengetik tiap transaksi.",
-              "The reason usually shows up on its own: a car, a baby, a lease running out. Then you need your average spending from past months, not a guess. JoyoArto builds it from your statements, so you don't type in every purchase.",
-            )}
-          </p>
-          <Link to="/demo" className={buttonVariants({ variant: "link", className: "mt-3 px-0" })}>
-            {t("Coba dengan statement-mu di demo", "Try it with your statement in the demo")} <ArrowRight aria-hidden />
-          </Link>
-        </div>
-        <ul className="space-y-2.5" aria-label={t("Contoh pertanyaan", "Example questions") as string}>
-          {questions.map((q, i) => (
-            <li key={i} className="rounded-3xl rounded-tl-md bg-card px-4 py-3 font-semibold text-pretty">
-              {q}
+    <Section id="fitur" className="bg-card">
+      <Heading
+        center
+        eyebrow={t("Fitur", "Features")}
+        title={t("Lebih dari catatan pengeluaran.", "More than an expense tracker.")}
+        sub={t("Semua yang kamu perlu untuk mengatur uang, dari hari ini sampai rencana tahun depan.", "Everything you need to run your money, from today to next year's plans.")}
+      />
+      <div className="grid gap-px overflow-hidden rounded-3xl bg-border ring-1 ring-border sm:grid-cols-2 lg:grid-cols-3">
+        {items.map((f, i) => (
+          <div key={i} className="bg-card p-6 sm:p-8">
+            <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary-ink [&_svg]:size-5">{f.icon}</span>
+            <h3 className="mt-5 text-lg font-bold tracking-tight">{f.title}</h3>
+            <p className="mt-1.5 text-muted-foreground">{f.body}</p>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Spotlights: two things that set JoyoArto apart, each with a small picture.
+
+function Spotlights({ t }: { t: T }) {
+  return (
+    <Section>
+      <div className="space-y-20 sm:space-y-28">
+      <Spotlight
+        eyebrow={t("Gambaran bulanan", "Monthly picture")}
+        title={t("Tahu sisa uangmu sebelum akhir bulan.", "Know what's left before the month ends.")}
+        body={t(
+          "Semua rekening, e-wallet dan kartu kredit jadi satu gambaran: uang masuk, keluar, dan anggaran yang hampir habis.",
+          "Every account, e-wallet and credit card in one picture: money in, money out, and budgets running low.",
+        )}
+        points={[t("Satu saldo untuk semua rekening", "One balance across accounts"), t("Anggaran per kategori", "Budgets per category"), t("Catat cepat dari HP", "Quick add from your phone")]}
+        visual={<MonthVisual t={t} />}
+      />
+      <Spotlight
+        reverse
+        eyebrow={t("Data yang akurat", "Accurate data")}
+        title={t("Angka yang bisa dipercaya.", "Numbers you can trust.")}
+        body={t(
+          "Upload e-statement, JoyoArto cek setiap saldo sampai cocok. Catat cepat dari HP, statement yang mengonfirmasi.",
+          "Upload a statement and JoyoArto checks every balance until it adds up. Quick-add on your phone; the statement confirms it.",
+        )}
+        points={[t("Bank Jago & GoPay dibaca otomatis", "Bank Jago & GoPay read automatically"), t("Bank lain lewat CSV", "Other banks via CSV"), t("Upload ulang aman, nggak dobel", "Re-upload safely, no duplicates")]}
+        visual={<StatementVisual t={t} />}
+      />
+      </div>
+    </Section>
+  );
+}
+
+function Spotlight({ eyebrow, title, body, points, visual, reverse }: { eyebrow: ReactNode; title: ReactNode; body: ReactNode; points: ReactNode[]; visual: ReactNode; reverse?: boolean }) {
+  return (
+    <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+      <div className={cn(reverse && "lg:order-2")}>
+        <p className="text-sm font-semibold text-primary">{eyebrow}</p>
+        <h2 className="mt-2 text-3xl leading-tight font-extrabold tracking-tight text-balance sm:text-[2.5rem]">{title}</h2>
+        <p className="mt-4 max-w-md text-lg text-pretty text-muted-foreground">{body}</p>
+        <ul className="mt-6 space-y-2.5">
+          {points.map((p, i) => (
+            <li key={i} className="flex items-center gap-2.5 font-medium">
+              <span className="grid size-5 place-items-center rounded-full bg-positive-soft text-positive-ink">
+                <Check aria-hidden className="size-3" strokeWidth={3} />
+              </span>
+              {p}
             </li>
           ))}
         </ul>
       </div>
-    </Section>
+      <div className={cn("rounded-[2rem] bg-muted/60 p-6 sm:p-10", reverse && "lg:order-1")}>{visual}</div>
+    </div>
   );
 }
 
-function HowItWorks({ t }: { t: T }) {
-  const steps = [
-    {
-      n: "1",
-      title: t("Upload statement", "Upload a statement"),
-      body: t(
-        "Download e-statement Bank Jago dan GoPay (PDF) dari aplikasinya, lalu taruh di JoyoArto. Bank lain bisa lewat CSV atau minta Claude bacain PDF-nya.",
-        "Download your Bank Jago and GoPay e-statements (PDF) from their apps and drop them in. Other banks work via CSV, or ask Claude to read the PDF.",
-      ),
-    },
-    {
-      n: "2",
-      title: t("Dicek sampai cocok", "Checked until it adds up"),
-      body: t(
-        "Setiap saldo berjalan dan total per pocket dihitung ulang. Kalau ada satu angka yang meleset, nggak ada yang disimpan. Upload ulang pun aman, nggak dobel.",
-        "Every running balance and pocket total is recomputed. If a single number is off, nothing is saved. Re-uploading is safe too: nothing is counted twice.",
-      ),
-    },
-    {
-      n: "3",
-      title: t("Tanya Claude, bikin rencana", "Ask Claude, make a plan"),
-      body: t(
-        "Sambungkan Claude, lalu tanya pakai bahasa sehari-hari. Atau simulasikan keputusan besar: cicilan mobil, biaya bayi, pindah rumah.",
-        "Connect Claude and ask in plain words. Or simulate a big decision: a car loan, baby costs, moving house.",
-      ),
-    },
+function MonthVisual({ t }: { t: T }) {
+  const budgets = [
+    { name: t("Makan & minum", "Food & drink"), pct: 64 },
+    { name: t("Transportasi", "Transport"), pct: 42 },
+    { name: t("Belanja", "Shopping"), pct: 91, warn: true },
   ];
   return (
-    <Section id="cara-kerja">
-      <Heading eyebrow={t("Cara kerjanya", "How it works")} title={t("Tiga langkah, sebulan sekali.", "Three steps, once a month.")} />
-      <ol className="grid gap-4 sm:grid-cols-3">
-        {steps.map((s) => (
-          <li key={s.n} className="rounded-3xl bg-card p-5">
-            <span className="grid size-9 place-items-center rounded-full bg-primary text-sm font-extrabold text-primary-foreground">{s.n}</span>
-            <h3 className="mt-3 text-lg font-bold tracking-tight">{s.title}</h3>
-            <p className="mt-1.5 text-sm text-muted-foreground">{s.body}</p>
+    <div aria-hidden="true" className="mx-auto max-w-sm rounded-3xl bg-card p-6 shadow-float select-none">
+      <p className="text-xs text-muted-foreground">{t("November 2026 · 5 rekening", "November 2026 · 5 accounts")}</p>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-xs text-muted-foreground">{t("Masuk", "In")}</p>
+          <p className="font-bold whitespace-nowrap text-positive tabular-nums">+Rp 18.000.000</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">{t("Keluar", "Out")}</p>
+          <p className="font-bold whitespace-nowrap tabular-nums">−Rp 11.240.000</p>
+        </div>
+      </div>
+      <p className="mt-6 text-sm font-bold">{t("Anggaran", "Budgets")}</p>
+      <ul className="mt-3 space-y-3 text-sm">
+        {budgets.map((b, i) => (
+          <li key={i}>
+            <div className="flex justify-between">
+              <span>{b.name}</span>
+              <span className={cn("font-semibold tabular-nums", b.warn ? "text-warning-ink" : "text-muted-foreground")}>{b.pct}%</span>
+            </div>
+            <div className="mt-1.5 h-1.5 rounded-full bg-muted">
+              <div className={cn("h-full rounded-full", b.warn ? "bg-warning" : "bg-primary")} style={{ width: `${b.pct}%` }} />
+            </div>
           </li>
         ))}
-      </ol>
-    </Section>
+      </ul>
+    </div>
   );
 }
 
-function Features({ t }: { t: T }) {
-  const items: { icon: ReactNode; title: ReactNode; body: ReactNode; soon?: boolean }[] = [
-    {
-      icon: <Icon d="M9 12l2 2 4-4M7 3h10a2 2 0 012 2v14l-3-2-2 2-2-2-2 2-2-2-3 2V5a2 2 0 012-2z" />,
-      title: t("Baca statement Jago & GoPay, dicek tiap saldonya", "Reads Jago & GoPay statements, checks every balance"),
-      body: t(
-        "Setiap pocket Jago jadi rekening sendiri. Saldo berjalan dan total harus cocok dengan statement, jadi angkanya bisa dipercaya.",
-        "Every Jago pocket becomes its own account. Running balances and totals must match the statement, so you can trust the numbers.",
-      ),
-    },
-    {
-      icon: <Icon d="M8 7h12M8 7l3-3M8 7l3 3M16 17H4m12 0l-3-3m3 3l-3 3" />,
-      title: t("“Gopay - Generic” jadi nama merchant asli", "“Gopay - Generic” becomes the real merchant"),
-      body: t(
-        "Bayar GoPay pakai Jago cuma tercatat “Gopay - Generic”. JoyoArto mencocokkan dengan e-statement GoPay, jadi kelihatan itu Kopi Kenangan atau Indomaret.",
-        "Paying with GoPay from Jago only shows “Gopay - Generic”. JoyoArto matches it with the GoPay e-statement, so you see whether it was Kopi Kenangan or Indomaret.",
-      ),
-    },
-    {
-      icon: <Icon d="M17 20h5v-2a3 3 0 00-5.4-1.8M9 20H2v-2a4 4 0 017-2.6M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z" />,
-      title: t("Satu buku untuk keluarga", "One ledger for the family"),
-      body: t(
-        "Undang pasangan ke rumah tangga yang sama. Rekening, kategori dan rencana dipakai bareng, tiap orang tetap login pakai akunnya sendiri.",
-        "Invite your spouse to the same household. Accounts, categories and plans are shared; everyone signs in with their own account.",
-      ),
-    },
-    {
-      icon: <Icon d="M8 10h8M8 14h5M21 12a9 9 0 01-13.4 7.8L3 21l1.2-4.6A9 9 0 1121 12z" />,
-      title: t("Tanya Claude soal uangmu", "Ask Claude about your money"),
-      body: t(
-        "Konektor Claude (MCP) untuk claude.ai, Claude Desktop dan Claude Code. Claude bisa cari transaksi, rangkum pengeluaran dan bantu kategorikan, dengan izin dari kamu.",
-        "A Claude connector (MCP) for claude.ai, Claude Desktop and Claude Code. Claude can search transactions, summarise spending and help categorise, with your permission.",
-      ),
-    },
-    {
-      icon: <Icon d="M3 17l6-6 4 4 8-8M14 7h7v7" />,
-      title: t("Rencana & simulasi", "Plan & simulate"),
-      body: t(
-        "“Kuat nggak ambil mobil ini, padahal bayi mau lahir?” Hitungan dari data asli: dana darurat, porsi cicilan, saldo bulan demi bulan.",
-        "“Can we afford this car with a baby on the way?” Worked out from your real data: emergency fund, share of income on loans, balance month by month.",
-      ),
-    },
-    {
-      icon: <Icon d="M12 5v14M5 12h14" />,
-      title: t("Catat cepat, statement yang mengonfirmasi", "Quick add, the statement confirms"),
-      body: t(
-        "Ketik “kopi 25rb” (atau suruh Claude). Masuk sebagai pending dan langsung dihitung; nanti statement bulanan yang menggantikan dengan angka resminya.",
-        "Type “coffee 25k” (or tell Claude). It is saved as pending and counted right away; the monthly statement later replaces it with the official row.",
-      ),
-    },
-    {
-      icon: <Icon d="M3 7h3l2-3h8l2 3h3v13H3zM12 17a4 4 0 100-8 4 4 0 000 8z" />,
-      title: t("Foto struk & klaim reimburse", "Receipt photos & reimbursement claims"),
-      body: t(
-        "Foto struknya, AI yang mengisi. Tandai “Diganti kantor” supaya tidak terhitung pengeluaran rumah tangga, lalu buat laporan klaim PDF lengkap dengan foto struk untuk disetujui atasan.",
-        "Snap the receipt and AI fills it in. Mark it “paid back by work” so it is not household spending, then make a PDF claim report with the receipts for approval.",
-      ),
-    },
-    {
-      icon: <Icon d="M16 18l6-6-6-6M8 6l-6 6 6 6" />,
-      title: t("Open source (AGPL)", "Open source (AGPL)"),
-      body: t(
-        "Kodenya terbuka (AGPL). Mau host sendiri boleh; mau praktis, pakai versi yang kami jalankan, dengan Joyo Pro untuk batas yang lebih longgar.",
-        "The code is open (AGPL). Host it yourself, or use the version we run for you, with Joyo Pro for higher limits.",
-      ),
-    },
-    {
-      icon: <Icon d="M7 2h10a2 2 0 012 2v16a2 2 0 01-2 2H7a2 2 0 01-2-2V4a2 2 0 012-2zm4 17h2" />,
-      title: t("Aplikasi Android & baca notifikasi", "Android app & notification capture"),
-      body: t(
-        IOS_TESTFLIGHT_URL
-          ? "Aplikasi Android (tahap uji di Google Play) mencatat dari notifikasi Jago & GoPay dan menerima PDF statement. iPhone: tahap uji lewat TestFlight."
-          : "Aplikasi Android (tahap uji di Google Play) mencatat dari notifikasi Jago & GoPay dan menerima PDF statement. iPhone: lewat TestFlight, link publiknya segera; sementara itu pakai web di Safari.",
-        IOS_TESTFLIGHT_URL
-          ? "The Android app (testing on Google Play) captures from Jago & GoPay notifications and takes statement PDFs. iPhone: testing through TestFlight."
-          : "The Android app (testing on Google Play) captures from Jago & GoPay notifications and takes statement PDFs. iPhone: through TestFlight, public link coming soon; meanwhile use the web app in Safari.",
-      ),
-    },
+function StatementVisual({ t }: { t: T }) {
+  const rows = [
+    { m: "PT Sinar Maju", c: t("Gaji", "Salary"), a: "+12.500.000", pos: true },
+    { m: "Indomaret", c: t("Belanja harian", "Groceries"), a: "−187.300" },
+    { m: "PLN", c: t("Listrik", "Electricity"), a: "−302.500" },
   ];
   return (
-    <Section id="fitur">
-      <Heading
-        eyebrow={t("Fitur", "Features")}
-        title={t("Dibuat buat rekening yang kamu pakai beneran.", "Built for the accounts you actually use.")}
-        sub={t(
-          "JoyoArto membaca statement asli dan memastikan saldonya cocok dulu. Baru setelah itu Claude ikut bantu.",
-          "JoyoArto reads the real statements and makes sure the balances add up first. Then Claude helps.",
-        )}
-      />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {items.map((f, i) => (
-          <div key={i} className={cn("rounded-3xl p-5", f.soon ? "border-2 border-dashed border-border" : "bg-card")}>
-            <div className="flex items-center justify-between">
-              <span className="grid size-10 place-items-center rounded-full bg-primary-soft text-primary-ink">{f.icon}</span>
-              {f.soon && <Badge tone="warning">{t("Segera", "Soon")}</Badge>}
-            </div>
-            <h3 className="mt-3 font-bold tracking-tight text-balance">{f.title}</h3>
-            <p className="mt-1.5 text-sm text-muted-foreground">{f.body}</p>
-          </div>
-        ))}
-      </div>
-    </Section>
-  );
-}
-
-type Step = {
-  n: string;
-  title: ReactNode;
-  body?: ReactNode;
-  /** External link for the step's button; `to` is an in-app route instead. */
-  href?: string;
-  to?: "/login";
-  icon?: ReactNode;
-  cta?: ReactNode;
-  small?: ReactNode;
-  soon?: boolean;
-};
-
-const STEP_BUTTON =
-  "mt-3 inline-flex min-h-11 items-center gap-2.5 rounded-xl bg-foreground px-4 text-sm font-semibold text-background transition-opacity hover:opacity-90 focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none";
-
-/** One phone platform's install steps: intro on the left, numbered steps on the right. */
-function InstallSection({ id, logo, platform, title, intro, steps, t }: { id: string; logo: ReactNode; platform: ReactNode; title: ReactNode; intro: ReactNode; steps: Step[]; t: T }) {
-  return (
-    <Section id={id} className="py-6 sm:py-8">
-      <div className="grid gap-8 rounded-[2rem] bg-card p-6 sm:p-10 lg:grid-cols-[1fr_1.2fr] lg:items-start">
+    <div aria-hidden="true" className="mx-auto max-w-sm rounded-3xl bg-card p-6 shadow-float select-none">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="flex items-center gap-2 text-sm font-bold text-primary">
-            <span className="grid size-9 place-items-center rounded-full bg-primary-soft text-primary-ink [&_svg]:size-5">{logo}</span>
-            {platform}
-          </p>
-          <h2 className="mt-3 text-[1.75rem] leading-tight font-extrabold tracking-tight text-balance sm:text-4xl">{title}</h2>
-          <p className="mt-3 text-pretty text-muted-foreground">{intro}</p>
+          <p className="text-xs text-muted-foreground">Bank Jago · {t("Oktober", "October")} 2026</p>
+          <p className="font-bold">Main Pocket</p>
         </div>
-        <ol className="space-y-3">
-          {steps.map((s) => (
-            <li key={s.n} className="rounded-3xl bg-muted/60 p-5">
-              <div className="flex items-start gap-3.5">
-                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-sm font-extrabold text-primary-foreground">{s.n}</span>
-                <div className="min-w-0 flex-1">
-                  <h3 className="flex flex-wrap items-center gap-2 font-bold tracking-tight">
-                    {s.title}
-                    {s.soon && <Badge tone="warning">{t("Segera", "Soon")}</Badge>}
-                  </h3>
-                  {s.body && <p className="mt-1 text-sm text-muted-foreground">{s.body}</p>}
-                  {s.href && (
-                    <a href={s.href} target="_blank" rel="noopener" className={STEP_BUTTON}>
-                      {s.icon}
-                      {s.cta}
-                    </a>
-                  )}
-                  {s.to && (
-                    <Link to={s.to} className={STEP_BUTTON}>
-                      {s.icon}
-                      {s.cta}
-                    </Link>
-                  )}
-                  {s.small && <p className="mt-2 text-xs break-all text-muted-foreground">{s.small}</p>}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <Badge tone="positive">
+          <ShieldCheck aria-hidden /> {t("Saldo cocok", "Balanced")}
+        </Badge>
       </div>
-    </Section>
+      <ul className="mt-4 divide-y divide-border text-sm">
+        {rows.map((r) => (
+          <li key={r.m} className="flex items-center gap-3 py-2.5">
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold">{r.m}</p>
+              <p className="truncate text-xs text-muted-foreground">{r.c}</p>
+            </div>
+            <span className={cn("font-semibold tabular-nums", r.pos && "text-positive")}>{r.a}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
-/** Android closed testing: join the Google Group, then opt in on Play (lib/app-links.ts), then sign in. */
-function AndroidTesters({ t }: { t: T }) {
-  const steps: Step[] = [
-    {
-      n: "1",
-      icon: <Users aria-hidden className="size-5" />,
-      title: t("Gabung grup tester", "Join the testers' group"),
-      body: t(
-        "Siapa pun bisa gabung. Pakai akun Google yang sama dengan di HP-mu.",
-        "Anyone can join. Use the same Google account as on your phone.",
-      ),
-      href: ANDROID_TESTERS_GROUP_URL,
-      cta: t("Buka Google Groups", "Open Google Groups"),
-      small: ANDROID_TESTERS_GROUP_EMAIL,
-    },
-    {
-      n: "2",
-      icon: <AndroidLogo className="size-5" />,
-      title: t("Daftar jadi tester, lalu pasang", "Opt in, then install"),
-      body: t(
-        "Ketuk “Jadi penguji” di halaman Google Play, lalu pasang JoyoArto dari Play Store. Update-nya datang lewat Play juga.",
-        "Tap “Become a tester” on the Google Play page, then install JoyoArto from the Play Store. Updates come through Play too.",
-      ),
-      href: ANDROID_TESTING_URL,
-      cta: t("Daftar di Google Play", "Opt in on Google Play"),
-    },
-    {
-      n: "3",
-      title: t("Masuk pakai Google, rumah tanggamu langsung dibuat", "Sign in with Google; your household is created for you"),
-    },
-  ];
-  return (
-    <InstallSection
-      id={ANDROID_SECTION_ID}
-      t={t}
-      logo={<AndroidLogo />}
-      platform="Android"
-      title={t("Jadi tester aplikasi Android JoyoArto.", "Test the JoyoArto Android app.")}
-      intro={t(
-        "Aplikasinya sudah di Google Play, masih tahap uji. Catat cepat, baca notifikasi Jago & GoPay, dan kirim PDF statement langsung dari HP. Tiga langkah untuk mulai:",
-        "It is on Google Play, still in testing. Quick add, capture from Jago & GoPay notifications, and send statement PDFs straight from your phone. Three steps to get started:",
-      )}
-      steps={steps}
-    />
-  );
-}
-
-/** iPhone beta through TestFlight. Until IOS_TESTFLIGHT_URL is set, step 2 points to the web app in Safari. */
-function IphoneTesters({ t }: { t: T }) {
-  const invite: Step = IOS_TESTFLIGHT_URL
-    ? {
-        n: "2",
-        icon: <AppleLogo className="size-5" />,
-        title: t("Buka undangan TestFlight JoyoArto", "Open the JoyoArto TestFlight invite"),
-        body: t("Buka link-nya di iPhone, lalu ketuk Accept, kemudian Install.", "Open the link on your iPhone, then tap Accept, then Install."),
-        href: IOS_TESTFLIGHT_URL,
-        cta: t("Buka undangan", "Open the invite"),
-      }
-    : {
-        n: "2",
-        soon: true,
-        icon: <LogIn aria-hidden className="size-5" />,
-        title: t("Buka undangan TestFlight JoyoArto", "Open the JoyoArto TestFlight invite"),
-        body: t(
-          "Link publiknya segera kami pasang di sini. Nanti tinggal buka di iPhone, lalu ketuk Accept, kemudian Install. Sementara itu, pakai versi web di Safari dengan akun yang sama.",
-          "The public link is coming soon and will be posted here. Then you open it on your iPhone and tap Accept, then Install. Meanwhile, use the web app in Safari with the same account.",
-        ),
-        to: "/login",
-        cta: t("Buka versi web", "Open the web app"),
-      };
-  const steps: Step[] = [
-    {
-      n: "1",
-      icon: <AppleLogo className="size-5" />,
-      title: t("Pasang TestFlight dari App Store", "Install TestFlight from the App Store"),
-      body: t("Aplikasi gratis dari Apple buat mencoba aplikasi yang masih tahap uji.", "Apple's free app for trying apps that are still in testing."),
-      href: TESTFLIGHT_APP_STORE_URL,
-      cta: t("Buka di App Store", "Open in the App Store"),
-    },
-    invite,
-    {
-      n: "3",
-      title: t("Masuk pakai Apple atau Google", "Sign in with Apple or Google"),
-    },
-  ];
-  return (
-    <InstallSection
-      id={IOS_SECTION_ID}
-      t={t}
-      logo={<AppleLogo />}
-      platform="iPhone"
-      title={t("Coba JoyoArto di iPhone.", "Try JoyoArto on iPhone.")}
-      intro={t(
-        "Versi iPhone dibagikan lewat TestFlight, aplikasi resmi Apple buat versi uji. Tiga langkah untuk mulai:",
-        "The iPhone version is shared through TestFlight, Apple's official app for test versions. Three steps to get started:",
-      )}
-      steps={steps}
-    />
-  );
-}
-
-function Icon({ d }: { d: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={d} />
-    </svg>
-  );
-}
+// ---------------------------------------------------------------------------------------------------------------
+// Privacy
 
 function Privacy({ t }: { t: T }) {
   const points = [
     {
-      title: t("Yang disimpan", "What is stored"),
-      body: t(
-        "Transaksi dari statement (tanggal, jumlah, keterangan asli, saldo), nama rekening/pocket, kategori dan catatanmu. Bukan PIN, bukan password bank: JoyoArto nggak pernah login ke bank-mu.",
-        "Transactions from your statements (date, amount, original description, balance), account/pocket names, categories and your notes. Never a PIN or bank password: JoyoArto never logs in to your bank.",
-      ),
+      icon: <LockKeyhole />,
+      title: t("Tanpa login bank", "No bank login"),
+      body: t("Kami nggak pernah minta PIN atau password bank.", "We never ask for your bank PIN or password."),
     },
     {
-      title: t("Demo: diproses di browser", "Demo: processed in your browser"),
-      body: t(
-        "Di halaman demo, PDF dibaca dan dihitung di perangkatmu sendiri. Nggak ada yang dikirim ke server, nggak ada yang disimpan.",
-        "On the demo page the PDF is read and analysed on your own device. Nothing is sent to a server and nothing is kept.",
-      ),
+      icon: <ShieldCheck />,
+      title: t("Datamu milikmu", "Your data is yours"),
+      body: t("Nggak dijual, nggak dipakai buat iklan.", "Never sold, never used for ads."),
     },
     {
-      title: t("Datamu tetap punyamu", "Your data stays yours"),
-      body: t(
-        "Data dipisah per rumah tangga; cuma anggota yang kamu undang yang bisa lihat. Claude hanya bisa akses kalau kamu sendiri yang menyambungkan dan menyetujuinya.",
-        "Data is separated per household; only members you invite can see it. Claude gets access only when you connect it and approve it yourself.",
-      ),
-    },
-    {
+      icon: <Code />,
       title: t("Kode terbuka", "Open code"),
-      body: t("Semua logikanya bisa dibaca (AGPL): cek sendiri, atau jalankan di server-mu.", "All the logic is readable (AGPL): check it yourself, or run it on your own server."),
+      body: t("Siapa pun bisa periksa ke mana datamu pergi.", "Anyone can check where your data goes."),
     },
   ];
   return (
-    <Section id="privasi" className="bg-[oklch(0.25_0.06_268)] text-white">
-      <div className="mb-8 max-w-2xl sm:mb-10">
-        <p className="text-sm font-bold text-coin">{t("Privasi", "Privacy")}</p>
-        <h2 className="mt-1.5 text-[1.75rem] leading-tight font-extrabold tracking-tight text-balance sm:text-4xl">
-          {t("Uang itu urusan pribadi. Kami anggap begitu juga.", "Money is personal. We treat it that way.")}
-        </h2>
-        <p className="mt-3 text-pretty text-white/70">
-          {t(
-            "Kodenya terbuka, jadi siapa pun bisa periksa ke mana datamu pergi. Nggak dijual, nggak dipakai buat iklan.",
-            "The code is open, so anyone can check where your data goes. Never sold, never used for ads.",
+    <Section id="privasi" className="bg-[oklch(0.22_0.05_268)] text-white">
+      <div className="grid gap-10 lg:grid-cols-[1fr_1.4fr] lg:items-center">
+        <div>
+          <p className="text-sm font-semibold text-coin">{t("Privasi", "Privacy")}</p>
+          <h2 className="mt-2 text-3xl leading-tight font-extrabold tracking-tight text-balance sm:text-[2.5rem]">
+            {t("Uang itu urusan pribadi.", "Money is personal.")}
+          </h2>
+          {REPO_URL && (
+            <a href={REPO_URL} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-white/75 hover:text-white">
+              {t("Lihat kode sumbernya", "Read the source code")} <ArrowRight aria-hidden className="size-4" />
+            </a>
           )}
-        </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {points.map((p, i) => (
+            <div key={i} className="rounded-3xl bg-white/[0.06] p-5 ring-1 ring-white/10">
+              <span className="text-coin [&_svg]:size-5">{p.icon}</span>
+              <h3 className="mt-3 font-bold">{p.title}</h3>
+              <p className="mt-1 text-sm text-white/70">{p.body}</p>
+            </div>
+          ))}
+        </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {points.map((p, i) => (
-          <div key={i} className="rounded-3xl bg-white/[0.07] p-5">
-            <h3 className="font-bold">{p.title}</h3>
-            <p className="mt-1.5 text-sm text-white/70">{p.body}</p>
-          </div>
-        ))}
-      </div>
-      {REPO_URL && (
-        <p className="mt-6 text-sm text-white/70">
-          <a href={REPO_URL} target="_blank" rel="noreferrer" className="underline hover:text-white">
-            {t("Lihat kode sumbernya", "Read the source code")}
-          </a>
-        </p>
-      )}
     </Section>
   );
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Phone apps (both still in testing): compact install steps, one card per platform.
+
+type Step = { title: ReactNode; href?: string; to?: "/login"; cta?: ReactNode; small?: ReactNode };
+
+function GetTheApp({ t }: { t: T }) {
+  const android: Step[] = [
+    { title: t("Gabung grup tester", "Join the testers' group"), href: ANDROID_TESTERS_GROUP_URL, cta: "Google Groups", small: ANDROID_TESTERS_GROUP_EMAIL },
+    { title: t("Daftar jadi tester, lalu pasang dari Play Store", "Opt in, then install from the Play Store"), href: ANDROID_TESTING_URL, cta: "Google Play" },
+    { title: t("Masuk pakai Google", "Sign in with Google") },
+  ];
+  const iphone: Step[] = [
+    { title: t("Pasang TestFlight dari App Store", "Install TestFlight from the App Store"), href: TESTFLIGHT_APP_STORE_URL, cta: "App Store" },
+    IOS_TESTFLIGHT_URL
+      ? { title: t("Buka undangan JoyoArto, ketuk Accept lalu Install", "Open the JoyoArto invite, tap Accept, then Install"), href: IOS_TESTFLIGHT_URL, cta: "TestFlight" }
+      : { title: t("Undangan TestFlight segera; sementara pakai web di Safari", "TestFlight invite coming soon; meanwhile use the web app in Safari"), to: "/login", cta: t("Buka web", "Open web app") },
+    { title: t("Masuk pakai Apple atau Google", "Sign in with Apple or Google") },
+  ];
+  return (
+    <Section id="aplikasi" className="bg-card">
+      <Heading
+        center
+        eyebrow={t("Aplikasi", "Apps")}
+        title={t("Di web, Android dan iPhone.", "On the web, Android and iPhone.")}
+        sub={t("Aplikasi HP masih tahap uji. Catat cepat, baca notifikasi Jago & GoPay, kirim PDF statement.", "The phone apps are in testing. Quick add, Jago & GoPay notification capture, statement PDFs.")}
+      />
+      <div className="grid gap-4 md:grid-cols-2">
+        <InstallCard id={ANDROID_SECTION_ID} logo={<AndroidLogo />} platform="Android" note={t("Google Play, tahap uji", "Google Play, testing")} steps={android} />
+        <InstallCard id={IOS_SECTION_ID} logo={<AppleLogo />} platform="iPhone" note={t("TestFlight, tahap uji", "TestFlight, testing")} steps={iphone} />
+      </div>
+    </Section>
+  );
+}
+
+function InstallCard({ id, logo, platform, note, steps }: { id: string; logo: ReactNode; platform: ReactNode; note: ReactNode; steps: Step[] }) {
+  const linkCls = buttonVariants({ variant: "outline", size: "xs", className: "shrink-0" });
+  return (
+    <div id={id} className="scroll-mt-20 rounded-3xl bg-background p-6 ring-1 ring-border sm:p-8">
+      <div className="flex items-center gap-3">
+        <span className="grid size-11 place-items-center rounded-xl bg-foreground text-background [&_svg]:size-5">{logo}</span>
+        <div>
+          <h3 className="text-lg font-bold tracking-tight">{platform}</h3>
+          <p className="text-sm text-muted-foreground">{note}</p>
+        </div>
+      </div>
+      <ol className="mt-6 space-y-4">
+        {steps.map((s, i) => (
+          <li key={i} className="flex items-start gap-3">
+            <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary-soft text-xs font-bold text-primary-ink">{i + 1}</span>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-3 gap-y-2">
+              <div className="min-w-0">
+                <p className="font-semibold text-pretty">{s.title}</p>
+                {s.small && <p className="text-xs break-all text-muted-foreground">{s.small}</p>}
+              </div>
+              {s.href && (
+                <a href={s.href} target="_blank" rel="noopener" className={linkCls}>
+                  {s.cta} <ArrowRight aria-hidden />
+                </a>
+              )}
+              {s.to && (
+                <Link to={s.to} className={linkCls}>
+                  {s.cta} <ArrowRight aria-hidden />
+                </Link>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Pricing, FAQ, closing call to action
 
 function Pricing({ t }: { t: T }) {
   const tt = <V,>(id: V, eng: V): V => t(id as ReactNode, eng as ReactNode) as V;
   return (
     <Section id="harga">
       <Heading
+        center
         eyebrow={t("Harga", "Pricing")}
-        title={t("Gratis untuk mulai. Joyo Pro kalau perlu lebih.", "Free to start. Joyo Pro when you need more.")}
-        sub={t(
-          "Joyo Pro itu satu langganan per akun yang membuka Pro di JoyoArto, JoyoRogo dan JoyoFit. Dibeli di JoyoRogo dengan akun Google yang sama.",
-          "Joyo Pro is one subscription per account that unlocks Pro in JoyoArto, JoyoRogo and JoyoFit. You buy it in JoyoRogo with the same Google account.",
-        )}
+        title={t("Gratis untuk mulai.", "Free to start.")}
+        sub={t("Joyo Pro: satu langganan untuk JoyoArto, JoyoRogo dan JoyoFit.", "Joyo Pro: one subscription for JoyoArto, JoyoRogo and JoyoFit.")}
       />
       <PricingPlans
         t={tt}
@@ -609,70 +547,82 @@ function Faq({ t }: { t: T }) {
     [
       t("Bank apa aja yang bisa dibaca?", "Which banks can it read?"),
       t(
-        "Sekarang Bank Jago (statement bulanan) dan GoPay (e-statement), langsung dibaca dan diverifikasi oleh JoyoArto. Berikutnya: BCA, BRI, Mandiri, DANA, SeaBank dan lainnya. Sementara itu, bank lain bisa lewat CSV atau minta Claude membaca PDF-nya.",
-        "Today: Bank Jago (monthly statements) and GoPay (e-statements), read and verified by JoyoArto itself. Next: BCA, BRI, Mandiri, DANA, SeaBank and more. Meanwhile, other banks work via CSV or by asking Claude to read the PDF.",
-      ),
-    ],
-    [
-      t("Berapa harganya?", "How much does it cost?"),
-      t(
-        "Ada paket Free (catat manual, CSV, 2 import statement sebulan) dan Joyo Pro: satu langganan per akun yang juga membuka Pro di JoyoRogo dan JoyoFit, dibeli di JoyoRogo per bulan atau per tahun. Harga terbarunya ada di halaman Harga. Kalau mau gratis sepenuhnya, kodenya open source: silakan host sendiri.",
-        "There is a Free plan (manual entries, CSV, 2 statement imports a month) and Joyo Pro: one subscription per account that also unlocks Pro in JoyoRogo and JoyoFit, bought in JoyoRogo monthly or yearly. Current prices are on the Pricing page. If you'd rather not pay at all, the code is open source: host it yourself.",
+        "Bank Jago dan GoPay dibaca dan diverifikasi otomatis. Bank lain bisa lewat CSV atau minta Claude membaca PDF-nya. BCA, BRI, Mandiri dan lainnya menyusul.",
+        "Bank Jago and GoPay are read and verified automatically. Other banks work via CSV or by asking Claude to read the PDF. BCA, BRI, Mandiri and more are coming.",
       ),
     ],
     [
       t("Apakah JoyoArto nyambung langsung ke rekening bank?", "Does JoyoArto connect to my bank account?"),
       t(
-        "Nggak. JoyoArto nggak minta login bank dan nggak menarik data otomatis. Kamu yang download statement dari aplikasi bank lalu upload. Lebih repot sedikit, tapi lebih aman dan angkanya bisa dicek.",
-        "No. JoyoArto never asks for your bank login and does not pull data automatically. You download the statement from your bank app and upload it. A little more effort, but safer, and the numbers can be checked.",
+        "Nggak. JoyoArto nggak pernah minta login bank. Kamu download statement dari aplikasi bank lalu upload, jadi lebih aman dan angkanya bisa dicek.",
+        "No. JoyoArto never asks for your bank login. You download the statement from your bank app and upload it, which is safer and the numbers can be checked.",
+      ),
+    ],
+    [
+      t("Berapa harganya?", "How much does it cost?"),
+      t(
+        "Paket Free gratis selamanya. Joyo Pro adalah satu langganan per akun yang juga membuka Pro di JoyoRogo dan JoyoFit, bulanan atau tahunan. Kodenya open source, jadi kamu juga bisa host sendiri.",
+        "The Free plan is free forever. Joyo Pro is one subscription per account that also unlocks Pro in JoyoRogo and JoyoFit, monthly or yearly. The code is open source, so you can also host it yourself.",
       ),
     ],
     [
       t("Harus pakai Claude?", "Do I need Claude?"),
       t(
-        "Nggak wajib. Dashboard, import, kategori dan simulasi semua ada di web. Claude itu bonus: kalau kamu sudah pakai Claude, tinggal sambungkan dan tanya.",
-        "No. The dashboard, imports, categories and simulations are all in the web app. Claude is a bonus: if you already use it, connect it and ask.",
-      ),
-    ],
-    [
-      t("Ada aplikasi HP?", "Is there a mobile app?"),
-      t(
-        IOS_TESTFLIGHT_URL
-          ? "Ada untuk Android, sudah di Google Play dalam tahap uji: catat cepat, baca notifikasi Jago dan GoPay, dan kirim PDF statement dari HP. Versi iPhone juga ada dalam tahap uji lewat TestFlight; langkahnya ada di bagian iPhone di atas."
-          : "Ada untuk Android, sudah di Google Play dalam tahap uji: catat cepat, baca notifikasi Jago dan GoPay, dan kirim PDF statement dari HP. Versi iPhone dibagikan lewat TestFlight dan link publiknya segera; langkahnya ada di bagian iPhone di atas. Sementara itu web-nya enak dipakai di Safari dan ada iOS Shortcuts buat catat cepat.",
-        IOS_TESTFLIGHT_URL
-          ? "Yes for Android, on Google Play in testing: quick add, capture from Jago and GoPay notifications, and send statement PDFs from your phone. The iPhone version is in testing too, through TestFlight; the steps are in the iPhone section above."
-          : "Yes for Android, on Google Play in testing: quick add, capture from Jago and GoPay notifications, and send statement PDFs from your phone. The iPhone version is shared through TestFlight and its public link is coming soon; the steps are in the iPhone section above. Meanwhile the web app works well in Safari and iOS Shortcuts can quick-add.",
+        "Nggak wajib. Semua fitur ada di web dan aplikasi, termasuk Joyo AI. Claude itu bonus kalau kamu sudah memakainya.",
+        "No. Every feature is in the web and phone apps, including Joyo AI. Claude is a bonus if you already use it.",
       ),
     ],
     [
       t("Gimana cara pasang aplikasi Android-nya?", "How do I install the Android app?"),
       t(
-        "Tiga langkah. Pertama, gabung grup Google joyoarto-testers (groups.google.com/g/joyoarto-testers, siapa pun bisa gabung) pakai akun Google yang ada di HP-mu. Kedua, buka play.google.com/apps/testing/com.joyodigitama.joyoarto, ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store. Ketiga, buka aplikasinya dan masuk pakai Google; rumah tanggamu langsung dibuat.",
-        "Three steps. First, join the joyoarto-testers Google Group (groups.google.com/g/joyoarto-testers, anyone can join) with the Google account on your phone. Second, open play.google.com/apps/testing/com.joyodigitama.joyoarto, tap “Become a tester”, then install JoyoArto from the Play Store. Third, open the app and sign in with Google; your household is created for you.",
+        "Gabung grup Google joyoarto-testers (groups.google.com/g/joyoarto-testers), buka play.google.com/apps/testing/com.joyodigitama.joyoarto dan ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store dan masuk pakai Google.",
+        "Join the joyoarto-testers Google Group (groups.google.com/g/joyoarto-testers), open play.google.com/apps/testing/com.joyodigitama.joyoarto and tap “Become a tester”, then install JoyoArto from the Play Store and sign in with Google.",
       ),
     ],
     [
       t("Data saya dipakai buat apa?", "What is my data used for?"),
       t(
-        "Cuma buat nampilin keuanganmu ke kamu (dan anggota rumah tangga yang kamu undang). Datamu nggak kami jual dan nggak dipakai buat iklan.",
-        "Only to show your finances to you (and household members you invite). We never sell your data or use it for ads.",
+        "Cuma buat nampilin keuanganmu ke kamu dan anggota rumah tangga yang kamu undang. Nggak dijual, nggak dipakai buat iklan.",
+        "Only to show your finances to you and the household members you invite. Never sold, never used for ads.",
       ),
     ],
   ];
   return (
-    <Section id="faq">
-      <Heading eyebrow="FAQ" title={t("Yang sering ditanyain", "Common questions")} />
-      <div className="max-w-3xl divide-y divide-border overflow-hidden rounded-3xl bg-card">
-        {qa.map(([q, a], i) => (
-          <details key={i} className="group px-5 py-4 [&_summary::-webkit-details-marker]:hidden">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold">
-              {q}
-              <Plus className="size-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-45" aria-hidden="true" />
-            </summary>
-            <p className="mt-2 text-sm text-muted-foreground">{a}</p>
-          </details>
-        ))}
+    <Section id="faq" className="bg-card">
+      <div className="grid gap-10 lg:grid-cols-[1fr_1.6fr]">
+        <Heading eyebrow="FAQ" title={t("Pertanyaan umum", "Common questions")} />
+        <div className="divide-y divide-border border-y border-border">
+          {qa.map(([q, a], i) => (
+            <details key={i} className="group py-5 [&_summary::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-lg font-semibold">
+                {q}
+                <Plus className="size-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-45" aria-hidden="true" />
+              </summary>
+              <p className="mt-2 text-pretty text-muted-foreground">{a}</p>
+            </details>
+          ))}
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+function FinalCta({ t }: { t: T }) {
+  return (
+    <Section className="py-16 sm:py-20">
+      <div className="rounded-[2rem] bg-primary px-6 py-12 text-center text-primary-foreground sm:px-12 sm:py-16">
+        <h2 className="text-3xl leading-tight font-extrabold tracking-tight text-balance sm:text-[2.5rem]">
+          {t("Mulai rapikan keuanganmu hari ini.", "Get your finances in order today.")}
+        </h2>
+        <p className="mx-auto mt-3 max-w-md text-lg text-primary-foreground/80">{t("Gratis, tanpa kartu kredit.", "Free, no credit card.")}</p>
+        <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+          <Link to="/login" className={buttonVariants({ size: "lg", variant: "secondary" })}>
+            {t("Mulai gratis", "Start free")} <ArrowRight aria-hidden />
+          </Link>
+          <Link to="/demo" className={buttonVariants({ size: "lg", className: "bg-white/10 text-primary-foreground hover:bg-white/20" })}>
+            {t("Coba demo", "Try the demo")}
+          </Link>
+        </div>
       </div>
     </Section>
   );
