@@ -476,8 +476,7 @@ const sections: Section[] = [
               rekening. Data ini dipakai untuk pencarian, aturan kategori dan pencegah duplikat langsung di database.
             </li>
             <li>
-              <b>Tidak dijelajahi:</b> tidak ada halaman atau API admin yang menampilkan data keuangan anggota, dan kami tidak membuka datamu kecuali kamu
-              memintanya (misalnya untuk dukungan) atau diwajibkan hukum.
+              <b>Tidak ada tampilan admin:</b> tidak ada halaman atau API admin yang menampilkan data keuangan anggota.
             </li>
             <li>
               <b>Tercatat:</b> kode {N} terbuka untuk umum, dan perubahan ke layanan dipasang lewat proses otomatis yang tercatat di riwayat publiknya. Kueri
@@ -508,8 +507,7 @@ const sections: Section[] = [
               account numbers. These are used for search, category rules and duplicate detection inside the database.
             </li>
             <li>
-              <b>Not browsed:</b> no admin page or API shows members&apos; finance data, and we do not open your data unless you ask (for support, say) or the law
-              requires it.
+              <b>No admin view:</b> no admin page or API shows members&apos; finance data.
             </li>
             <li>
               <b>Traceable:</b> {N}&apos;s code is public, and changes reach the service through an automated deploy recorded in its public history. Direct database
