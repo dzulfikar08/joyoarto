@@ -69,6 +69,7 @@ export default function More() {
         <ListSection title="Money">
           <ListRow icon="document-text-outline" title="Import statements" subtitle="Jago and GoPay PDFs" onPress={() => go("/import")} />
           <ListRow icon="wallet-outline" title="Accounts" subtitle="Balances, add and archive" onPress={() => go("/accounts")} />
+          <ListRow icon="git-network-outline" title="Money flow" subtitle="Where this month's money went" onPress={() => go("/flow")} />
           <ListRow icon="calculator-outline" title="Plan & simulate" subtitle="Can we afford this?" onPress={() => go("/plan")} />
           <ListRow icon="briefcase-outline" title="Reimburse" subtitle="Diganti kantor: claim reports with receipts" onPress={() => go("/reimburse")} />
           {Platform.OS === "android" ? <ListRow icon="notifications-outline" title="Captured payments" subtitle="From Jago and GoPay notifications" onPress={() => go("/captured")} /> : null}

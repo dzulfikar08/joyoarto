@@ -161,6 +161,10 @@ export const appRouter = {
       .route({ method: "GET", path: "/reports/dashboard", tags: ["reports"], summary: "Everything the home screen shows for one month" })
       .input(dashboard.dashboardInput)
       .handler(({ context, input }) => dashboard.dashboard(context.db, context.principal, input)),
+    flow: readProcedure
+      .route({ method: "GET", path: "/reports/flow", tags: ["reports"], summary: "Where one month's money came from and went (income → spending groups and saved → subcategories)" })
+      .input(reports.moneyFlowInput)
+      .handler(({ context, input }) => reports.moneyFlow(context.db, context.principal, input)),
   },
 
   plan: {

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import type { LinkProps } from "@tanstack/react-router";
-import { BriefcaseBusiness, ChartNoAxesCombined, ChevronRight, ExternalLink, FileDown, LogOut, Settings, ShieldCheck, Smartphone, Sparkles, WalletCards } from "lucide-react";
+import { BriefcaseBusiness, ChartNoAxesCombined, ChevronRight, ExternalLink, FileDown, LogOut, Settings, ShieldCheck, Smartphone, Sparkles, WalletCards, Waypoints } from "lucide-react";
 import type { ComponentType } from "react";
 
 import { Avatar } from "@/components/avatar";
@@ -17,6 +17,7 @@ type Item = { to: LinkProps["to"]; label: string; hint: string; Icon: ComponentT
 
 /** What the phone tab bar has no room for, in the order people look for it. */
 const ITEMS: Item[] = [
+  { to: "/flow", label: "Money flow", hint: "Where this month's money came from and went", Icon: Waypoints },
   { to: "/plan", label: "Plan", hint: "Can we afford it? Car, baby, saved scenarios", Icon: ChartNoAxesCombined },
   { to: "/reimburse", label: "Reimburse", hint: "Diganti kantor: work expenses, claim reports with receipts", Icon: BriefcaseBusiness },
   { to: "/import", label: "Import", hint: "Statements: Jago, GoPay, CSV, by email", Icon: FileDown },

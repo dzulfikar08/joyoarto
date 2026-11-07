@@ -101,6 +101,7 @@ export const BOTTOM_NAV_SPACE = "pb-[calc(6.5rem+env(safe-area-inset-bottom))] s
 const DESKTOP_LINKS = [
   { to: "/", label: "Home" },
   { to: "/transactions", label: "Transactions" },
+  { to: "/flow", label: "Flow" },
   { to: "/plan", label: "Plan" },
   { to: "/import", label: "Import" },
   { to: "/accounts", label: "Accounts" },
@@ -120,7 +121,7 @@ export function DesktopBar({ wide }: { wide?: boolean }) {
             <li key={n.to}>
               <Link
                 to={n.to}
-                className="inline-flex h-9 items-center rounded-full px-3 text-sm font-semibold whitespace-nowrap text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40 lg:px-3.5"
+                className="inline-flex h-9 items-center rounded-full px-3 text-sm font-semibold whitespace-nowrap text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40"
                 activeProps={{ className: "bg-primary-soft text-primary-ink hover:bg-primary-soft hover:text-primary-ink" }}
                 activeOptions={{ exact: n.to === "/" }}
               >
