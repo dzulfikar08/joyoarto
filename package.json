@@ -52,5 +52,9 @@
     "turbo": "^2.10.12",
     "typescript": "catalog:"
   },
-  "packageManager": "bun@1.4.4"
+  "packageManager": "bun@1.4.4",
+  "overrides": {
+    "wrangler": "4.158.0",
+    "workerd": "1.20261104.1"
+  }
 }

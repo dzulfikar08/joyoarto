@@ -206,6 +206,10 @@
       },
     },
   },
+  "overrides": {
+    "workerd": "1.20261104.1",
+    "wrangler": "4.158.0",
+  },
   "catalog": {
     "@better-auth/mcp": "1.7.3",
     "@better-auth/oauth-provider": "1.7.3",
