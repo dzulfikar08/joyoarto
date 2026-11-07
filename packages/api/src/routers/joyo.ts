@@ -36,6 +36,11 @@ const chatInput = z.object({
       model: z.string().trim().max(120).optional(),
     })
     .optional(),
+  /** The page Joyo runs beside, so it can work on what the member sees. Only the Plan page for now: its state as compare_plans takes it. */
+  page: z
+    .object({ kind: z.literal("plan"), state: z.record(z.string(), z.unknown()) })
+    .refine((p) => JSON.stringify(p.state).length <= 20_000, { message: "The page state is too large" })
+    .optional(),
 });
 
 export type JoyoStreamEvent =
@@ -119,7 +124,7 @@ export const joyoRouter = {
    * takes a slot of the daily cap before the model runs; the ledger keeps counts and tokens, never text.
    */
   chat: readProcedure
-    .route({ method: "POST", path: "/joyo/chat", tags: ["joyo"], summary: "Ask Joyo AI (server-sent events: start, round, text, toolStart, toolDone, proposal, done)" })
+    .route({ method: "POST", path: "/joyo/chat", tags: ["joyo"], summary: "Ask Joyo AI (server-sent events: start, round, text, toolStart, toolDone, proposal, plan, done)" })
     .input(chatInput)
     .output(eventIterator(z.custom<JoyoStreamEvent>()))
     .handler(async function* ({ context, input, signal }) {
@@ -173,7 +178,7 @@ export const joyoRouter = {
 
       const drive = async () => {
         try {
-          const person = await personOf({ ...context, principal });
+          const person = { ...(await personOf({ ...context, principal })), ...(input.page ? { planPage: JSON.stringify(input.page.state) } : {}) };
           const answer = await runChat({
             engine,
             context,

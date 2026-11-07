@@ -194,3 +194,80 @@ export function applyCuts(st: PlanState, cuts: CutIn[], target: string | null, n
   const id = uid();
   return { state: { ...st, scenarios: [...st.scenarios, { id, name, slot: freeSlot(st.scenarios), blocks: blocks() }] }, scenarioId: id };
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Joyo AI beside the page
+
+/** What Joyo is told the page shows: the baseline overrides and each scenario's items, as compare_plans takes them. */
+export function planPageState(state: PlanState): Record<string, unknown> {
+  return {
+    ...(state.monthlyIncome !== undefined ? { monthlyIncome: state.monthlyIncome } : {}),
+    ...(state.monthlySpending !== undefined ? { monthlySpending: state.monthlySpending } : {}),
+    ...(state.existingInstallments !== undefined ? { existingInstallments: state.existingInstallments } : {}),
+    ...(Object.keys(state.roles).length ? { roles: state.roles } : {}),
+    horizonMonths: state.horizonMonths,
+    scenarios: state.scenarios.map((s) => ({ name: s.name || "Untitled", items: flatten(s) })),
+  };
+}
+
+type JoyoPlanArgs = {
+  monthlyIncome?: unknown;
+  monthlySpending?: unknown;
+  existingInstallments?: unknown;
+  roles?: unknown;
+  horizonMonths?: unknown;
+  items?: unknown;
+  scenarios?: unknown;
+};
+
+const int = (v: unknown) => (typeof v === "number" && Number.isInteger(v) ? v : undefined);
+const NO_CHANGE = /^(no change|tanpa perubahan|baseline)$/i;
+
+/**
+ * A plan Joyo just ran, applied to the page. compare_plans replaces the page's scenarios with the inline ones it ran
+ * (matched by name, so a scenario keeps its colour, saved link and id; empty "No change" ones are left out because the
+ * page adds that itself; saved ones by id only are skipped). simulate_plan adds or updates one "Joyo" scenario. Baseline
+ * overrides Joyo passed are taken over; the rest of the page stays.
+ */
+export function applyJoyoPlan(state: PlanState, tool: "compare_plans" | "simulate_plan", raw: Record<string, unknown>, joyoName = "Joyo"): PlanState {
+  const args = raw as JoyoPlanArgs;
+  const next: PlanState = { ...state };
+  if (int(args.monthlyIncome) !== undefined) next.monthlyIncome = int(args.monthlyIncome);
+  if (int(args.monthlySpending) !== undefined) next.monthlySpending = int(args.monthlySpending);
+  if (int(args.existingInstallments) !== undefined) next.existingInstallments = int(args.existingInstallments);
+  if (args.roles && typeof args.roles === "object") next.roles = { ...(args.roles as Record<string, AccountRole>) };
+  const h = int(args.horizonMonths);
+  if (h !== undefined && h >= 1 && h <= 120) next.horizonMonths = h;
+
+  const incoming: { name: string; items: ScenarioItemInput[] }[] = [];
+  if (tool === "compare_plans" && Array.isArray(args.scenarios)) {
+    for (const s of args.scenarios as { name?: unknown; items?: unknown }[]) {
+      if (typeof s?.name !== "string" || !Array.isArray(s.items)) continue;
+      if (!s.items.length && NO_CHANGE.test(s.name.trim())) continue;
+      incoming.push({ name: s.name.slice(0, 60), items: s.items as ScenarioItemInput[] });
+    }
+  } else if (tool === "simulate_plan" && Array.isArray(args.items)) {
+    incoming.push({ name: joyoName, items: args.items as ScenarioItemInput[] });
+  }
+  if (!incoming.length) return next;
+
+  const kept: Scenario[] = tool === "simulate_plan" ? state.scenarios.filter((s) => s.name !== joyoName) : [];
+  const out: Scenario[] = [...kept];
+  for (const inc of incoming.slice(0, 6 - kept.length)) {
+    const prev = state.scenarios.find((s) => (s.name || "Untitled") === inc.name);
+    const blocks = blocksFromSaved(inc.items, undefined);
+    out.push(prev ? { ...prev, blocks } : { id: uid(), name: inc.name, slot: freeSlot(out), blocks });
+  }
+  // A matched scenario keeps its slot; make sure no two share one.
+  const seen = new Set<number>();
+  next.scenarios = out.map((s) => {
+    if (!seen.has(s.slot)) {
+      seen.add(s.slot);
+      return s;
+    }
+    const slot = [1, 2, 3, 4, 5, 6].find((n) => !seen.has(n) && !out.some((o) => o !== s && o.slot === n)) ?? s.slot;
+    seen.add(slot);
+    return { ...s, slot };
+  });
+  return next;
+}

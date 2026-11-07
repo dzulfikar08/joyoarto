@@ -1,9 +1,6 @@
 // Joyo AI, the in-app finance chat (after JoyoRogo's components/joyo/joyo-page.tsx and joyo-chat.tsx). Conversations
 // are stored on the server per member and household; the page streams one answer at a time from `joyo.chat`.
 
-import type { Proposal, Step } from "@baroka/api/lib/joyo-ai/tools";
-import type { JoyoStreamEvent } from "@baroka/api/routers/joyo";
-import type { StoredMessage } from "@baroka/api/services/joyo";
 import { Button } from "@baroka/ui/components/button";
 import { Checkbox } from "@baroka/ui/components/checkbox";
 import { Input } from "@baroka/ui/components/input";
@@ -17,14 +14,12 @@ import { ArrowDown, ArrowLeft, ArrowUp, History, MessageSquarePlus, SlidersHoriz
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { STARTERS, byokInput, loadByok, saveByok } from "@/lib/joyo";
+import { STARTERS } from "@/lib/joyo";
 import type { ByokProvider, ByokSettings } from "@/lib/joyo";
 import { client, errorMessage, orpc } from "@/lib/orpc";
 
 import { AssistantTurn, UserBubble } from "./message";
-
-type LiveStep = Step & { running?: boolean };
-type Live = { text: string; steps: LiveStep[]; proposals: Proposal[] };
+import { useJoyoChat } from "./use-joyo-chat";
 
 const MAX_CHARS = 4_000;
 
@@ -37,33 +32,20 @@ function nearBottom(): boolean {
 }
 
 export function JoyoPage({ conversationId, onConversation }: { conversationId: string | undefined; onConversation: (id: string | undefined) => void }) {
-  const qc = useQueryClient();
-  const status = useQuery(orpc.joyo.status.queryOptions());
-  const conversation = useQuery({ ...orpc.joyo.conversations.get.queryOptions({ input: { id: conversationId ?? "" } }), enabled: !!conversationId });
-  const [messages, setMessages] = useState<StoredMessage[]>([]);
-  const [live, setLive] = useState<Live | null>(null);
-  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
-  const [error, setError] = useState<{ message: string; retry: string } | null>(null);
   const [text, setText] = useState("");
-  const [busyProposal, setBusyProposal] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [keyOpen, setKeyOpen] = useState(false);
-  const [byok, setByok] = useState<ByokSettings | null>(loadByok);
   const [away, setAway] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
   const followRef = useRef(true);
-  // The conversation the page created itself while streaming: its fetch must not replace the live state.
-  const ownIdRef = useRef<string | undefined>(undefined);
-
-  useEffect(() => {
-    if (!conversationId) {
-      setMessages([]);
-      return;
-    }
-    if (conversation.data && conversation.data.id === conversationId && ownIdRef.current !== conversationId) setMessages(conversation.data.messages);
-  }, [conversationId, conversation.data]);
-
-  useEffect(() => () => abortRef.current?.abort(), []);
+  const chat = useJoyoChat({
+    conversationId,
+    onConversation,
+    onAsk: () => {
+      setText("");
+      followRef.current = true;
+    },
+  });
+  const { status, conversation, messages, live, pendingQuestion, error, busyProposal, byok, streaming, hosted, usingKey, available, capReached, empty, ask, stop, act, newChat } = chat;
 
   useEffect(() => {
     const onScroll = () => {
@@ -83,107 +65,6 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
     if (followRef.current && (messages.length || live !== null || pendingQuestion)) toBottom();
   }, [messages, live, pendingQuestion, toBottom]);
 
-  const streaming = live !== null;
-  const hosted = status.data?.hosted ?? null;
-  const usingKey = !!byokInput(byok);
-  const available = usingKey || hosted !== null;
-  const capReached = !usingKey && !!status.data && status.data.dailyCap > 0 && status.data.usedToday >= status.data.dailyCap;
-
-  const ask = async (question: string) => {
-    const q = question.trim();
-    if (!q || streaming) return;
-    setError(null);
-    setText("");
-    setPendingQuestion(q);
-    setLive({ text: "", steps: [], proposals: [] });
-    followRef.current = true;
-    const controller = new AbortController();
-    abortRef.current = controller;
-    let started: string | undefined = conversationId;
-    try {
-      const key = byokInput(byok);
-      const events = await client.joyo.chat({ message: q, ...(conversationId ? { conversationId } : {}), ...(key ? { byok: key } : {}) }, { signal: controller.signal });
-      for await (const raw of events) {
-        const event = raw as JoyoStreamEvent;
-        switch (event.type) {
-          case "start":
-            started = event.conversationId;
-            if (!conversationId) {
-              ownIdRef.current = event.conversationId;
-              onConversation(event.conversationId);
-            }
-            setMessages((m) => (m.some((x) => x.id === event.userMessage.id) ? m : [...m, event.userMessage]));
-            setPendingQuestion(null);
-            break;
-          case "round":
-            // Text before a tool call was a preamble: the next call writes the answer.
-            setLive((l) => (l && event.round > 0 ? { ...l, text: "" } : l));
-            break;
-          case "text":
-            setLive((l) => (l ? { ...l, text: l.text + event.delta } : l));
-            break;
-          case "toolStart":
-            setLive((l) => (l ? { ...l, steps: [...l.steps, { ...event.step, running: true }] } : l));
-            break;
-          case "toolDone":
-            setLive((l) => (l ? { ...l, steps: l.steps.map((s) => (s.id === event.step.id ? { ...event.step, running: false } : s)) } : l));
-            break;
-          case "proposal":
-            setLive((l) => (l ? { ...l, proposals: [...l.proposals, event.proposal] } : l));
-            break;
-          case "done":
-            setMessages((m) => [...m, event.message]);
-            setLive(null);
-            void qc.invalidateQueries({ queryKey: orpc.joyo.status.key() });
-            void qc.invalidateQueries({ queryKey: orpc.joyo.conversations.list.key() });
-            break;
-        }
-      }
-    } catch (err) {
-      if (!controller.signal.aborted) setError({ message: errorMessage(err), retry: q });
-      else if (started) void qc.invalidateQueries({ queryKey: orpc.joyo.conversations.get.key({ input: { id: started } }) });
-    } finally {
-      setLive(null);
-      setPendingQuestion(null);
-      abortRef.current = null;
-      void qc.invalidateQueries({ queryKey: orpc.joyo.status.key() });
-    }
-  };
-
-  const stop = () => abortRef.current?.abort();
-
-  const act = async (messageId: string, proposal: Proposal, action: "confirm" | "dismiss") => {
-    setBusyProposal(proposal.id);
-    try {
-      const res = await client.joyo.proposal({ messageId, proposalId: proposal.id, action });
-      setMessages((m) => m.map((msg) => (msg.id === messageId ? { ...msg, proposals: msg.proposals.map((p) => (p.id === proposal.id ? res.proposal : p)) } : msg)));
-      if (res.proposal.status === "done") {
-        toast.success(res.proposal.result ?? "Done");
-        void qc.invalidateQueries({ queryKey: orpc.transactions.key() });
-        void qc.invalidateQueries({ queryKey: orpc.reports.key() });
-        void qc.invalidateQueries({ queryKey: orpc.accounts.key() });
-        void qc.invalidateQueries({ queryKey: orpc.plan.key() });
-        void qc.invalidateQueries({ queryKey: orpc.rules.key() });
-        void qc.invalidateQueries({ queryKey: orpc.reimburse.key() });
-        void qc.invalidateQueries({ queryKey: orpc.budgets.key() });
-        void qc.invalidateQueries({ queryKey: orpc.categories.key() });
-      } else if (res.proposal.status === "failed") toast.error(res.proposal.result ?? "Couldn't make this change");
-    } catch (err) {
-      toast.error(errorMessage(err));
-    } finally {
-      setBusyProposal(null);
-    }
-  };
-
-  const newChat = () => {
-    if (streaming) stop();
-    ownIdRef.current = undefined;
-    setMessages([]);
-    setError(null);
-    onConversation(undefined);
-  };
-
-  const empty = messages.length === 0 && !streaming && !pendingQuestion;
   const router = useRouter();
   const canGoBack = useCanGoBack();
   const back = () => (canGoBack ? router.history.back() : void router.navigate({ to: "/" }));
@@ -340,9 +221,8 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
         onOpenChange={setHistoryOpen}
         current={conversationId}
         onPick={(id) => {
-          ownIdRef.current = undefined;
           setHistoryOpen(false);
-          onConversation(id);
+          chat.pick(id);
         }}
         onDeleted={(id) => id === conversationId && newChat()}
       />
@@ -350,10 +230,7 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
         open={keyOpen}
         onOpenChange={setKeyOpen}
         settings={byok}
-        onSave={(s) => {
-          setByok(s);
-          saveByok(s);
-        }}
+        onSave={chat.setByok}
         providers={status.data?.byokProviders ?? []}
         hosted={hosted}
         readOnly={status.data?.readOnly ?? false}

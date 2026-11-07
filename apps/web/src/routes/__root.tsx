@@ -22,11 +22,13 @@ function Shell() {
   const nav = !bare && !!session;
   // The chat is a detail page on phones: no bottom nav, its own header with a back button, the composer at the bottom.
   const chat = path === "/joyo";
+  // Plan & simulate uses the whole width on large screens (scenarios, results and Joyo AI side by side).
+  const wide = path === "/plan";
   // Title, description, canonical and share tags follow client-side navigation (first loads are prerendered).
   useEffect(() => syncHead(path), [path]);
   return (
     <div className="min-h-dvh bg-background">
-      {nav && <DesktopBar />}
+      {nav && <DesktopBar wide={wide} />}
       {nav && !chat && (
         <header className="pt-[env(safe-area-inset-top)] sm:hidden">
           <div className="mx-auto flex h-14 max-w-5xl items-center px-4">
@@ -36,7 +38,7 @@ function Shell() {
           </div>
         </header>
       )}
-      <main className={bare ? "" : chat ? "" : `mx-auto max-w-5xl px-4 pt-2 pb-6 sm:pt-6 ${nav ? BOTTOM_NAV_SPACE : ""}`}>
+      <main className={bare ? "" : chat ? "" : `mx-auto ${wide ? "max-w-[100rem]" : "max-w-5xl"} px-4 pt-2 pb-6 sm:pt-6 ${nav ? BOTTOM_NAV_SPACE : ""}`}>
         <Outlet />
       </main>
       {nav && (

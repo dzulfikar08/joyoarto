@@ -108,10 +108,10 @@ const DESKTOP_LINKS = [
 ] as const;
 
 /** Desktop and tablet top bar (`sm` and up): every page, Joyo AI, and the Add button that opens the same sheet. */
-export function DesktopBar() {
+export function DesktopBar({ wide }: { wide?: boolean }) {
   return (
     <header className="sticky top-0 z-30 hidden border-b border-border/60 bg-background/85 pt-[env(safe-area-inset-top)] backdrop-blur sm:block">
-      <nav aria-label="Main" className="mx-auto flex h-16 max-w-5xl items-center gap-1 px-4">
+      <nav aria-label="Main" className={`mx-auto flex h-16 ${wide ? "max-w-[100rem]" : "max-w-5xl"} items-center gap-1 px-4`}>
         <Link to="/" className="mr-3 flex shrink-0 items-center rounded-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40">
           <Wordmark />
         </Link>

@@ -83,7 +83,8 @@ function milestoneText(m: Milestone, horizon: number, en: boolean): string | nul
 type Targets = Record<string, number | null>;
 
 /** The block on /plan. `onApply` puts the cuts into scenario `target` (null: a new scenario). */
-export function SavingsBlock({ state, onApply }: { state: PlanState; onApply: (cuts: CutIn[], target: string | null) => void }) {
+/** `bare`: no card and no title, for use inside a collapsible row that already names it. */
+export function SavingsBlock({ state, onApply, bare }: { state: PlanState; onApply: (cuts: CutIn[], target: string | null) => void; bare?: boolean }) {
   const { en, t } = useCopy();
   const [targets, setTargets] = useState<Targets>({});
   const [target, setTarget] = useState<string>(state.scenarios[0]?.id ?? "");
@@ -125,12 +126,10 @@ export function SavingsBlock({ state, onApply }: { state: PlanState; onApply: (c
   const endGain = d?.effect ? d.effect.endBalance.with.amount - d.effect.endBalance.without.amount : 0;
 
   return (
-    <section className="card space-y-4" aria-labelledby="savings-title">
+    <section className={bare ? "space-y-4 text-foreground" : "card space-y-4"} aria-label={t("Bisa hemat di mana", "Where to save")}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 id="savings-title" className="text-base font-bold tracking-tight">
-            {t("Bisa hemat di mana", "Where to save")}
-          </h2>
+          {!bare && <h2 className="text-base font-bold tracking-tight">{t("Bisa hemat di mana", "Where to save")}</h2>}
           <p className="text-xs text-muted-foreground">
             {range
               ? t(`Dari kebiasaan kamu sendiri, ${range}. Pilih yang mau kamu ubah, sisanya biarkan saja.`, `From your own habits, ${range}. Pick what you'd like to change and leave the rest.`)
