@@ -26,7 +26,11 @@ export function toWireMessages(messages: readonly NeutralMessage[]): BetaMessage
     else wire.push({ role, content: blocks });
   };
   for (const message of messages) {
-    if (message.role === 'user') push('user', [{ type: 'text', text: message.content }]);
+    if (message.role === 'user')
+      push('user', [
+        ...(message.images ?? []).map((img): BetaContentBlockParam => ({ type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data } })),
+        { type: 'text', text: message.content },
+      ]);
     else if (message.role === 'tool') push('user', [{ type: 'tool_result', tool_use_id: message.callId, content: message.content }]);
     else if (Array.isArray(message.raw) && message.raw.length > 0) {
       // A tool round's own blocks go back unchanged (thinking blocks included), as the API requires.

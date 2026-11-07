@@ -8,12 +8,15 @@ import { Link } from "@tanstack/react-router";
 import { ArrowUp, MessageSquarePlus, Sparkles, Square, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { AttachButton, AttachmentChips, filesFrom, useAttachments } from "./attachments";
 import { AssistantTurn, UserBubble } from "./message";
 import { useJoyoChat } from "./use-joyo-chat";
 import type { PageContext, PlanEvent } from "./use-joyo-chat";
 
 const MAX_CHARS = 4_000;
 const CONVERSATION_KEY = "baroka.plan.joyo";
+/** The question sent when the member attaches files without typing anything. */
+const ATTACHMENT_ONLY = "Tolong baca file terlampir dan pakai angkanya untuk rencana ini.";
 
 export type Starter = { text: string; hint?: string };
 
@@ -42,9 +45,26 @@ export function JoyoPanel({
   }, [conversationId]);
 
   const [text, setText] = useState("");
+  const [dragging, setDragging] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const chat = useJoyoChat({ conversationId, onConversation: setConversationId, page, onPlan, onAsk: () => setText("") });
+  const att = useAttachments();
+  const chat = useJoyoChat({
+    conversationId,
+    onConversation: setConversationId,
+    page,
+    onPlan,
+    onAsk: () => {
+      setText("");
+      att.clear();
+    },
+  });
   const { status, messages, live, pendingQuestion, error, busyProposal, streaming, available, capReached, empty, ask, stop, act, newChat } = chat;
+
+  const canSend = (!!text.trim() || att.ready.length > 0) && !att.busy;
+  const send = () => {
+    if (!canSend) return;
+    void ask(text.trim() || ATTACHMENT_ONLY, att.ready);
+  };
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -52,7 +72,28 @@ export function JoyoPanel({
   }, [messages, live, pendingQuestion]);
 
   return (
-    <aside aria-label={title} className={cn("flex min-h-0 flex-col overflow-hidden rounded-3xl bg-card", className)}>
+    <aside
+      aria-label={title}
+      className={cn("relative flex min-h-0 flex-col overflow-hidden rounded-3xl bg-card", className)}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragging(false);
+        att.add(filesFrom(e.dataTransfer));
+      }}
+    >
+      {dragging && (
+        <div aria-hidden className="pointer-events-none absolute inset-2 z-10 grid place-items-center rounded-3xl border-2 border-dashed border-primary bg-primary-soft/80 text-sm font-semibold text-primary-ink">
+          Drop a photo, PDF or table
+        </div>
+      )}
       <header className="flex items-center gap-2 border-b border-border px-4 py-3">
         <span aria-hidden className="grid size-8 place-items-center rounded-full bg-primary-soft text-primary-ink">
           <Sparkles className="size-4" />
@@ -78,6 +119,7 @@ export function JoyoPanel({
         {empty && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">{intro}</p>
+            <p className="text-xs text-muted-foreground">You can attach a dealer's quote, a bank's installment table (PDF or CSV) or a screenshot with the paperclip.</p>
             <ul className="space-y-2">
               {starters.map((s) => (
                 <li key={s.text}>
@@ -107,7 +149,7 @@ export function JoyoPanel({
         {error && (
           <div role="alert" className="rounded-2xl bg-destructive-soft px-3.5 py-3 text-sm text-destructive-ink">
             <p>{error.message}</p>
-            <button type="button" className="mt-1 font-semibold underline underline-offset-4" onClick={() => void ask(error.retry)}>
+            <button type="button" className="mt-1 font-semibold underline underline-offset-4" onClick={() => void ask(error.retry, error.attachments)}>
               Try again
             </button>
           </div>
@@ -128,17 +170,31 @@ export function JoyoPanel({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              void ask(text);
+              send();
             }}
-            className="flex items-end gap-2 rounded-2xl bg-muted/60 p-1 pl-3"
+            className="space-y-1.5 rounded-2xl bg-muted/60 p-1"
           >
+            {att.list.length > 0 && (
+              <div className="px-1.5 pt-1">
+                <AttachmentChips list={att.list} onRemove={att.remove} />
+              </div>
+            )}
+            <div className="flex items-end gap-1">
+            <AttachButton onFiles={att.add} disabled={att.full || streaming} />
             <Textarea
               value={text}
               onChange={(e) => setText(e.target.value.slice(0, MAX_CHARS))}
+              onPaste={(e) => {
+                const files = filesFrom(e.clipboardData);
+                if (files.length) {
+                  e.preventDefault();
+                  att.add(files);
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
-                  void ask(text);
+                  send();
                 }
               }}
               placeholder="Ask Joyo to change the plan…"
@@ -151,10 +207,11 @@ export function JoyoPanel({
                 <Square className="size-3.5" aria-hidden />
               </Button>
             ) : (
-              <Button type="submit" size="icon-sm" aria-label="Send" disabled={!text.trim()}>
+              <Button type="submit" size="icon-sm" aria-label="Send" disabled={!canSend}>
                 <ArrowUp aria-hidden />
               </Button>
             )}
+            </div>
           </form>
         )}
         <p className="mt-1.5 text-center text-[0.6875rem] text-muted-foreground">Not financial advice; check the numbers that matter.</p>

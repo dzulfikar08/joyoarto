@@ -2,6 +2,24 @@ import { describe, expect, test } from "bun:test";
 
 import { AiError } from "../types";
 import { buildAnthropicParams, replyOf, toWireMessages } from "./anthropic";
+import { buildOpenAiBody } from "./openai";
+
+describe("attached images", () => {
+  const img = { mediaType: "image/jpeg" as const, data: "QUJD" };
+  test("anthropic: image blocks before the question's text", () => {
+    const wire = toWireMessages([{ role: "user", content: "quote?", images: [img] }]);
+    expect(wire[0]!.content).toEqual([
+      { type: "image", source: { type: "base64", media_type: "image/jpeg", data: "QUJD" } },
+      { type: "text", text: "quote?" },
+    ]);
+  });
+  test("openai-style: a content array with a data URL", () => {
+    const body = buildOpenAiBody("https://api.openai.com/v1", { model: "m", system: "S", messages: [{ role: "user", content: "quote?", images: [img] }], maxTokens: 10 }) as { messages: unknown[] };
+    expect(body.messages[1]).toEqual({ role: "user", content: [{ type: "text", text: "quote?" }, { type: "image_url", image_url: { url: "data:image/jpeg;base64,QUJD" } }] });
+    const plain = buildOpenAiBody("https://api.openai.com/v1", { model: "m", system: "S", messages: [{ role: "user", content: "hi" }], maxTokens: 10 }) as { messages: unknown[] };
+    expect(plain.messages[1]).toEqual({ role: "user", content: "hi" });
+  });
+});
 
 describe("anthropic adapter", () => {
   test("params: cached system prompt, effort, server-side fallback on Opus 5.5", () => {

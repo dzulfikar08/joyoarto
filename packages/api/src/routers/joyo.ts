@@ -36,6 +36,21 @@ const chatInput = z.object({
       model: z.string().trim().max(120).optional(),
     })
     .optional(),
+  /** Files attached to this question, read in the browser: text from a PDF or a table, or an image (photo, screenshot, scanned page). */
+  attachments: z
+    .array(
+      z.discriminatedUnion("kind", [
+        z.object({ kind: z.literal("text"), name: z.string().trim().min(1).max(120), text: z.string().max(CHAT_LIMITS.attachmentChars) }),
+        z.object({
+          kind: z.literal("image"),
+          name: z.string().trim().min(1).max(120),
+          mediaType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+          data: z.string().max(CHAT_LIMITS.imageChars).regex(/^[A-Za-z0-9+/=]+$/, "Base64 only"),
+        }),
+      ]),
+    )
+    .max(CHAT_LIMITS.attachments)
+    .optional(),
   /** The page Joyo runs beside, so it can work on what the member sees. Only the Plan page for now: its state as compare_plans takes it. */
   page: z
     .object({ kind: z.literal("plan"), state: z.record(z.string(), z.unknown()) })
@@ -136,13 +151,16 @@ export const joyoRouter = {
         throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Joyo AI is off on this server. Add your own key in Joyo AI settings to use it.", data: { reason: "off" } });
       }
 
+      // Only the file names are stored with the question; the files themselves reach the model with this question only.
+      const files = input.attachments?.length ? `\n\n📎 ${input.attachments.map((a) => a.name).join(", ")}` : "";
+      const stored = `${input.message}${files}`;
       const conversationId = input.conversationId
         ? (await joyo.getConversationRow(db, principal, input.conversationId)).id
         : await joyo.createConversation(db, principal, input.message);
       const history = await joyo.historyOf(db, conversationId);
       // A retry after a failed answer: the question is already the last turn, so it is not stored twice.
       const lastTurn = history.at(-1);
-      const userMessage = lastTurn?.role === "user" && lastTurn.content === input.message ? lastTurn : await joyo.appendMessage(db, conversationId, { role: "user", content: input.message });
+      const userMessage = lastTurn?.role === "user" && lastTurn.content === stored ? lastTurn : await joyo.appendMessage(db, conversationId, { role: "user", content: stored });
       if (userMessage !== lastTurn) history.push(userMessage);
 
       const { cap, plan } = engine.kind === "hosted" ? await chatCap(db, principal.userId, context.billing, serverCap) : { cap: serverCap, plan: "pro" as const };
@@ -187,6 +205,7 @@ export const joyoRouter = {
             signal: stop.signal,
             onEvent: (event) => channel.push(event),
             tally,
+            ...(input.attachments?.length ? { attachments: input.attachments } : {}),
           });
           const message = await joyo.appendMessage(db, conversationId, {
             role: "assistant",

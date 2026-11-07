@@ -25,7 +25,13 @@ function quirks(baseUrl: string) {
 }
 
 function toWire(message: NeutralMessage): Json {
-  if (message.role === 'user') return { role: 'user', content: message.content };
+  if (message.role === 'user') {
+    if (!message.images?.length) return { role: 'user', content: message.content };
+    return {
+      role: 'user',
+      content: [{ type: 'text', text: message.content }, ...message.images.map((img) => ({ type: 'image_url', image_url: { url: `data:${img.mediaType};base64,${img.data}` } }))],
+    };
+  }
   if (message.role === 'tool') return { role: 'tool', tool_call_id: message.callId, content: message.content };
   const wire: Json = { role: 'assistant', content: message.content === '' && message.toolCalls?.length ? null : message.content };
   if (message.toolCalls?.length) {

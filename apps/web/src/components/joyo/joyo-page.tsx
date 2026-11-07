@@ -18,6 +18,7 @@ import { STARTERS } from "@/lib/joyo";
 import type { ByokProvider, ByokSettings } from "@/lib/joyo";
 import { client, errorMessage, orpc } from "@/lib/orpc";
 
+import { AttachButton, AttachmentChips, filesFrom, useAttachments } from "./attachments";
 import { AssistantTurn, UserBubble } from "./message";
 import { useJoyoChat } from "./use-joyo-chat";
 
@@ -37,11 +38,13 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
   const [keyOpen, setKeyOpen] = useState(false);
   const [away, setAway] = useState(false);
   const followRef = useRef(true);
+  const att = useAttachments();
   const chat = useJoyoChat({
     conversationId,
     onConversation,
     onAsk: () => {
       setText("");
+      att.clear();
       followRef.current = true;
     },
   });
@@ -64,6 +67,11 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
     // Nothing to follow before the first message: keep the welcome screen at the top.
     if (followRef.current && (messages.length || live !== null || pendingQuestion)) toBottom();
   }, [messages, live, pendingQuestion, toBottom]);
+
+  const canSend = (!!text.trim() || att.ready.length > 0) && !att.busy;
+  const send = () => {
+    if (canSend) void ask(text.trim() || "Tolong baca file terlampir.", att.ready);
+  };
 
   const router = useRouter();
   const canGoBack = useCanGoBack();
@@ -138,7 +146,7 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
         {error && (
           <div role="alert" className="rounded-2xl bg-destructive-soft px-4 py-3 text-sm text-destructive-ink">
             <p>{error.message}</p>
-            <button type="button" className="mt-1 font-semibold underline underline-offset-4" onClick={() => void ask(error.retry)}>
+            <button type="button" className="mt-1 font-semibold underline underline-offset-4" onClick={() => void ask(error.retry, error.attachments)}>
               Try again
             </button>
           </div>
@@ -183,17 +191,36 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                void ask(text);
+                send();
               }}
-              className="flex items-end gap-2 rounded-[1.75rem] border border-border bg-card p-1.5 pl-4 shadow-float"
+              onDragOver={(e) => e.dataTransfer.types.includes("Files") && e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                att.add(filesFrom(e.dataTransfer));
+              }}
+              className="space-y-1.5 rounded-[1.75rem] border border-border bg-card p-1.5 shadow-float"
             >
+              {att.list.length > 0 && (
+                <div className="px-2 pt-1">
+                  <AttachmentChips list={att.list} onRemove={att.remove} />
+                </div>
+              )}
+              <div className="flex items-end gap-1">
+              <AttachButton onFiles={att.add} disabled={att.full || streaming} className="mb-1" />
               <Textarea
                 value={text}
                 onChange={(e) => setText(e.target.value.slice(0, MAX_CHARS))}
+                onPaste={(e) => {
+                  const files = filesFrom(e.clipboardData);
+                  if (files.length) {
+                    e.preventDefault();
+                    att.add(files);
+                  }
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                     e.preventDefault();
-                    void ask(text);
+                    send();
                   }
                 }}
                 placeholder="Tanya Joyo… (Berapa pengeluaran makan bulan ini?)"
@@ -206,10 +233,11 @@ export function JoyoPage({ conversationId, onConversation }: { conversationId: s
                   <Square className="size-4" aria-hidden />
                 </Button>
               ) : (
-                <Button type="submit" size="icon" aria-label="Send" disabled={!text.trim()}>
+                <Button type="submit" size="icon" aria-label="Send" disabled={!canSend}>
                   <ArrowUp aria-hidden />
                 </Button>
               )}
+              </div>
             </form>
           )}
           <p className="mt-1.5 hidden text-center text-[0.6875rem] text-muted-foreground sm:block">Joyo can be wrong. It's not financial advice; check the numbers that matter.</p>

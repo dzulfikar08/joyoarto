@@ -96,6 +96,33 @@ describe("runChat", () => {
     expect(seen[0]!.system).toContain(page);
   });
 
+  test("attachments reach the model with the last question only: text as labelled blocks, images alongside", async () => {
+    const { engine, seen } = scripted([reply({ text: "Cicilannya Rp 4,1 jt." })]);
+    await runChat({
+      engine,
+      context: { db, principal: dewi },
+      person,
+      turns: [
+        { role: "user", content: "halo" },
+        { role: "assistant", content: "Hai" },
+        { role: "user", content: "cek simulasi ini" },
+      ],
+      attachments: [
+        { kind: "text", name: "simulasi.pdf", text: "Harga 250.000.000\nDP 30%\nTenor 60" },
+        { kind: "image", name: "brosur.jpg", mediaType: "image/jpeg", data: "QUJD" },
+      ],
+    });
+    const sent = seen[0]!.messages;
+    expect(sent[0]).toEqual({ role: "user", content: "halo" });
+    const last = sent.at(-1)!;
+    expect(last.role).toBe("user");
+    expect(last.role === "user" && last.content).toContain('<attachment name="simulasi.pdf">');
+    expect(last.role === "user" && last.content).toContain("Tenor 60");
+    expect(last.role === "user" && last.content).toContain("brosur.jpg");
+    expect(last.role === "user" && last.images).toEqual([{ mediaType: "image/jpeg", data: "QUJD" }]);
+    expect(seen[0]!.system).toContain("<attachment> tags");
+  });
+
   test("no plan event for a failed plan call, and no page rules without a page", async () => {
     const { engine, seen } = scripted([reply({ toolCalls: [{ id: "t1", name: "compare_plans", args: { scenarios: [] } }], stop: "tools" }), reply({ text: "ok" })]);
     const events: { type: string }[] = [];

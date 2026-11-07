@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 import { byokInput, loadByok, saveByok } from "@/lib/joyo";
 import type { ByokSettings } from "@/lib/joyo";
+import type { ChatAttachmentIn } from "@/lib/joyo-attachments";
 import { client, errorMessage, orpc } from "@/lib/orpc";
 
 export type LiveStep = Step & { running?: boolean };
@@ -39,7 +40,7 @@ export function useJoyoChat({
   const [messages, setMessages] = useState<StoredMessage[]>([]);
   const [live, setLive] = useState<Live | null>(null);
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
-  const [error, setError] = useState<{ message: string; retry: string } | null>(null);
+  const [error, setError] = useState<{ message: string; retry: string; attachments?: ChatAttachmentIn[] } | null>(null);
   const [busyProposal, setBusyProposal] = useState<string | null>(null);
   const [byok, setByokState] = useState<ByokSettings | null>(loadByok);
   const abortRef = useRef<AbortController | null>(null);
@@ -64,11 +65,12 @@ export function useJoyoChat({
   const available = usingKey || hosted !== null;
   const capReached = !usingKey && !!status.data && status.data.dailyCap > 0 && status.data.usedToday >= status.data.dailyCap;
 
-  const ask = async (question: string) => {
+  const ask = async (question: string, attachments: readonly ChatAttachmentIn[] = []) => {
     const q = question.trim();
     if (!q || streaming) return;
     setError(null);
-    setPendingQuestion(q);
+    // Shown until the server echoes the stored question (which keeps the file names the same way).
+    setPendingQuestion(attachments.length ? `${q}\n\n📎 ${attachments.map((a) => a.name).join(", ")}` : q);
     setLive({ text: "", steps: [], proposals: [] });
     onAsk?.();
     const controller = new AbortController();
@@ -78,7 +80,13 @@ export function useJoyoChat({
       const key = byokInput(byok);
       const ctx = page?.();
       const events = await client.joyo.chat(
-        { message: q, ...(conversationId ? { conversationId } : {}), ...(key ? { byok: key } : {}), ...(ctx ? { page: ctx } : {}) },
+        {
+          message: q,
+          ...(conversationId ? { conversationId } : {}),
+          ...(key ? { byok: key } : {}),
+          ...(ctx ? { page: ctx } : {}),
+          ...(attachments.length ? { attachments: [...attachments] } : {}),
+        },
         { signal: controller.signal },
       );
       for await (const raw of events) {
@@ -121,7 +129,7 @@ export function useJoyoChat({
         }
       }
     } catch (err) {
-      if (!controller.signal.aborted) setError({ message: errorMessage(err), retry: q });
+      if (!controller.signal.aborted) setError({ message: errorMessage(err), retry: q, attachments: [...attachments] });
       else if (started) void qc.invalidateQueries({ queryKey: orpc.joyo.conversations.get.key({ input: { id: started } }) });
     } finally {
       setLive(null);
