@@ -27,6 +27,6 @@
   "devDependencies": {
     "@baroka/config": "workspace:*",
     "typescript": "catalog:",
-    "wrangler": "^4.40.0"
+    "wrangler": "^4.158.0"
   }
 }
