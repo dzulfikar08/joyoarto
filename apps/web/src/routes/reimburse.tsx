@@ -136,12 +136,12 @@ function OpenItems({ profileId, company }: { profileId: string; company: string 
           <h2 className="text-base font-bold tracking-tight">Not claimed yet</h2>
           <p className="text-sm text-muted-foreground">Pick the items and period, then make the report for {company}.</p>
         </div>
-        <div className="flex gap-2">
-          <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
+        <div className="grid w-full grid-cols-2 gap-2 sm:w-auto">
+          <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-muted-foreground">
             From
             <Input type="date" className="h-10 px-3 sm:text-sm" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
           </label>
-          <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
+          <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-muted-foreground">
             To
             <Input type="date" className="h-10 px-3 sm:text-sm" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
           </label>
@@ -210,9 +210,9 @@ function Claims({ profileId }: { profileId: string }) {
         {list.map((c) => (
           <li key={c.id} className="space-y-3 py-3">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 basis-full sm:basis-auto sm:flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold">{c.number}</span>
+                  <span className="font-semibold whitespace-nowrap">{c.number}</span>
                   <Badge tone={CLAIM_STATUS[c.status].tone}>{CLAIM_STATUS[c.status].label}</Badge>
                 </div>
                 <div className="text-xs text-muted-foreground">
