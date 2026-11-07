@@ -24,3 +24,9 @@ export const TESTFLIGHT_APP_STORE_URL = "https://apps.apple.com/app/testflight/i
 export const IOS_TESTFLIGHT_URL = "https://testflight.apple.com/join/QRb1W23m";
 /** The landing page section with the iPhone steps. */
 export const IOS_SECTION_ID = "iphone";
+
+// Community: the JoyoDigitama Discord server (JoyoArto, JoyoRogo, JoyoFit), with a forum per app for bug reports and
+// feedback, and release announcements. Permanent invite.
+
+/** The Discord invite. Linked from the landing page (footer, phone apps section, Android FAQ) and the More page. */
+export const DISCORD_URL = "https://discord.gg/vtud8UYekp";
