@@ -15,6 +15,7 @@ import { ChevronLeft, ChevronRight, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { CashflowChart, CumulativeChart, DonutChart, Legend, LineKey, SwatchKey } from "@/components/charts";
+import { MoneyFlowChart } from "@/components/money-flow";
 import { QuickAdd } from "@/components/quick-add";
 import { habitName, targetText, useCopy } from "@/components/savings";
 import { currentMonthWib, formatMoney, monthLabel, rupiahToMinor, shiftMonth } from "@/lib/format";
@@ -101,6 +102,7 @@ function Body({ d, onMonth }: { d: Dashboard; onMonth: (m: string) => void }) {
     <>
       <Overview d={d} />
       <QuickAdd collapsible />
+      <FlowPreview month={d.month} />
       <div className="grid gap-4 md:grid-cols-2">
         <Categories d={d} range={range} />
         <Pace d={d} />
@@ -112,6 +114,28 @@ function Body({ d, onMonth }: { d: Dashboard; onMonth: (m: string) => void }) {
         <Accounts d={d} />
       </div>
     </>
+  );
+}
+
+/** The month's money flow, small; the whole chart is on /flow. */
+function FlowPreview({ month }: { month: string }) {
+  const q = useQuery({ ...orpc.reports.flow.queryOptions({ input: { month } }), placeholderData: keepPreviousData });
+  const flow = q.data;
+  if (!flow?.nodes.length) return null;
+  return (
+    <Card
+      title="Money flow"
+      sub={flow.saved.amount > 0 ? `${flow.income.display} in, ${flow.saved.display} saved` : `${flow.income.display} in, ${flow.fromSavings.display} from savings`}
+      action={
+        <Link to="/flow" search={{ month }} className="text-sm font-semibold text-primary hover:underline">
+          Open
+        </Link>
+      }
+    >
+      <Link to="/flow" search={{ month }} aria-label="Open money flow" className="block rounded-2xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40">
+        <MoneyFlowChart flow={flow} height={240} sources={false} interactive={false} />
+      </Link>
+    </Card>
   );
 }
 

@@ -14,15 +14,17 @@ import { BudgetSheet, type BudgetTarget } from "@/components/budgets/budget-shee
 import { CashflowChart } from "@/components/charts/cashflow";
 import { DonutChart, LegendRow, Swatch } from "@/components/charts/donut";
 import { PaceChart } from "@/components/charts/pace";
+import { MoneyFlowChart } from "@/components/charts/flow";
 import { useMe } from "@/components/data";
-import { Avatar, Button, Card, Disclosure, EmptyState, ErrorState, Icon, IconButton, Pill, Row, Screen, SkeletonCard, Text } from "@/components/ui";
+import { MonthSwitcher } from "@/components/month-switcher";
+import { Avatar, Button, Card, Disclosure, EmptyState, ErrorState, Icon, Pill, Row, Screen, SkeletonCard, Text } from "@/components/ui";
 import { isCaptureSupported, NotificationCapture } from "@/modules/notification-capture";
 import { counts } from "@/src/capture/queue";
 import { useCaptures } from "@/src/capture/store";
 import { shortName } from "@/src/lib/accounts";
 import { openAddSheet } from "@/src/lib/add-sheet";
 import { attentionItems, balanceSplit, changeText, delta, donutSlices, keyOf, monthRange, OTHER, periodLabel, type Dashboard, type FilterLink } from "@/src/lib/dashboard";
-import { currentMonthWib, monthLabel, shiftMonth } from "@/src/lib/format";
+import { currentMonthWib, monthLabel } from "@/src/lib/format";
 import { orpc } from "@/src/lib/orpc";
 import { useSettings } from "@/src/lib/settings";
 import { filtersToParams } from "@/src/lib/transaction-filters";
@@ -81,21 +83,6 @@ function Header() {
   );
 }
 
-function MonthSwitcher({ month, thisMonth, onChange }: { month: string; thisMonth: string; onChange: (m: string) => void }) {
-  return (
-    <Row style={{ justifyContent: "space-between" }}>
-      <View style={styles.switcher}>
-        <IconButton name="chevron-back" label="Previous month" size={18} onPress={() => onChange(shiftMonth(month, -1))} />
-        <Text variant="heading" style={{ minWidth: 140, textAlign: "center" }} accessibilityRole="header">
-          {monthLabel(month)}
-        </Text>
-        <IconButton name="chevron-forward" label="Next month" size={18} tone={month >= thisMonth ? "muted" : "default"} onPress={() => month < thisMonth && onChange(shiftMonth(month, 1))} />
-      </View>
-      {month !== thisMonth ? <Button title="This month" variant="ghost" small onPress={() => onChange(thisMonth)} /> : null}
-    </Row>
-  );
-}
-
 /** The collapsed quick add: tap to open the add sheet. */
 function QuickAddCard() {
   return (
@@ -130,6 +117,7 @@ function Body({ d, onMonth, openTransactions }: { d: Dashboard; onMonth: (m: str
     <>
       <Overview d={d} />
       <QuickAddCard />
+      <FlowPreview month={d.month} />
       <Categories d={d} openTransactions={openTransactions} />
       <Cashflow d={d} onMonth={onMonth} />
       <Pace d={d} />
@@ -138,6 +126,28 @@ function Body({ d, onMonth, openTransactions }: { d: Dashboard; onMonth: (m: str
       <Merchants d={d} openTransactions={openTransactions} />
       <Balances d={d} openTransactions={openTransactions} />
     </>
+  );
+}
+
+/** The month's money flow, small; tap to open the whole chart. */
+function FlowPreview({ month }: { month: string }) {
+  const router = useRouter();
+  const q = useQuery({ ...orpc.reports.flow.queryOptions({ input: { month } }), placeholderData: keepPreviousData });
+  const flow = q.data;
+  if (!flow?.nodes.length) return null;
+  const open = () => router.push({ pathname: "/flow", params: { month } });
+  return (
+    <Card
+      title="Money flow"
+      subtitle={flow.saved.amount > 0 ? `${flow.income.display} in, ${flow.saved.display} saved` : `${flow.income.display} in, ${flow.fromSavings.display} from savings`}
+      action={<Button title="Open" variant="ghost" small onPress={open} />}
+      onPress={open}
+      accessibilityLabel="Open money flow"
+    >
+      <View pointerEvents="none">
+        <MoneyFlowChart flow={flow} height={200} />
+      </View>
+    </Card>
   );
 }
 
@@ -498,7 +508,6 @@ function Shortcuts() {
 const styles = StyleSheet.create((theme) => ({
   safe: { flex: 1, backgroundColor: theme.colors.background },
   header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.sm, paddingBottom: theme.spacing.xs },
-  switcher: { flexDirection: "row", alignItems: "center", backgroundColor: theme.colors.muted, borderRadius: theme.radius.pill, paddingHorizontal: 2 },
   quick: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: theme.colors.card, borderRadius: theme.radius.card, paddingHorizontal: 16, paddingVertical: 12 },
   quickIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: theme.colors.primarySoft },
   body: { gap: theme.spacing.md },

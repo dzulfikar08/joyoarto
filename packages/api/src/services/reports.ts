@@ -5,6 +5,7 @@ import type { SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Principal } from "../context";
+import { buildFlow } from "../lib/flow";
 import { formatMoney } from "../lib/money";
 import { categoriesById, categoryWithChildren, day, money, month, notFound, resolveCategory, baseCurrency } from "./common";
 
@@ -247,5 +248,51 @@ export async function budgetStatus(db: Database, p: Principal, input: z.infer<ty
     budgets: items,
     total: { budget: formatMoney(totalBudget, cur), spent: formatMoney(totalSpent, cur) },
     ...(items.length ? {} : { note: "No budgets yet. Use set_budget." }),
+  };
+}
+
+export const moneyFlowInput = z.object({ month: month.optional().describe("Default: this month (WIB)") });
+
+/**
+ * Where one month's money came from and went: income categories → all money in → spending groups and what was saved
+ * → their subcategories, in the household's base currency (transfers and open reimbursable items are left out).
+ */
+export async function moneyFlow(db: Database, p: Principal, input: z.infer<typeof moneyFlowInput>) {
+  const mo = input.month ?? currentMonth();
+  const cur = await baseCurrency(db, p.householdId);
+  const [rows, cats] = await Promise.all([
+    db
+      .select({ slug: c.slug, kind: kindExpr, total: sql<number>`sum(${t.amount})` })
+      .from(t)
+      .leftJoin(c, eq(c.id, t.categoryId))
+      .where(
+        and(
+          eq(t.householdId, p.householdId),
+          eq(t.currency, cur),
+          gte(t.date, firstOfMonth(mo)),
+          lte(t.date, lastOfMonth(mo)),
+          sql`${kindExpr} <> 'transfer'`,
+        ),
+      )
+      .groupBy(c.slug, kindExpr),
+    categoriesById(db, p.householdId),
+  ]);
+  const names = new Map([...cats.values()].map((x) => [x.slug, x.name]));
+  const flow = buildFlow({
+    income: rows.filter((r) => r.kind === "income").map((r) => ({ slug: r.slug, amount: Number(r.total) })),
+    expense: rows.filter((r) => r.kind === "expense").map((r) => ({ slug: r.slug, amount: -Number(r.total) })),
+    name: (slug) => names.get(slug),
+  });
+  return {
+    month: mo,
+    currency: cur,
+    from: firstOfMonth(mo),
+    to: lastOfMonth(mo),
+    income: money(flow.income, cur),
+    spending: money(flow.spending, cur),
+    saved: money(flow.saved, cur),
+    fromSavings: money(flow.fromSavings, cur),
+    nodes: flow.nodes,
+    links: flow.links,
   };
 }
