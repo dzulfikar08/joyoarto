@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { ANDROID_TESTERS_GROUP_URL, ANDROID_TESTING_URL, TESTFLIGHT_APP_STORE_URL } from "./app-links";
+import { ANDROID_TESTERS_GROUP_URL, ANDROID_TESTING_URL, DISCORD_URL, TESTFLIGHT_APP_STORE_URL } from "./app-links";
 import { CONTACT_EMAIL, SITE_URL } from "./brand";
 import { PUBLIC_PATHS } from "./hosts";
 import { FAQ, OG_CARDS, PAGES, jsonLd, pageFor } from "./seo";
@@ -63,4 +63,6 @@ test("the home page's crawler body has the Android tester steps and the iPhone s
   expect(body).toContain(`href="${TESTFLIGHT_APP_STORE_URL}"`);
   expect(body).not.toContain("waitlist");
   expect(FAQ.some((f) => f.a.includes("apps/testing/com.joyodigitama.joyoarto"))).toBe(true);
+  expect(body).toContain(`href="${DISCORD_URL}"`);
+  expect(FAQ.some((f) => f.a.includes(new URL(DISCORD_URL).host + new URL(DISCORD_URL).pathname))).toBe(true);
 });

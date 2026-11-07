@@ -6,7 +6,7 @@ import { Badge } from "@baroka/ui/components/badge";
 import { buttonVariants } from "@baroka/ui/components/button";
 import { cn } from "@baroka/ui/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Calculator, Check, Code, Landmark, LockKeyhole, PieChart, Plus, ShieldCheck, Sparkles, TrendingUp, Users } from "lucide-react";
+import { ArrowRight, Calculator, Check, Code, Landmark, LockKeyhole, MessagesSquare, PieChart, Plus, ShieldCheck, Sparkles, TrendingUp, Users } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { PricingPlans } from "@/components/pricing";
@@ -17,6 +17,7 @@ import {
   ANDROID_TESTERS_GROUP_EMAIL,
   ANDROID_TESTERS_GROUP_URL,
   ANDROID_TESTING_URL,
+  DISCORD_URL,
   IOS_SECTION_ID,
   IOS_TESTFLIGHT_URL,
   TESTFLIGHT_APP_STORE_URL,
@@ -475,6 +476,11 @@ function GetTheApp({ t }: { t: T }) {
         <InstallCard id={ANDROID_SECTION_ID} logo={<AndroidLogo />} platform="Android" note={t("Google Play, tahap uji", "Google Play, testing")} steps={android} />
         <InstallCard id={IOS_SECTION_ID} logo={<AppleLogo />} platform="iPhone" note={t("TestFlight, tahap uji", "TestFlight, testing")} steps={iphone} />
       </div>
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        <a href={DISCORD_URL} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 font-semibold text-foreground hover:text-primary [&_svg]:size-4">
+          <MessagesSquare aria-hidden /> {t("Gabung Discord untuk lapor bug dan diskusi", "Join our Discord to report bugs and talk with us")}
+        </a>
+      </p>
     </Section>
   );
 }
@@ -575,8 +581,8 @@ function Faq({ t }: { t: T }) {
     [
       t("Gimana cara pasang aplikasi Android-nya?", "How do I install the Android app?"),
       t(
-        "Gabung grup Google joyoarto-testers (groups.google.com/g/joyoarto-testers), buka play.google.com/apps/testing/com.joyodigitama.joyoarto dan ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store dan masuk pakai Google.",
-        "Join the joyoarto-testers Google Group (groups.google.com/g/joyoarto-testers), open play.google.com/apps/testing/com.joyodigitama.joyoarto and tap “Become a tester”, then install JoyoArto from the Play Store and sign in with Google.",
+        "Gabung grup Google joyoarto-testers (groups.google.com/g/joyoarto-testers), buka play.google.com/apps/testing/com.joyodigitama.joyoarto dan ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store dan masuk pakai Google. Ada bug atau pertanyaan? Gabung Discord kami di discord.gg/vtud8UYekp.",
+        "Join the joyoarto-testers Google Group (groups.google.com/g/joyoarto-testers), open play.google.com/apps/testing/com.joyodigitama.joyoarto and tap “Become a tester”, then install JoyoArto from the Play Store and sign in with Google. Found a bug or have a question? Join our Discord at discord.gg/vtud8UYekp.",
       ),
     ],
     [

@@ -12,6 +12,7 @@ import {
   ANDROID_TESTERS_GROUP_EMAIL,
   ANDROID_TESTERS_GROUP_URL,
   ANDROID_TESTING_URL,
+  DISCORD_URL,
   IOS_SECTION_ID,
   IOS_TESTFLIGHT_URL,
   TESTFLIGHT_APP_STORE_URL,
@@ -108,7 +109,7 @@ export const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Gimana cara pasang aplikasi Android-nya?",
-    a: "Gabung grup Google joyoarto-testers (groups.google.com/g/joyoarto-testers), buka play.google.com/apps/testing/com.joyodigitama.joyoarto dan ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store dan masuk pakai Google.",
+    a: "Gabung grup Google joyoarto-testers (groups.google.com/g/joyoarto-testers), buka play.google.com/apps/testing/com.joyodigitama.joyoarto dan ketuk “Jadi penguji”, lalu pasang JoyoArto dari Play Store dan masuk pakai Google. Ada bug atau pertanyaan? Gabung Discord kami di discord.gg/vtud8UYekp.",
   },
   {
     q: "Data saya dipakai buat apa?",
@@ -358,7 +359,7 @@ function softwareApplication(): Record<string, unknown> {
 const nav = () =>
   `<header><p><a href="/"><strong>JoyoArto</strong></a></p><nav aria-label="Navigasi"><a href="/#fitur">Fitur</a> · <a href="/demo">Demo</a> · <a href="/pricing">Harga</a> · <a href="/claude">Claude</a> · <a href="/#faq">FAQ</a> · <a href="https://app.arto.joyorogo.com/login">Masuk</a></nav></header>`;
 const footer = () =>
-  `<footer><p>JoyoArto oleh JoyoDigitama · <a href="/privasi">Kebijakan privasi</a> · <a href="/syarat">Syarat layanan</a> · <a href="${REPO}">Kode sumber (AGPL)</a> · <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></p></footer>`;
+  `<footer><p>JoyoArto oleh JoyoDigitama · <a href="/privasi">Kebijakan privasi</a> · <a href="/syarat">Syarat layanan</a> · <a href="${REPO}">Kode sumber (AGPL)</a> · <a href="${DISCORD_URL}">Discord</a> · <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></p></footer>`;
 const wrap = (main: string) => `${nav()}<main>${main}</main>${footer()}`;
 
 function homeBody(): string {
@@ -383,6 +384,7 @@ function homeBody(): string {
       `<li>Gabung grup tester di <a href="${ANDROID_TESTERS_GROUP_URL}">Google Groups: joyoarto-testers</a> (${esc(ANDROID_TESTERS_GROUP_EMAIL)}).</li>` +
       `<li>Buka <a href="${ANDROID_TESTING_URL}">halaman uji JoyoArto di Google Play</a>, ketuk “Jadi penguji”, lalu pasang dari Play Store.</li>` +
       `<li>Masuk pakai Google.</li></ol>` +
+      `<p><a href="${DISCORD_URL}">Gabung Discord untuk lapor bug dan diskusi</a>.</p>` +
       `<h3 id="${IOS_SECTION_ID}">iPhone (TestFlight, tahap uji)</h3><ol>` +
       `<li>Pasang <a href="${TESTFLIGHT_APP_STORE_URL}">TestFlight dari App Store</a>.</li>` +
       (IOS_TESTFLIGHT_URL

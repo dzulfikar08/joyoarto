@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import type { LinkProps } from "@tanstack/react-router";
-import { BriefcaseBusiness, ChartNoAxesCombined, ChevronRight, ExternalLink, FileDown, LogOut, Settings, ShieldCheck, Smartphone, Sparkles, WalletCards, Waypoints } from "lucide-react";
+import { BriefcaseBusiness, ChartNoAxesCombined, ChevronRight, ExternalLink, FileDown, LogOut, MessagesSquare, Settings, ShieldCheck, Smartphone, Sparkles, WalletCards, Waypoints } from "lucide-react";
 import type { ComponentType } from "react";
 
 import { Avatar } from "@/components/avatar";
 import { PageHeader, ThemeSwitch } from "@/components/kit";
-import { ANDROID_SECTION_ID } from "@/lib/app-links";
+import { ANDROID_SECTION_ID, DISCORD_URL } from "@/lib/app-links";
 import { requireSession, signOut } from "@/lib/auth";
 import { SITE_URL } from "@/lib/brand";
 import { orpc } from "@/lib/orpc";
@@ -73,6 +73,16 @@ function More() {
           <span className="min-w-0 flex-1">
             <span className="block font-semibold">Pasang di Android</span>
             <span className="block text-xs text-muted-foreground">Join the testers' group, then install from Google Play. iPhone: soon</span>
+          </span>
+          <ExternalLink aria-hidden className="size-5 shrink-0 text-muted-foreground/70" />
+        </a>
+        <a href={DISCORD_URL} target="_blank" rel="noopener" className={ROW}>
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-ink">
+            <MessagesSquare className="size-5" aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Gabung Discord</span>
+            <span className="block text-xs text-muted-foreground">Report bugs, ask questions, see what's new</span>
           </span>
           <ExternalLink aria-hidden className="size-5 shrink-0 text-muted-foreground/70" />
         </a>

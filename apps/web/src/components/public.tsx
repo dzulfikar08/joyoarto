@@ -5,6 +5,7 @@ import { cn } from "@baroka/ui/lib/utils";
 import { Link } from "@tanstack/react-router";
 
 import { Wordmark } from "@/components/kit";
+import { DISCORD_URL } from "@/lib/app-links";
 import type { Lang } from "@/lib/lang";
 import { setLang, useLang } from "@/lib/lang";
 
@@ -95,6 +96,15 @@ export function PublicFooter() {
               {en ? "Source code (AGPL)" : "Kode sumber (AGPL)"}
             </a>
           )}
+          <a
+            href={DISCORD_URL}
+            className="hover:underline"
+            target="_blank"
+            rel="noopener"
+            aria-label={en ? "Discord community (opens in a new tab)" : "Komunitas Discord (buka di tab baru)"}
+          >
+            Discord
+          </a>
           <a href="/api/docs" className="hover:underline">
             API
           </a>
