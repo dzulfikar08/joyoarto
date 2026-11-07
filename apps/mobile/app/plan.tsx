@@ -14,7 +14,7 @@ import { CompareView } from "@/components/plan/compare-view";
 import { ChoiceField } from "@/components/plan/fields";
 import { SavingsCard } from "@/components/plan/savings-card";
 import { ScenarioCard } from "@/components/plan/scenario-card";
-import { Button, Card, ErrorState, ListRow, Screen, SkeletonCard, Text } from "@/components/ui";
+import { Button, Card, ErrorState, ListRow, Pill, Screen, SkeletonCard, Text } from "@/components/ui";
 import { errorMessage } from "@/src/lib/errors";
 import { currentMonthWib, shiftMonth } from "@/src/lib/format";
 import { client, orpc } from "@/src/lib/orpc";
@@ -175,11 +175,11 @@ export default function PlanScreen() {
             const by = s.updatedBy?.name ?? s.createdBy?.name;
             const onPage = openIds.has(s.id);
             return (
+              <View key={s.id}>
               <ListRow
-                key={s.id}
                 title={s.name}
                 numberOfLines={2}
-                subtitle={`${s.labels.length ? s.labels.join(" · ") : "No change"} — ${dateFmt.format(new Date(s.updatedAt))}${by ? ` by ${by}` : ""}`}
+                subtitle={`Changed ${dateFmt.format(new Date(s.updatedAt))}${by ? ` by ${by}` : ""}`}
                 right={
                   <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
                     {onPage ? (
@@ -204,6 +204,15 @@ export default function PlanScreen() {
                   </View>
                 }
               />
+              {s.labels.length ? (
+                <View style={styles.savedPills}>
+                  {s.labels.slice(0, 3).map((l, i) => (
+                    <Pill key={i} label={l} />
+                  ))}
+                  {s.labels.length > 3 ? <Pill label={`+${s.labels.length - 3} more`} /> : null}
+                </View>
+              ) : null}
+              </View>
             );
           })}
         </Card>
@@ -263,4 +272,5 @@ export default function PlanScreen() {
 
 const styles = StyleSheet.create(() => ({
   sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 4 },
+  savedPills: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: -2, marginBottom: 8 },
 }));

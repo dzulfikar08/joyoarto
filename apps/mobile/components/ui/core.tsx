@@ -7,6 +7,7 @@ import {
   RefreshControl,
   ScrollView,
   Switch,
+  StyleSheet as RNStyleSheet,
   Text as RNText,
   TextInput,
   View,
@@ -20,6 +21,7 @@ import { BottomTabBarHeightContext } from "expo-router/js-tabs";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+import { NUM_FONTS, numericFamily, wantsFigures } from "@/src/lib/fonts";
 import { tabContentInset } from "@/src/lib/tab-bar-metrics";
 
 // JoyoArto native kit on the JoyoRogo v2 base: paper canvas, borderless white cards, one arto-blue primary.
@@ -30,9 +32,15 @@ export type IconName = ComponentProps<typeof Ionicons>["name"];
 export type Tone = "default" | "muted" | "primary" | "positive" | "destructive" | "warning";
 export type TextVariant = "hero" | "title" | "heading" | "body" | "label" | "caption";
 
+/** The text face each variant uses (core styles below), so figures can switch to the same weight of Inter. */
+const VARIANT_WEIGHT: Record<TextVariant, keyof typeof NUM_FONTS> = { hero: "heavy", title: "heavy", heading: "bold", body: "regular", label: "medium", caption: "regular" };
+
 export function Text({ variant = "body", tone = "default", style, ...rest }: TextProps & { variant?: TextVariant; tone?: Tone }) {
   styles.useVariants({ variant, tone: tone === "default" ? undefined : tone });
-  return <RNText maxFontSizeMultiplier={1.6} {...rest} style={[styles.text, style]} />;
+  // Tabular figures (amounts) are drawn in Inter, at the weight the variant or the style asks for.
+  const flat = RNStyleSheet.flatten(style);
+  const figures = wantsFigures(flat) ? { fontFamily: numericFamily(flat?.fontFamily) ?? NUM_FONTS[VARIANT_WEIGHT[variant]] } : null;
+  return <RNText maxFontSizeMultiplier={1.6} {...rest} style={[styles.text, style, figures]} />;
 }
 
 /** True inside a tab screen: the floating bar covers the bottom of the screen. */

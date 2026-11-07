@@ -2,6 +2,7 @@ import type { AppRouterClient } from "@baroka/api/routers/index";
 import type { AccountRole, ScenarioItemInput } from "@baroka/api/lib/plan/schema";
 import { defaultResalePct } from "@baroka/api/lib/plan/resale";
 import { babyTemplate, carTemplate } from "@baroka/api/lib/plan/templates";
+import { Badge } from "@baroka/ui/components/badge";
 import { Button } from "@baroka/ui/components/button";
 import { Disclosure } from "@baroka/ui/components/disclosure";
 import { Checkbox } from "@baroka/ui/components/checkbox";
@@ -431,9 +432,10 @@ function SavedScenarios({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{s.name}</p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {s.labels.length ? s.labels.join(" · ") : "No change"} — {dateFmt.format(new Date(s.updatedAt))}
+                  Changed {dateFmt.format(new Date(s.updatedAt))}
                   {by ? ` by ${by}` : ""}
                 </p>
+                {s.labels.length > 0 && <ItemPills labels={s.labels} className="mt-1.5" />}
               </div>
               <div className="flex shrink-0 items-center gap-3 text-xs">
                 {open ? (
@@ -784,17 +786,17 @@ function ScenarioCard({
   const remove = (key: string) => onChange((x) => ({ ...x, blocks: x.blocks.filter((y) => y.key !== key) }));
   const add = (b: Block) => onChange((x) => ({ ...x, blocks: [...x.blocks, b] }));
   let loanIndex = 0;
-  const summary = s.blocks.length ? s.blocks.map((b) => (b.kind === "baby" ? "Baby" : b.item.label || "Item")).join(" · ") : "No change yet";
+  const labels = s.blocks.map((b) => (b.kind === "baby" ? "Baby" : b.item.label || "Item"));
   return (
     <details open={defaultOpen} className="group/sc card min-w-0 p-0 sm:p-0">
       <summary className="flex cursor-pointer list-none items-center gap-3 rounded-3xl px-4 py-3.5 outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/40 sm:px-5 [&::-webkit-details-marker]:hidden">
         <span aria-hidden className="inline-block size-3 shrink-0 rounded-full" style={{ background: `var(--viz-series-${s.slot})` }} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate font-bold">{s.name || "Untitled"}</span>
-          <span className="block truncate text-xs text-muted-foreground">
-            {summary}
-            {s.savedId ? (dirty ? " · unsaved changes" : " · saved") : ""}
+        <span className="min-w-0 flex-1 space-y-1.5">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate font-bold">{s.name || "Untitled"}</span>
+            {s.savedId && <Badge tone={dirty ? "warning" : "muted"}>{dirty ? "Unsaved changes" : "Saved"}</Badge>}
           </span>
+          {labels.length ? <ItemPills labels={labels} /> : <span className="block text-xs text-muted-foreground">No change yet</span>}
         </span>
         {result && <VerdictBadge v={result.verdict} />}
         <ChevronDown aria-hidden className="size-4 shrink-0 text-muted-foreground transition-transform group-open/sc:rotate-180" />
@@ -832,6 +834,22 @@ function ScenarioCard({
       </div>
       </div>
     </details>
+  );
+}
+
+/** A scenario's contents as small pills: the first few, then "+N more" (its title lists them all). */
+function ItemPills({ labels, max = 3, className }: { labels: string[]; max?: number; className?: string }) {
+  const shown = labels.slice(0, max);
+  const rest = labels.length - shown.length;
+  return (
+    <span className={cn("flex min-w-0 flex-wrap gap-1", className)} title={labels.join("\n")}>
+      {shown.map((l, i) => (
+        <span key={i} className="max-w-56 truncate rounded-full bg-muted px-2 py-0.5 text-[0.6875rem] font-medium text-muted-foreground">
+          {l}
+        </span>
+      ))}
+      {rest > 0 && <span className="rounded-full px-1.5 py-0.5 text-[0.6875rem] font-medium text-muted-foreground">+{rest} more</span>}
+    </span>
   );
 }
 

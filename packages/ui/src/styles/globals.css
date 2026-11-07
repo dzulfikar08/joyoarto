@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@fontsource-variable/plus-jakarta-sans/wght.css";
+@import "@fontsource-variable/inter/wght.css";
 @source "../../../../apps/web/src";
 @source "../";
 
@@ -16,7 +17,8 @@
  *   limit, deleting). Each status colour has a -soft tint for backgrounds and an -ink that passes AA on that tint.
  * - Charts use the --viz-* tokens below (validated dataviz palette); series 1 follows the brand blue.
  * - --segment is the active item of a pill segmented control (bg-muted track), lighter than the track in both themes.
- * - Type: Plus Jakarta Sans (Indonesian foundry), as in JoyoRogo.
+ * - Type: Plus Jakarta Sans (Indonesian foundry), as in JoyoRogo. Money and other figures (anything `tabular-nums`)
+ *   use Inter: narrower, very legible digits that line up in columns.
  */
 :root {
   --background: oklch(0.975 0.008 85);
@@ -125,6 +127,8 @@
   --font-sans:
     "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
     Arial, sans-serif;
+  --font-num:
+    "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -176,6 +180,13 @@
   }
   body {
     @apply bg-background font-sans text-foreground antialiased;
+  }
+}
+
+/* Figures: every amount, date column and count marked tabular-nums gets the number face. */
+@layer utilities {
+  .tabular-nums {
+    font-family: var(--font-num);
   }
 }
 

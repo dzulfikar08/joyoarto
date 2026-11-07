@@ -6,6 +6,7 @@ import {
   PlusJakartaSans_800ExtraBold,
   useFonts,
 } from "@expo-google-fonts/plus-jakarta-sans";
+import { Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold } from "@expo-google-fonts/inter";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { Redirect, Stack, usePathname, useRouter } from "expo-router";
 import { addNetworkStateListener } from "expo-network";
@@ -113,7 +114,16 @@ function Root() {
 }
 
 export default function RootLayout() {
-  const [fonts] = useFonts({ PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold });
+  const [fonts] = useFonts({
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
+  });
   const [ready, setReady] = useState(false);
   useEffect(() => {
     void Promise.all([loadSession(), loadSettings().then(syncNativeConfig), loadCaptures(), loadAppearance().catch(() => undefined)]).finally(() => setReady(true));

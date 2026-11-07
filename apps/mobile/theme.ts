@@ -1,3 +1,5 @@
+import { NUM_FONTS, TEXT_FONTS } from "./src/lib/fonts";
+
 /**
  * JoyoArto tokens for native, converted from packages/ui/src/styles/globals.css (oklch → sRGB hex) on the
  * JoyoRogo v2 base: warm paper canvas, white cards, deep-indigo "arto blue" primary, gold coin accent.
@@ -7,12 +9,9 @@ const shared = {
   spacing: { xs: 4, sm: 8, md: 12, lg: 20, xl: 28, xxl: 40 },
   radius: { card: 20, tile: 14, input: 14, pill: 999 },
   fontSize: { xs: 12, sm: 13, base: 15, md: 16, lg: 18, xl: 20, "2xl": 24, title: 28, hero: 36 },
-  fonts: {
-    regular: "PlusJakartaSans_500Medium",
-    medium: "PlusJakartaSans_600SemiBold",
-    bold: "PlusJakartaSans_700Bold",
-    heavy: "PlusJakartaSans_800ExtraBold",
-  },
+  fonts: TEXT_FONTS,
+  /** Figures (amounts): Inter at the same weights; Text switches to it by itself for tabular-nums. */
+  numFonts: NUM_FONTS,
 } as const;
 
 export const lightTheme = {
