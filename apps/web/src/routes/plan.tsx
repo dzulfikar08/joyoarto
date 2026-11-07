@@ -6,19 +6,21 @@ import { Button } from "@baroka/ui/components/button";
 import { Disclosure } from "@baroka/ui/components/disclosure";
 import { Checkbox } from "@baroka/ui/components/checkbox";
 import { Input } from "@baroka/ui/components/input";
-import { Label } from "@baroka/ui/components/label";
 import { Combobox } from "@baroka/ui/components/combobox";
 import { Select, type SelectBaseProps } from "@baroka/ui/components/select";
 import { cn } from "@baroka/ui/lib/utils";
+import { useMediaQuery } from "@baroka/ui/hooks/use-media-query";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Share2, X } from "lucide-react";
-import { createContext, useContext, useEffect, useId, useMemo, useState } from "react";
+import { Bookmark, ChevronDown, PiggyBank, Plus, Share2, Sparkles, X } from "lucide-react";
+import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 
 import { Field as KitField, PageHeader } from "@/components/kit";
 import { Legend, LineKey, ProjectionChart } from "@/components/charts";
+import { JoyoPanel } from "@/components/joyo/joyo-panel";
+import type { PlanEvent } from "@/components/joyo/use-joyo-chat";
 import { SavingsBlock } from "@/components/savings";
 import { requireSession } from "@/lib/auth";
 import { useLang } from "@/lib/lang";
@@ -33,11 +35,13 @@ import {
   encodeShare,
   flatten,
   addSharedScenarios,
+  applyJoyoPlan,
   blocksFromSaved,
   freeSlot,
   hasContent,
   isDirty,
   loadLocal,
+  planPageState,
   quickStart,
   saveLocal,
   shiftBaby,
@@ -241,105 +245,160 @@ function Plan() {
     }
   };
 
-  return (
-    <div className="space-y-4">
-      <PageHeader
-        title="Plan & simulate"
-        subtitle="Try a car, a baby or any big change against your real income, spending and savings."
-        action={
-          <Button variant="secondary" size="sm" onClick={() => void share()} disabled={!state.scenarios.length}>
-            <Share2 aria-hidden />
-            {copied ? "Link copied" : "Share link"}
-          </Button>
-        }
-      />
-      {pending ? (
-        <SharedPrompt resolve={resolve} canAdd={savedScenarios < 6} />
-      ) : (
-        fromShare && <p className="rounded-2xl bg-primary-soft px-4 py-3 text-sm text-primary-ink">Opened a shared plan. Changes are kept in this browser.</p>
-      )}
-      {baseline.isError && <p className="text-sm text-destructive">{errorMessage(baseline.error)}</p>}
-      {baseline.isPending && <p className="text-sm text-muted-foreground">Reading your ledger…</p>}
-      {baseline.data && <BaselineCard b={baseline.data} state={state} update={update} />}
-      {baseline.data && !pending && <SavingsBlock state={state} onApply={addCuts} />}
-      <SavedScenarios
-        list={saved.data}
-        error={saved.error}
-        openIds={new Set(state.scenarios.map((s) => s.savedId).filter((x): x is string => !!x))}
-        onOpen={(id) => void openSaved(id)}
-        onDelete={(id, name) => confirm(`Delete the saved scenario "${name}"? It is removed for everyone in your household.`) && remove.mutate(id)}
-      />
+  const [joyoOpen, setJoyoOpen] = useState(true);
+  const [joyoOverlay, setJoyoOverlay] = useState(false);
+  const wide = useMediaQuery("(min-width: 1280px)");
+  const docked = wide && joyoOpen;
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const joyoPage = () => ({ kind: "plan" as const, state: planPageState(stateRef.current) });
+  const onJoyoPlan = (e: PlanEvent) => {
+    setState((s) => applyJoyoPlan(s, e.tool, e.args));
+    toast.success("Joyo updated the plan", { description: wide ? undefined : "Close the chat to see it.", duration: 2500 });
+  };
+  const joyo = (onClose: () => void, className: string) => (
+    <JoyoPanel
+      title="Joyo AI · plan consultant"
+      intro="Tell Joyo what you're weighing up. It builds the scenarios on this page and checks them against your real numbers while you talk."
+      starters={PLAN_STARTERS}
+      page={joyoPage}
+      onPlan={onJoyoPlan}
+      onClose={onClose}
+      className={className}
+    />
+  );
+  const empty = !state.scenarios.length;
 
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-bold tracking-tight">Scenarios</h2>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="plan-horizon" className="font-normal text-muted-foreground">
-              Look ahead
-            </Label>
-            <Select id="plan-horizon" size="sm" className="w-32" value={String(state.horizonMonths)} onValueChange={(v) => update((s) => ({ ...s, horizonMonths: Number(v) }))} items={HORIZON_ITEMS} />
-          </div>
-        </div>
-        {!state.scenarios.length && (
-          <div className="card space-y-3 text-sm">
-            <p>Start with an example: two car options and a baby in six months, against not buying a car. Then fill in the real prices and the dealer's rate.</p>
+  return (
+    <div className={cn("grid items-start gap-4", docked && "grid-cols-[minmax(0,1fr)_24rem]")}>
+      <div className="min-w-0 space-y-4">
+        <PageHeader
+          title="Plan & simulate"
+          subtitle="Test a big decision against your real income, spending and savings."
+          action={
+            <>
+              <Select aria-label="Look ahead" size="sm" className="w-32" value={String(state.horizonMonths)} onValueChange={(v) => update((s) => ({ ...s, horizonMonths: Number(v) }))} items={HORIZON_ITEMS} />
+              <Button variant="secondary" size="sm" onClick={() => void share()} disabled={empty}>
+                <Share2 aria-hidden />
+                {copied ? "Copied" : "Share"}
+              </Button>
+              {!docked && (
+                <Button size="sm" onClick={() => (wide ? setJoyoOpen(true) : setJoyoOverlay(true))}>
+                  <Sparkles aria-hidden />
+                  Ask Joyo
+                </Button>
+              )}
+            </>
+          }
+        />
+        {pending ? (
+          <SharedPrompt resolve={resolve} canAdd={savedScenarios < 6} />
+        ) : (
+          fromShare && <p className="rounded-2xl bg-primary-soft px-4 py-3 text-sm text-primary-ink">Opened a shared plan. Changes are kept in this browser.</p>
+        )}
+        {baseline.isError && <p className="text-sm text-destructive">{errorMessage(baseline.error)}</p>}
+        {baseline.isPending && <p className="text-sm text-muted-foreground">Reading your ledger…</p>}
+        {baseline.data && <BaselineCard b={baseline.data} state={state} update={update} />}
+
+        {empty && (
+          <section className="card space-y-3">
+            <div>
+              <h2 className="text-base font-bold tracking-tight">What are you thinking about?</h2>
+              <p className="text-sm text-muted-foreground">Start from an example and change the numbers, or ask Joyo to build it with you.</p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={() => update((s) => ({ ...s, scenarios: quickStart(start) }))}>
-                Car A vs Car B vs no car, with a baby
+                Car A vs Car B, with a baby
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => update((s) => ({ ...s, scenarios: [{ id: uid(), name: "Small car now, bigger later", slot: 1, blocks: upgradeBlocks(start) }] }))}
-              >
-                Small car now, bigger car later
+              <Button variant="secondary" size="sm" onClick={() => update((s) => ({ ...s, scenarios: [{ id: uid(), name: "Small car now, bigger later", slot: 1, blocks: upgradeBlocks(start) }] }))}>
+                Small car now, bigger later
               </Button>
               <Button variant="secondary" size="sm" onClick={() => update((s) => ({ ...s, scenarios: [{ id: uid(), name: "Scenario 1", slot: 1, blocks: [] }] }))}>
                 Blank scenario
               </Button>
             </div>
+          </section>
+        )}
+
+        {compare.isError && <p className="text-sm text-destructive">{errorMessage(compare.error)}</p>}
+        {compare.data && !empty && (
+          <div className={`space-y-4 transition-opacity ${compare.isPlaceholderData || compare.isFetching ? "opacity-70" : ""}`}>
+            <CompareView c={compare.data} scenarios={state.scenarios} />
           </div>
         )}
-        <div className="grid gap-4 lg:grid-cols-2">
-          {state.scenarios.map((s, i) => (
-            <ScenarioCard
-              key={s.id}
-              s={s}
-              start={start}
-              result={compare.data?.scenarios.find((r) => r.name === (s.name || "Untitled"))}
-              onChange={(fn) => setScenario(s.id, fn)}
-              onSave={() => onSave(s)}
-              saving={save.isPending && save.variables?.id === s.id}
-              onRemove={() => update((st) => ({ ...st, scenarios: st.scenarios.filter((x) => x.id !== s.id) }))}
-              onDuplicate={() =>
-                update((st) => {
-                  const copy: Scenario = { ...structuredClone(s), id: uid(), name: `${s.name} (copy)`, slot: freeSlot(st.scenarios), savedId: undefined, savedSig: undefined };
-                  return { ...st, scenarios: [...st.scenarios.slice(0, i + 1), copy, ...st.scenarios.slice(i + 1)] };
-                })
-              }
-            />
-          ))}
-        </div>
-        {state.scenarios.length > 0 && state.scenarios.length < 6 && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => update((st) => ({ ...st, scenarios: [...st.scenarios, { id: uid(), name: `Scenario ${st.scenarios.length + 1}`, slot: freeSlot(st.scenarios), blocks: [] }] }))}
-          >
-            + Add scenario
-          </Button>
-        )}
-      </section>
 
-      {compare.isError && <p className="text-sm text-destructive">{errorMessage(compare.error)}</p>}
-      {compare.data && state.scenarios.length > 0 && (
-        <div className={`space-y-4 transition-opacity ${compare.isPlaceholderData || compare.isFetching ? "opacity-70" : ""}`}>
-          <CompareView c={compare.data} scenarios={state.scenarios} />
+        {!empty && (
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+              <h2 className="text-base font-bold tracking-tight">
+                Scenarios <span className="font-normal text-muted-foreground">({state.scenarios.length}/6)</span>
+              </h2>
+              {state.scenarios.length < 6 && (
+                <Button
+                  variant="secondary"
+                  size="xs"
+                  onClick={() => update((st) => ({ ...st, scenarios: [...st.scenarios, { id: uid(), name: `Scenario ${st.scenarios.length + 1}`, slot: freeSlot(st.scenarios), blocks: [] }] }))}
+                >
+                  <Plus aria-hidden /> Add scenario
+                </Button>
+              )}
+            </div>
+            <div className={cn("grid gap-3", docked ? "2xl:grid-cols-2" : "lg:grid-cols-2")}>
+              {state.scenarios.map((s, i) => (
+                <ScenarioCard
+                  key={s.id}
+                  s={s}
+                  start={start}
+                  defaultOpen={state.scenarios.length === 1 || s.blocks.length === 0}
+                  result={compare.data?.scenarios.find((r) => r.name === (s.name || "Untitled"))}
+                  onChange={(fn) => setScenario(s.id, fn)}
+                  onSave={() => onSave(s)}
+                  saving={save.isPending && save.variables?.id === s.id}
+                  onRemove={() => update((st) => ({ ...st, scenarios: st.scenarios.filter((x) => x.id !== s.id) }))}
+                  onDuplicate={() =>
+                    update((st) => {
+                      if (st.scenarios.length >= 6) return st;
+                      const copy: Scenario = { ...structuredClone(s), id: uid(), name: `${s.name} (copy)`, slot: freeSlot(st.scenarios), savedId: undefined, savedSig: undefined };
+                      return { ...st, scenarios: [...st.scenarios.slice(0, i + 1), copy, ...st.scenarios.slice(i + 1)] };
+                    })
+                  }
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {baseline.data && !pending && (
+          <Disclosure icon={<PiggyBank />} title="Where to save" description="Habits you could trim, from your own spending" bodyClassName="text-foreground">
+            <SavingsBlock bare state={state} onApply={addCuts} />
+          </Disclosure>
+        )}
+        <SavedScenarios
+          list={saved.data}
+          error={saved.error}
+          openIds={new Set(state.scenarios.map((s) => s.savedId).filter((x): x is string => !!x))}
+          onOpen={(id) => void openSaved(id)}
+          onDelete={(id, name) => confirm(`Delete the saved scenario "${name}"? It is removed for everyone in your household.`) && remove.mutate(id)}
+        />
+      </div>
+
+      {docked && <div className="sticky top-20 h-[calc(100dvh-6rem)]">{joyo(() => setJoyoOpen(false), "h-full shadow-float")}</div>}
+      {!wide && joyoOverlay && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black/35 p-2 pt-[max(env(safe-area-inset-top),2rem)]" onClick={(e) => e.target === e.currentTarget && setJoyoOverlay(false)}>
+          {joyo(() => setJoyoOverlay(false), "flex-1 shadow-float")}
         </div>
       )}
     </div>
   );
 }
+
+/** Questions to start the plan chat with; Joyo works on whatever the page shows. */
+const PLAN_STARTERS = [
+  { text: "Bandingkan mobil Rp 250 jt, DP 30%, 5 tahun, dengan tanpa mobil", hint: "Car options side by side" },
+  { text: "Kalau anak pertama lahir tahun depan, masih aman?", hint: "Baby costs on top of the plan" },
+  { text: "Make the scenarios on this page safer. What should change?", hint: "Tweaks to what you see" },
+  { text: "Bisa hemat di mana supaya cicilannya aman?", hint: "Spending cuts" },
+] as const;
 
 // ---------------------------------------------------------------------------------------------------------------
 // Saved scenarios
@@ -362,11 +421,7 @@ function SavedScenarios({
   if (error) return <p className="text-sm text-destructive">{errorMessage(error)}</p>;
   if (!list?.scenarios.length) return null;
   return (
-    <section className="card space-y-2">
-      <div>
-        <h2 className="text-base font-bold tracking-tight">Saved scenarios</h2>
-        <p className="text-xs text-muted-foreground">Shared with your household. Open one to compare it with what is on this page.</p>
-      </div>
+    <Disclosure icon={<Bookmark />} title={`Saved scenarios (${list.scenarios.length})`} description="Shared with your household; open one to compare it here" bodyClassName="text-foreground">
       <ul className="divide-y divide-border">
         {list.scenarios.map((s) => {
           const open = openIds.has(s.id);
@@ -396,7 +451,7 @@ function SavedScenarios({
           );
         })}
       </ul>
-    </section>
+    </Disclosure>
   );
 }
 
@@ -547,8 +602,8 @@ function BaselineCard({ b, state, update }: { b: Baseline; state: PlanState; upd
     <section className="card space-y-4">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="text-base font-bold tracking-tight">Your baseline</h2>
-          <p className="text-xs text-muted-foreground">{empty ? "Type your own numbers to start." : `From ${range}${span}. Change any number to try something else.`}</p>
+          <h2 className="text-base font-bold tracking-tight">Your month today</h2>
+          <p className="text-xs text-muted-foreground">{empty ? "Type your own numbers to start." : `From your ledger, ${range}${span}.${edited ? " Edited by you." : ""}`}</p>
         </div>
         {edited && (
           <Button
@@ -572,7 +627,19 @@ function BaselineCard({ b, state, update }: { b: Baseline; state: PlanState; upd
           Only {used} complete month of history so far, so these numbers are rough. Check them, or type your usual income and spending below.
         </p>
       )}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <Stat label="Income / month" value={rp(income)} edited={state.monthlyIncome !== undefined} />
+        <Stat label="Core spending / month" value={rp(spending)} edited={state.monthlySpending !== undefined} />
+        <Stat label="Installments / month" value={rp(existing)} edited={state.existingInstallments !== undefined} />
+        <Stat label="Free cash / month" value={rp(free)} tone={free < 0 ? "bad" : "good"} />
+      </div>
+      <p className="text-xs tabular-nums text-muted-foreground">
+        Savings counted: emergency {rp(totals.emergency)} · goal {rp(totals.goal)} · spending {rp(totals.spending)}
+      </p>
+
+      <Disclosure plain title="Adjust income, spending and accounts" defaultOpen={empty}>
+      <div className="space-y-4 pt-2 text-foreground">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Field label="Recurring income / month" hint={`Ledger: ${b.income.recurring.display}`}>
           <MoneyInput label="Monthly income" value={state.monthlyIncome} placeholder={rp(b.income.recurring.amount).replace("Rp ", "")} onChange={(v) => update((s) => ({ ...s, monthlyIncome: v }))} />
         </Field>
@@ -582,18 +649,12 @@ function BaselineCard({ b, state, update }: { b: Baseline; state: PlanState; upd
         <Field label="Existing installments / month" hint="Loan payments are transfers, not spending">
           <MoneyInput label="Existing installments" value={state.existingInstallments} placeholder={rp(b.existingInstallments.monthly.amount).replace("Rp ", "")} onChange={(v) => update((s) => ({ ...s, existingInstallments: v }))} />
         </Field>
-        <div className="flex flex-col justify-center rounded-2xl bg-muted/60 px-3 py-2">
-          <span className="text-xs text-muted-foreground">Free cash / month</span>
-          <span className={`text-lg font-semibold tabular-nums ${free < 0 ? "text-[var(--viz-bad-text)]" : ""}`}>{rp(free)}</span>
-        </div>
       </div>
 
       <div className="space-y-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Savings by role</h3>
-          <p className="text-xs tabular-nums text-muted-foreground">
-            Emergency {rp(totals.emergency)} · Goal {rp(totals.goal)} · Spending {rp(totals.spending)}
-          </p>
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What each account is for</h3>
+          <p className="text-xs text-muted-foreground">The emergency fund is checked against 6 months of outflow; "Not counted" leaves an account out.</p>
         </div>
         <ul className="divide-y divide-border">
           {b.accounts.map((a) => (
@@ -676,7 +737,21 @@ function BaselineCard({ b, state, update }: { b: Baseline; state: PlanState; upd
           ))}
         </ul>
       </Disclosure>
+      </div>
+      </Disclosure>
     </section>
+  );
+}
+
+function Stat({ label, value, edited, tone }: { label: string; value: string; edited?: boolean; tone?: "good" | "bad" }) {
+  return (
+    <div className={cn("min-w-0 rounded-2xl px-3 py-2.5", tone ? "bg-primary-soft" : "bg-muted/60")}>
+      <p className="truncate text-xs text-muted-foreground">
+        {label}
+        {edited && <span className="ml-1 font-semibold text-primary-ink">· edited</span>}
+      </p>
+      <p className={cn("truncate text-base font-bold tabular-nums sm:text-lg", tone === "bad" && "text-[var(--viz-bad-text)]", tone === "good" && "text-primary-ink")}>{value}</p>
+    </div>
   );
 }
 
@@ -686,6 +761,7 @@ function BaselineCard({ b, state, update }: { b: Baseline; state: PlanState; upd
 function ScenarioCard({
   s,
   start,
+  defaultOpen,
   result,
   onChange,
   onSave,
@@ -695,6 +771,7 @@ function ScenarioCard({
 }: {
   s: Scenario;
   start: string;
+  defaultOpen?: boolean;
   result?: CompareScenario;
   onChange: (fn: (s: Scenario) => Scenario) => void;
   onSave: () => void;
@@ -707,14 +784,23 @@ function ScenarioCard({
   const remove = (key: string) => onChange((x) => ({ ...x, blocks: x.blocks.filter((y) => y.key !== key) }));
   const add = (b: Block) => onChange((x) => ({ ...x, blocks: [...x.blocks, b] }));
   let loanIndex = 0;
+  const summary = s.blocks.length ? s.blocks.map((b) => (b.kind === "baby" ? "Baby" : b.item.label || "Item")).join(" · ") : "No change yet";
   return (
-    <section className="card min-w-0 space-y-3">
-      <div className="flex items-center gap-2">
+    <details open={defaultOpen} className="group/sc card min-w-0 p-0 sm:p-0">
+      <summary className="flex cursor-pointer list-none items-center gap-3 rounded-3xl px-4 py-3.5 outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/40 sm:px-5 [&::-webkit-details-marker]:hidden">
         <span aria-hidden className="inline-block size-3 shrink-0 rounded-full" style={{ background: `var(--viz-series-${s.slot})` }} />
-        <Input className={cn(DENSE, "flex-1 font-semibold")} aria-label="Scenario name" value={s.name} onChange={(e) => onChange((x) => ({ ...x, name: e.target.value }))} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-bold">{s.name || "Untitled"}</span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {summary}
+            {s.savedId ? (dirty ? " · unsaved changes" : " · saved") : ""}
+          </span>
+        </span>
         {result && <VerdictBadge v={result.verdict} />}
-      </div>
-      {s.savedId && <p className="-mt-1 text-[11px] text-muted-foreground">{dirty ? "Saved scenario · unsaved changes" : "Saved scenario"}</p>}
+        <ChevronDown aria-hidden className="size-4 shrink-0 text-muted-foreground transition-transform group-open/sc:rotate-180" />
+      </summary>
+      <div className="space-y-3 px-4 pb-4 sm:px-5 sm:pb-5">
+      <Input className={cn(DENSE, "font-semibold")} aria-label="Scenario name" value={s.name} onChange={(e) => onChange((x) => ({ ...x, name: e.target.value }))} />
       {s.blocks.length === 0 && <p className="text-sm text-muted-foreground">Nothing added yet: this is the same as no change.</p>}
       {s.blocks.map((b) => {
         if (b.kind === "loan") {
@@ -744,7 +830,8 @@ function ScenarioCard({
           </Button>
         </span>
       </div>
-    </section>
+      </div>
+    </details>
   );
 }
 
@@ -1141,7 +1228,7 @@ function CompareView({ c, scenarios }: { c: Compare; scenarios: Scenario[] }) {
         <ProjectionChart months={c.months} series={series} format={rp} monthShort={(m) => `${monthLabel(m, "short")} '${m.slice(2, 4)}`} />
       </section>
 
-      <section className="card min-w-0 space-y-2">
+      <section className="card min-w-0 space-y-3">
         <div className="flex items-baseline justify-between gap-2">
           <h2 className="text-base font-bold tracking-tight">Side by side</h2>
           {c.scenarios.length > 1 && <span className="text-xs text-muted-foreground sm:hidden">Swipe sideways for all {c.scenarios.length} →</span>}
@@ -1175,13 +1262,15 @@ function CompareView({ c, scenarios }: { c: Compare; scenarios: Scenario[] }) {
             </tbody>
           </table>
         </div>
-      </section>
-
-      <div className="grid gap-4 md:grid-cols-2">
+        <Disclosure plain title="Why each verdict">
+        <div className="grid gap-4 pt-2 text-foreground md:grid-cols-2">
         {c.scenarios.map((s) => (
-          <section key={s.name} className="card min-w-0 space-y-2">
+          <div key={s.name} className="min-w-0 space-y-2 rounded-2xl bg-muted/50 p-3.5">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="truncate text-base font-bold tracking-tight">{s.name}</h2>
+              <h3 className="flex min-w-0 items-center gap-1.5 truncate font-bold">
+                <LineKey color={colorOf(s.name, scenarios)} dashed={!scenarios.some((x) => (x.name || "Untitled") === s.name)} />
+                {s.name}
+              </h3>
               <VerdictBadge v={s.verdict} />
             </div>
             <p className="text-sm">{plainVerdict(s)}</p>
@@ -1204,12 +1293,12 @@ function CompareView({ c, scenarios }: { c: Compare; scenarios: Scenario[] }) {
                 ))}
               </ul>
             </Disclosure>
-          </section>
+          </div>
         ))}
-      </div>
-
-      <section className="card space-y-1 text-xs text-muted-foreground">
-        <h2 className="text-base font-bold tracking-tight text-foreground">Assumptions</h2>
+        </div>
+        </Disclosure>
+        <Disclosure plain title="Assumptions and checks">
+        <div className="space-y-1 text-xs">
         <ul className="list-disc space-y-0.5 pl-5">
           {c.assumptions.map((a) => (
             <li key={a}>{a}</li>
@@ -1219,6 +1308,8 @@ function CompareView({ c, scenarios }: { c: Compare; scenarios: Scenario[] }) {
           Checks: emergency fund ≥ 6 months of the new monthly outflow (warn under 6, risky under 3); all installments ≤ 30% of income and the car ≤ 20% (risky above +10 points); liquid money
           never below zero; income covers the monthly outflow. Any risky check makes the plan risky; any warning makes it tight.
         </p>
+        </div>
+        </Disclosure>
       </section>
     </>
   );

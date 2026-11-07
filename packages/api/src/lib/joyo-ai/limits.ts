@@ -18,6 +18,11 @@ export const CHAT_LIMITS = {
   /** Answer budget per call (the Claude adapter adds room for adaptive thinking). */
   maxTokens: 3_000,
   deadlineMs: 120_000,
+  /** Files attached to one question (photos, PDFs, tables), and how much of each reaches the model. */
+  attachments: 3,
+  attachmentChars: 30_000,
+  /** Base64 length of one attached image (the apps send a JPEG about 1600 px on the long side, well under this). */
+  imageChars: 2_000_000,
 } as const;
 
 export type UsageKind = "chat" | "transcribe" | "parse" | "receipt" | "format";

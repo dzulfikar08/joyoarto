@@ -20,8 +20,11 @@ export interface ToolCall {
 }
 
 /** A conversation turn in neutral form; each adapter translates it. */
+/** An image the member attached to a question (a photo, a screenshot, a scanned PDF page), base64 without the data: prefix. */
+export type ChatImage = { mediaType: 'image/jpeg' | 'image/png' | 'image/webp'; data: string };
+
 export type NeutralMessage =
-  | { role: 'user'; content: string }
+  | { role: 'user'; content: string; images?: readonly ChatImage[] }
   | { role: 'assistant'; content: string; toolCalls?: ToolCall[]; /** Reasoning text the provider sent with this turn; passed back only in tool rounds, as thinking models expect. */ reasoning?: string; /** The provider's own content blocks of this turn (Anthropic: thinking + tool_use), replayed unchanged in tool rounds. */ raw?: unknown }
   | { role: 'tool'; callId: string; name: string; content: string };
 
