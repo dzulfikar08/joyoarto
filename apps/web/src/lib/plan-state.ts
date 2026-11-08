@@ -24,6 +24,8 @@ export type Scenario = {
   savedId?: string;
   /** signature() when last saved or opened: a different one means unsaved changes. */
   savedSig?: string;
+  /** Turned off: kept on the page but left out of the comparison (and of what Joyo sees). */
+  off?: boolean;
 };
 
 /** What a saved scenario keeps as `view`, so the page gets its blocks (a baby as one block) back. */
@@ -206,7 +208,7 @@ export function planPageState(state: PlanState): Record<string, unknown> {
     ...(state.existingInstallments !== undefined ? { existingInstallments: state.existingInstallments } : {}),
     ...(Object.keys(state.roles).length ? { roles: state.roles } : {}),
     horizonMonths: state.horizonMonths,
-    scenarios: state.scenarios.map((s) => ({ name: s.name || "Untitled", items: flatten(s) })),
+    scenarios: state.scenarios.filter((s) => !s.off).map((s) => ({ name: s.name || "Untitled", items: flatten(s) })),
   };
 }
 
@@ -251,10 +253,11 @@ export function applyJoyoPlan(state: PlanState, tool: "compare_plans" | "simulat
   }
   if (!incoming.length) return next;
 
-  const kept: Scenario[] = tool === "simulate_plan" ? state.scenarios.filter((s) => s.name !== joyoName) : [];
+  // Joyo never sees turned-off scenarios, so compare_plans keeps them rather than dropping them.
+  const kept: Scenario[] = tool === "simulate_plan" ? state.scenarios.filter((s) => s.name !== joyoName) : state.scenarios.filter((s) => s.off);
   const out: Scenario[] = [...kept];
   for (const inc of incoming.slice(0, 6 - kept.length)) {
-    const prev = state.scenarios.find((s) => (s.name || "Untitled") === inc.name);
+    const prev = state.scenarios.find((s) => !s.off && (s.name || "Untitled") === inc.name);
     const blocks = blocksFromSaved(inc.items, undefined);
     out.push(prev ? { ...prev, blocks } : { id: uid(), name: inc.name, slot: freeSlot(out), blocks });
   }

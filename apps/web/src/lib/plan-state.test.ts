@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 import { EMPTY, applyCuts, applyJoyoPlan, itemsWithoutCuts, planPageState } from "./plan-state";
 import type { CutIn, PlanState } from "./plan-state";
@@ -78,4 +78,24 @@ test("simulate_plan from Joyo adds or updates one Joyo scenario and leaves the o
 test("a plan call without usable scenarios changes nothing but the overrides", () => {
   const st: PlanState = { ...EMPTY, scenarios: [{ id: "a", name: "Mine", slot: 1, blocks: [] }] };
   expect(applyJoyoPlan(st, "compare_plans", { scenarios: [{ scenarioId: "x" }] }).scenarios).toEqual(st.scenarios);
+});
+
+describe("turned-off scenarios", () => {
+  const st = (): PlanState => ({
+    v: 1,
+    roles: {},
+    horizonMonths: 36,
+    scenarios: [
+      { id: "a", name: "On", slot: 1, blocks: [] },
+      { id: "b", name: "Off", slot: 2, blocks: [], off: true },
+    ],
+  });
+  test("Joyo is not told about them", () => {
+    expect((planPageState(st()).scenarios as { name: string }[]).map((s) => s.name)).toEqual(["On"]);
+  });
+  test("compare_plans keeps them instead of dropping them", () => {
+    const next = applyJoyoPlan(st(), "compare_plans", { scenarios: [{ name: "Joyo pick", items: [] }, { name: "Car", items: [{ type: "recurring", label: "x", monthly: 1 }] }] });
+    expect(next.scenarios.map((s) => [s.name, !!s.off])).toEqual([["Off", true], ["Joyo pick", false], ["Car", false]]);
+    expect(new Set(next.scenarios.map((s) => s.slot)).size).toBe(3);
+  });
 });

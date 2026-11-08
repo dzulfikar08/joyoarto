@@ -400,7 +400,17 @@ export async function comparePlans(db: Database, p: Principal, input: z.infer<ty
       rules: r.rules.map((x) => ({ id: x.id, title: x.title, status: x.status, value: x.value, detail: x.detail })),
       loans: r.loans.map((l) => ({ label: l.label, month: l.month, ...loanOut(l.terms, base.currency), sale: saleOut(l.sale, base.currency) })),
       /** Total liquid money and the emergency fund at the end of each month, minor units. */
-      series: { total: r.projection.map((x) => x.total), emergency: r.projection.map((x) => x.balances.emergency), freeCash: r.projection.map((x) => x.freeCash) },
+      series: {
+        total: r.projection.map((x) => x.total),
+        emergency: r.projection.map((x) => x.balances.emergency),
+        freeCash: r.projection.map((x) => x.freeCash),
+        /** Where each month's income goes (the page's spending plan): installments include the existing ones. */
+        income: r.projection.map((x) => x.income),
+        spending: r.projection.map((x) => x.spending),
+        recurring: r.projection.map((x) => x.recurring),
+        installments: r.projection.map((x) => x.installments),
+        vehicleCosts: r.projection.map((x) => x.vehicleCosts),
+      },
     })),
     assumptions: [...new Set(results.flatMap(({ r }) => r.assumptions))],
     notes,

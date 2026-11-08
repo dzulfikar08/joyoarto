@@ -4,6 +4,7 @@ import { defaultResalePct } from "@baroka/api/lib/plan/resale";
 import { babyTemplate, carTemplate } from "@baroka/api/lib/plan/templates";
 import { Badge } from "@baroka/ui/components/badge";
 import { Button } from "@baroka/ui/components/button";
+import { Dialog } from "@baroka/ui/components/dialog";
 import { Disclosure } from "@baroka/ui/components/disclosure";
 import { Checkbox } from "@baroka/ui/components/checkbox";
 import { Input } from "@baroka/ui/components/input";
@@ -13,13 +14,13 @@ import { cn } from "@baroka/ui/lib/utils";
 import { useMediaQuery } from "@baroka/ui/hooks/use-media-query";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Bookmark, ChevronDown, PiggyBank, Plus, Share2, Sparkles, X } from "lucide-react";
+import { Bookmark, ChevronDown, Eye, EyeOff, PiggyBank, Plus, Share2, Sparkles, X } from "lucide-react";
 import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 
 import { Field as KitField, PageHeader } from "@/components/kit";
-import { Legend, LineKey, ProjectionChart } from "@/components/charts";
+import { DonutChart, Legend, LineKey, ProjectionChart, SwatchKey } from "@/components/charts";
 import { JoyoPanel } from "@/components/joyo/joyo-panel";
 import type { PlanEvent } from "@/components/joyo/use-joyo-chat";
 import { SavingsBlock } from "@/components/savings";
@@ -149,7 +150,7 @@ function Plan() {
       existingInstallments: state.existingInstallments,
       roles: state.roles,
       horizonMonths: state.horizonMonths,
-      scenarios: state.scenarios.map((s) => ({ name: s.name || "Untitled", items: flatten(s) as never })),
+      scenarios: state.scenarios.filter((s) => !s.off).map((s) => ({ name: s.name || "Untitled", items: flatten(s) as never })),
       includeBaseline: true,
     }),
     [state],
@@ -269,6 +270,9 @@ function Plan() {
     />
   );
   const empty = !state.scenarios.length;
+  const allOff = !empty && state.scenarios.every((s) => s.off);
+  const [savedOpen, setSavedOpen] = useState(false);
+  const savedCount = saved.data?.scenarios.length ?? 0;
 
   return (
     <div className={cn("grid items-start gap-4", docked && "grid-cols-[minmax(0,1fr)_24rem]")}>
@@ -278,6 +282,10 @@ function Plan() {
           subtitle="Test a big decision against your real income, spending and savings."
           action={
             <>
+              <Button variant="secondary" size="sm" onClick={() => setSavedOpen(true)} disabled={!savedCount && !saved.error}>
+                <Bookmark aria-hidden />
+                Saved{savedCount ? ` (${savedCount})` : ""}
+              </Button>
               <Select aria-label="Look ahead" size="sm" className="w-32" value={String(state.horizonMonths)} onValueChange={(v) => update((s) => ({ ...s, horizonMonths: Number(v) }))} items={HORIZON_ITEMS} />
               <Button variant="secondary" size="sm" onClick={() => void share()} disabled={empty}>
                 <Share2 aria-hidden />
@@ -317,12 +325,18 @@ function Plan() {
               <Button variant="secondary" size="sm" onClick={() => update((s) => ({ ...s, scenarios: [{ id: uid(), name: "Scenario 1", slot: 1, blocks: [] }] }))}>
                 Blank scenario
               </Button>
+              {savedCount > 0 && (
+                <Button variant="secondary" size="sm" onClick={() => setSavedOpen(true)}>
+                  <Bookmark aria-hidden /> Open a saved one ({savedCount})
+                </Button>
+              )}
             </div>
           </section>
         )}
 
         {compare.isError && <p className="text-sm text-destructive">{errorMessage(compare.error)}</p>}
-        {compare.data && !empty && (
+        {allOff && <p className="rounded-2xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">Every scenario is turned off. Turn one on to compare it.</p>}
+        {compare.data && !empty && !allOff && (
           <div className={`space-y-4 transition-opacity ${compare.isPlaceholderData || compare.isFetching ? "opacity-70" : ""}`}>
             <CompareView c={compare.data} scenarios={state.scenarios} />
           </div>
@@ -351,10 +365,11 @@ function Plan() {
                   s={s}
                   start={start}
                   defaultOpen={state.scenarios.length === 1 || s.blocks.length === 0}
-                  result={compare.data?.scenarios.find((r) => r.name === (s.name || "Untitled"))}
+                  result={s.off ? undefined : compare.data?.scenarios.find((r) => r.name === (s.name || "Untitled"))}
                   onChange={(fn) => setScenario(s.id, fn)}
                   onSave={() => onSave(s)}
                   saving={save.isPending && save.variables?.id === s.id}
+                  onToggle={() => setScenario(s.id, (x) => ({ ...x, off: !x.off }))}
                   onRemove={() => update((st) => ({ ...st, scenarios: st.scenarios.filter((x) => x.id !== s.id) }))}
                   onDuplicate={() =>
                     update((st) => {
@@ -375,10 +390,16 @@ function Plan() {
           </Disclosure>
         )}
         <SavedScenarios
+          open={savedOpen}
+          onOpenChange={setSavedOpen}
           list={saved.data}
           error={saved.error}
+          full={state.scenarios.length >= 6}
           openIds={new Set(state.scenarios.map((s) => s.savedId).filter((x): x is string => !!x))}
-          onOpen={(id) => void openSaved(id)}
+          onOpen={(id) => {
+            setSavedOpen(false);
+            void openSaved(id);
+          }}
           onDelete={(id, name) => confirm(`Delete the saved scenario "${name}"? It is removed for everyone in your household.`) && remove.mutate(id)}
         />
       </div>
@@ -407,53 +428,59 @@ const PLAN_STARTERS = [
 const dateFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
 function SavedScenarios({
+  open,
+  onOpenChange,
   list,
   error,
+  full,
   openIds,
   onOpen,
   onDelete,
 }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   list?: SavedList;
   error: unknown;
+  full: boolean;
   openIds: Set<string>;
   onOpen: (id: string) => void;
   onDelete: (id: string, name: string) => void;
 }) {
-  if (error) return <p className="text-sm text-destructive">{errorMessage(error)}</p>;
-  if (!list?.scenarios.length) return null;
   return (
-    <Disclosure icon={<Bookmark />} title={`Saved scenarios (${list.scenarios.length})`} description="Shared with your household; open one to compare it here" bodyClassName="text-foreground">
+    <Dialog open={open} onOpenChange={onOpenChange} title="Saved scenarios" description="Shared with your household. Pick one to compare it on this page.">
+      {error ? <p className="text-sm text-destructive">{errorMessage(error)}</p> : null}
+      {!error && !list?.scenarios.length && <p className="text-sm text-muted-foreground">Nothing saved yet. Use Save on a scenario card to keep it here.</p>}
+      {full && <p className="mb-2 rounded-2xl bg-warning-soft px-3 py-2 text-xs text-warning-ink">Six scenarios are on the page already; remove one to open another.</p>}
       <ul className="divide-y divide-border">
-        {list.scenarios.map((s) => {
-          const open = openIds.has(s.id);
+        {list?.scenarios.map((s) => {
+          const here = openIds.has(s.id);
           const by = s.updatedBy?.name ?? s.createdBy?.name;
           return (
-            <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{s.name}</p>
-                <p className="truncate text-xs text-muted-foreground">
+            <li key={s.id} className="flex items-center gap-2 py-2">
+              <button
+                type="button"
+                disabled={here || full}
+                onClick={() => onOpen(s.id)}
+                className="min-w-0 flex-1 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none disabled:cursor-default disabled:hover:bg-transparent"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-sm font-medium">{s.name}</span>
+                  {here && <Badge tone="muted">On this page</Badge>}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">
                   Changed {dateFmt.format(new Date(s.updatedAt))}
                   {by ? ` by ${by}` : ""}
-                </p>
+                </span>
                 {s.labels.length > 0 && <ItemPills labels={s.labels} className="mt-1.5" />}
-              </div>
-              <div className="flex shrink-0 items-center gap-3 text-xs">
-                {open ? (
-                  <span className="text-muted-foreground">On this page</span>
-                ) : (
-                  <Button variant="secondary" size="xs" onClick={() => onOpen(s.id)}>
-                    Open
-                  </Button>
-                )}
-                <Button variant="link" size="xs" className="text-destructive" onClick={() => onDelete(s.id, s.name)}>
-                  Delete
-                </Button>
-              </div>
+              </button>
+              <Button variant="link" size="xs" className="shrink-0 text-destructive" onClick={() => onDelete(s.id, s.name)}>
+                Delete
+              </Button>
             </li>
           );
         })}
       </ul>
-    </Disclosure>
+    </Dialog>
   );
 }
 
@@ -768,6 +795,7 @@ function ScenarioCard({
   onChange,
   onSave,
   saving,
+  onToggle,
   onRemove,
   onDuplicate,
 }: {
@@ -778,6 +806,7 @@ function ScenarioCard({
   onChange: (fn: (s: Scenario) => Scenario) => void;
   onSave: () => void;
   saving: boolean;
+  onToggle: () => void;
   onRemove: () => void;
   onDuplicate: () => void;
 }) {
@@ -788,17 +817,32 @@ function ScenarioCard({
   let loanIndex = 0;
   const labels = s.blocks.map((b) => (b.kind === "baby" ? "Baby" : b.item.label || "Item"));
   return (
-    <details open={defaultOpen} className="group/sc card min-w-0 p-0 sm:p-0">
+    <details open={defaultOpen} className={cn("group/sc card min-w-0 p-0 sm:p-0", s.off && "bg-muted/40")}>
       <summary className="flex cursor-pointer list-none items-center gap-3 rounded-3xl px-4 py-3.5 outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/40 sm:px-5 [&::-webkit-details-marker]:hidden">
-        <span aria-hidden className="inline-block size-3 shrink-0 rounded-full" style={{ background: `var(--viz-series-${s.slot})` }} />
-        <span className="min-w-0 flex-1 space-y-1.5">
+        <span aria-hidden className={cn("inline-block size-3 shrink-0 rounded-full", s.off && "opacity-30")} style={{ background: `var(--viz-series-${s.slot})` }} />
+        <span className={cn("min-w-0 flex-1 space-y-1.5", s.off && "opacity-60")}>
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate font-bold">{s.name || "Untitled"}</span>
             {s.savedId && <Badge tone={dirty ? "warning" : "muted"}>{dirty ? "Unsaved changes" : "Saved"}</Badge>}
           </span>
           {labels.length ? <ItemPills labels={labels} /> : <span className="block text-xs text-muted-foreground">No change yet</span>}
         </span>
-        {result && <VerdictBadge v={result.verdict} />}
+        {s.off ? <Badge tone="muted">Off</Badge> : result && <VerdictBadge v={result.verdict} />}
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="shrink-0 text-muted-foreground"
+          aria-pressed={!s.off}
+          aria-label={`In the comparison: ${s.name || "Untitled"}`}
+          title={s.off ? "Off: left out of the comparison. Click to turn on." : "On: in the comparison. Click to turn off."}
+          onClick={(e) => {
+            // Inside <summary>: toggle the scenario, not the card.
+            e.preventDefault();
+            onToggle();
+          }}
+        >
+          {s.off ? <EyeOff /> : <Eye />}
+        </Button>
         <ChevronDown aria-hidden className="size-4 shrink-0 text-muted-foreground transition-transform group-open/sc:rotate-180" />
       </summary>
       <div className="space-y-3 px-4 pb-4 sm:px-5 sm:pb-5">
@@ -823,6 +867,9 @@ function ScenarioCard({
         <span className="ml-auto flex items-center gap-3 text-xs">
           <Button variant="link" size="xs" disabled={saving || (!!s.savedId && !dirty)} onClick={onSave}>
             {saving ? "Saving…" : !s.savedId ? "Save" : dirty ? "Save changes" : "Saved ✓"}
+          </Button>
+          <Button variant="link" size="xs" className="text-muted-foreground" onClick={onToggle}>
+            {s.off ? "Turn on" : "Turn off"}
           </Button>
           <Button variant="link" size="xs" className="text-muted-foreground" onClick={onDuplicate}>
             Duplicate
@@ -1246,6 +1293,8 @@ function CompareView({ c, scenarios }: { c: Compare; scenarios: Scenario[] }) {
         <ProjectionChart months={c.months} series={series} format={rp} monthShort={(m) => `${monthLabel(m, "short")} '${m.slice(2, 4)}`} />
       </section>
 
+      <SpendingPlan c={c} scenarios={scenarios} />
+
       <section className="card min-w-0 space-y-3">
         <div className="flex items-baseline justify-between gap-2">
           <h2 className="text-base font-bold tracking-tight">Side by side</h2>
@@ -1330,6 +1379,107 @@ function CompareView({ c, scenarios }: { c: Compare; scenarios: Scenario[] }) {
         </Disclosure>
       </section>
     </>
+  );
+}
+
+const PLAN_SLICES = [
+  { key: "spending", label: "Core spending", color: "var(--viz-series-1)" },
+  { key: "existing", label: "Existing installments", color: "var(--viz-series-2)" },
+  { key: "newInstallments", label: "New installments", color: "var(--viz-series-3)" },
+  { key: "vehicle", label: "Car running costs", color: "var(--viz-series-4)" },
+  { key: "recurring", label: "Other monthly costs", color: "var(--viz-series-5)" },
+  { key: "left", label: "Left over", color: "var(--viz-series-6)" },
+] as const;
+const AVERAGE = "avg";
+
+/** One scenario's month as a pie: where the income goes, on average over the plan or in a month the member picks. */
+function SpendingPlan({ c, scenarios }: { c: Compare; scenarios: Scenario[] }) {
+  const [pick, setPick] = useState<string | null>(null);
+  const [month, setMonth] = useState(AVERAGE);
+  const [active, setActive] = useState<string | null>(null);
+  // The first scenario of the member's own, else "No change"; falls back when the picked one is turned off or renamed.
+  const sc = c.scenarios.find((x) => x.name === pick) ?? c.scenarios.find((x) => scenarios.some((y) => (y.name || "Untitled") === x.name)) ?? c.scenarios[0]!;
+  const idx = c.months.indexOf(month);
+  const at = (xs: number[]) => (idx >= 0 ? (xs[idx] ?? 0) : xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : 0);
+  const existing = c.baseline.existingInstallments.amount;
+  const installments = at(sc.series.installments);
+  const income = at(sc.series.income);
+  const values: Record<(typeof PLAN_SLICES)[number]["key"], number> = {
+    spending: at(sc.series.spending),
+    existing: Math.min(existing, installments),
+    newInstallments: Math.max(0, installments - existing),
+    vehicle: Math.max(0, at(sc.series.vehicleCosts)),
+    recurring: Math.max(0, at(sc.series.recurring)),
+    left: 0,
+  };
+  const outflow = values.spending + values.existing + values.newInstallments + values.vehicle + values.recurring;
+  const free = income - outflow;
+  values.left = Math.max(0, free);
+  const total = outflow + values.left;
+  const slices = PLAN_SLICES.filter((x) => values[x.key] > 0).map((x) => ({
+    ...x,
+    value: values[x.key],
+    display: rp(values[x.key]),
+    share: total ? Math.round((values[x.key] / total) * 100) : 0,
+  }));
+  const when = idx >= 0 ? monthYear(month) : `average month, ${monthYear(c.months[0]!)} – ${monthYear(c.months[c.months.length - 1]!)}`;
+  const monthItems = [{ value: AVERAGE, label: "Average month" }, ...c.months.map((m) => ({ value: m, label: monthYear(m) }))];
+
+  return (
+    <section className="card min-w-0 space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-base font-bold tracking-tight">Spending plan</h2>
+          <p className="text-xs text-muted-foreground">Where the income goes, {when}.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {c.scenarios.length > 1 && (
+            <Select aria-label="Scenario" size="sm" className="w-auto min-w-40" value={sc.name} onValueChange={setPick} items={c.scenarios.map((x) => ({ value: x.name, label: x.name }))} />
+          )}
+          <Combobox aria-label="Month" size="sm" className="w-40" value={month} onValueChange={(v) => setMonth(v || AVERAGE)} items={monthItems} searchPlaceholder="Search months" />
+        </div>
+      </div>
+      {free < 0 && (
+        <p className="rounded-2xl bg-destructive-soft px-4 py-3 text-sm text-destructive-ink">
+          Short by {rp(-free)} {idx >= 0 ? "this month" : "a month on average"}: the costs below are more than the {rp(income)} coming in, so the gap comes out of savings.
+        </p>
+      )}
+      <div className="@container">
+        <div className="flex flex-col items-center gap-4 @md:flex-row @md:items-start">
+          <DonutChart
+            slices={slices}
+            centerLabel={free < 0 ? "Costs" : "Income"}
+            centerValue={rp(free < 0 ? outflow : income)}
+            label={`${sc.name}, ${when}: ${slices.map((x) => `${x.label} ${x.display} (${x.share}%)`).join(", ")}`}
+            active={active}
+            onActive={setActive}
+          />
+          <ul className="w-full min-w-0 flex-1 space-y-0.5">
+            {slices.map((x) => (
+              <li
+                key={x.key}
+                className={cn("flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm", active === x.key && "bg-muted")}
+                onPointerEnter={() => setActive(x.key)}
+                onPointerLeave={() => setActive(null)}
+              >
+                <SwatchKey color={x.color} />
+                <span className="min-w-0 flex-1 truncate">{x.label}</span>
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{x.share}%</span>
+                <span className="w-32 shrink-0 text-right font-semibold tabular-nums">{x.display}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <Disclosure plain title="What each part means">
+        <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs text-muted-foreground">
+          <li>Core spending: your usual monthly spending from the ledger (or the number you typed), after any spending cuts in the scenario.</li>
+          <li>New installments: the scenario's loans, in the months they are paid. Car running costs: fuel, parking, toll, maintenance, insurance renewal and PKB, minus what the car saves.</li>
+          <li>Other monthly costs: monthly items such as the baby's costs. One-off payments (down payments, hospital bills) are not in a month's plan; they come out of savings.</li>
+          <li>Left over: what goes to the emergency fund and savings that month.</li>
+        </ul>
+      </Disclosure>
+    </section>
   );
 }
 
