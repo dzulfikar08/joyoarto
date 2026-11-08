@@ -400,6 +400,11 @@ function Plan() {
             setSavedOpen(false);
             void openSaved(id);
           }}
+          onClose={(id) => {
+            const here = state.scenarios.filter((x) => x.savedId === id);
+            if (here.some(isDirty) && !confirm(`"${here[0]!.name}" has unsaved changes on this page. Take it off the page anyway? The saved version stays.`)) return;
+            update((st) => ({ ...st, scenarios: st.scenarios.filter((x) => x.savedId !== id) }));
+          }}
           onDelete={(id, name) => confirm(`Delete the saved scenario "${name}"? It is removed for everyone in your household.`) && remove.mutate(id)}
         />
       </div>
@@ -435,6 +440,7 @@ function SavedScenarios({
   full,
   openIds,
   onOpen,
+  onClose,
   onDelete,
 }: {
   open: boolean;
@@ -444,6 +450,7 @@ function SavedScenarios({
   full: boolean;
   openIds: Set<string>;
   onOpen: (id: string) => void;
+  onClose: (id: string) => void;
   onDelete: (id: string, name: string) => void;
 }) {
   return (
@@ -459,13 +466,15 @@ function SavedScenarios({
             <li key={s.id} className="flex items-center gap-2 py-2">
               <button
                 type="button"
-                disabled={here || full}
-                onClick={() => onOpen(s.id)}
+                disabled={!here && full}
+                aria-pressed={here}
+                title={here ? "On this page: tap to take it off (the saved version stays)" : "Open it on this page"}
+                onClick={() => (here ? onClose(s.id) : onOpen(s.id))}
                 className="min-w-0 flex-1 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none disabled:cursor-default disabled:hover:bg-transparent"
               >
                 <span className="flex min-w-0 items-center gap-2">
                   <span className="truncate text-sm font-medium">{s.name}</span>
-                  {here && <Badge tone="muted">On this page</Badge>}
+                  {here && <Badge tone="positive">On this page ✓</Badge>}
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
                   Changed {dateFmt.format(new Date(s.updatedAt))}
@@ -473,6 +482,11 @@ function SavedScenarios({
                 </span>
                 {s.labels.length > 0 && <ItemPills labels={s.labels} className="mt-1.5" />}
               </button>
+              {here && (
+                <Button variant="link" size="xs" className="shrink-0 text-muted-foreground" onClick={() => onClose(s.id)}>
+                  Remove from page
+                </Button>
+              )}
               <Button variant="link" size="xs" className="shrink-0 text-destructive" onClick={() => onDelete(s.id, s.name)}>
                 Delete
               </Button>
