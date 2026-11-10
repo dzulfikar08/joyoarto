@@ -72,10 +72,28 @@ appId: com.joyodigitama.joyoarto
     timeout: 30000
 - tapOn:
     point: "50%,94%"
+# "kopi 25rb gopay" in the field is only a placeholder, which Maestro does not see; wait for the label above it.
 - extendedWaitUntil:
-    visible: "kopi 25rb gopay"
+    visible: "Or type it"
     timeout: 15000
-- tapOn: "kopi 25rb gopay"
+- tapOn:
+    below: "Or type it"
+    index: 0
+# A fresh simulator shows the keyboard's slide-to-type tip over the sheet the first time; dismiss it.
+- runFlow:
+    when:
+      visible: "Speed up your typing.*"
+    commands:
+      - tapOn:
+          text: "Continue"
+          below: "Speed up your typing.*"
 - inputText: "kopi 25rb gopay"
 - hideKeyboard
+- runFlow:
+    when:
+      visible: "Speed up your typing.*"
+    commands:
+      - tapOn:
+          text: "Continue"
+          below: "Speed up your typing.*"
 - takeScreenshot: 06-quick-add
