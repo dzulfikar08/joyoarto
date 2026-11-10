@@ -1,6 +1,6 @@
-// Joyo Pro status on the phone (web: apps/web/src/routes/-billing.tsx). JoyoArto sells nothing: Joyo Pro is bought
-// and managed in JoyoRogo. Android may link there ("Manage in JoyoRogo", opens the browser). iOS (`storeSafe`, App
-// Review 3.1.1 / 3.1.3) shows the status only: no prices, no purchase wording, no outbound link. Pure, unit-tested.
+// Joyo Pro status on the phone (web: apps/web/src/routes/-billing.tsx). On Android Joyo Pro is bought and managed in
+// JoyoRogo ("Manage in JoyoRogo", opens the browser). iOS (`storeSafe`, App Review 3.1.1 / 3.1.3) sells it with
+// In-App Purchase on its own screen (app/joyo-pro.tsx) and never links outside the app. Pure, unit-tested.
 
 import { shortDate } from "./format";
 import type { AppRouterClient, Out } from "./rpc";
@@ -81,9 +81,9 @@ export function importsLeft(s: Pick<BillingStatus, "usage"> | undefined): number
 }
 
 /**
- * A Pro-only feature that is off for this account: what to say instead of the control. iOS never says where Joyo Pro
- * is sold.
+ * A Pro-only feature that is off for this account: what to say instead of the control. iOS points to its own Joyo Pro
+ * screen (In-App Purchase), never to JoyoRogo or the web.
  */
 export function proOnlyNote(feature: string, opts: { storeSafe: boolean }): string {
-  return opts.storeSafe ? `${feature} is not included in this account's plan.` : `${feature} is part of Joyo Pro. Get it in JoyoRogo with the same Google account.`;
+  return opts.storeSafe ? `${feature} is part of Joyo Pro (More → Joyo Pro).` : `${feature} is part of Joyo Pro. Get it in JoyoRogo with the same Google account.`;
 }

@@ -1,7 +1,9 @@
-// Data & privacy: download your data (JSON or CSV, through the share sheet), connected AI apps, delete the household,
-// delete the account. Same safeguards as the web (apps/web/src/routes/-data-privacy.tsx): a preview of which
-// households go with the account, owners blocking it, and the email or household name typed to confirm. All of it
-// needs a Google/Apple sign-in; the demo account is refused by the server.
+// Data & privacy: AI consent (allow / withdraw sending data to the AI providers), download your data (JSON or CSV,
+// through the share sheet), connected AI apps, delete the household, delete the account. Same safeguards as the web
+// (apps/web/src/routes/-data-privacy.tsx): a preview of which households go with the account, owners blocking it, and
+// the email or household name typed to confirm. Export and household deletion need a Google/Apple sign-in. Deleting
+// the account also works on the reviewers' demo account, where it resets the made-up data and signs out (App Review
+// 5.1.1(v)).
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import * as FileSystem from "expo-file-system/legacy";
@@ -14,6 +16,7 @@ import { useMe } from "@/components/data";
 import { SessionOnlyNote, useHasSession } from "@/components/session-only";
 import { Button, Card, Disclosure, Field, ListRow, ListSection, Row, Screen, SkeletonCard, Text } from "@/components/ui";
 import { signOut, useSession } from "@/src/lib/auth";
+import { AI_CONSENT_LINES, giveAiConsent, withdrawAiConsent } from "@/src/lib/ai-consent";
 import { downloadError, emailConfirmed, EXPORTS, exportFileName, exportUrl, nameConfirmed, type ExportKind } from "@/src/lib/data-privacy";
 import { errorMessage } from "@/src/lib/errors";
 import { shortDate } from "@/src/lib/format";
@@ -25,8 +28,11 @@ import { toast } from "@/src/lib/toast";
 
 export default function DataPrivacyScreen() {
   const hasSession = useHasSession();
+  const me = useMe();
+  const demo = me?.demo === true;
   return (
     <Screen>
+      <AiConsentCard />
       {!hasSession ? (
         <Card>
           <SessionOnlyNote />
@@ -36,9 +42,9 @@ export default function DataPrivacyScreen() {
           <Download />
           <ConnectedApps />
           <DeleteHousehold />
-          <DeleteAccount />
         </>
       )}
+      {hasSession || demo ? <DeleteAccount demo={demo} /> : null}
       <ListSection>
         <ListRow icon="shield-checkmark-outline" title="Privacy policy" onPress={() => void Linking.openURL("https://arto.joyorogo.com/privasi")} />
         <ListRow icon="document-outline" title="Terms" onPress={() => void Linking.openURL("https://arto.joyorogo.com/syarat")} />
@@ -192,7 +198,53 @@ function DeleteHousehold() {
   );
 }
 
-function DeleteAccount() {
+/** Whether JoyoArto may send the member's data to the AI providers; the same wording as the consent dialog. */
+function AiConsentCard() {
+  const q = useQuery(orpc.account.aiConsent.queryOptions());
+  const change = useMutation({
+    mutationFn: (allow: boolean) => (allow ? giveAiConsent() : withdrawAiConsent()),
+    onSuccess: (_r, allow) => toast.success(allow ? "Joyo AI may use your data" : "Withdrawn: nothing more is sent to an AI"),
+    onError: (e) => toast.error("Couldn't change it", errorMessage(e, { storeSafe })),
+  });
+  const allowed = q.data?.allowed === true;
+  return (
+    <Card title="Joyo AI and your data">
+      {q.isPending ? (
+        <SkeletonCard lines={1} />
+      ) : (
+        <Text>
+          {allowed && q.data?.at
+            ? `Allowed on ${shortDate(q.data.at)}. Joyo AI chat, voice notes, receipt scans and quick add send data to Anthropic and Cloudflare Workers AI.`
+            : "Not allowed: nothing is sent to an AI. Joyo AI chat, voice notes and receipt scans ask first; quick add reads your text without AI."}
+        </Text>
+      )}
+      <Disclosure plain title="What is sent, and to whom">
+        {AI_CONSENT_LINES.join("\n\n")}
+      </Disclosure>
+      {q.data ? (
+        allowed ? (
+          <Button
+            title="Withdraw"
+            variant="secondary"
+            small
+            loading={change.isPending}
+            onPress={() =>
+              Alert.alert("Stop sending data to AI?", "Joyo AI chat, voice notes and receipt scans stop working until you allow it again. Quick add still works without AI.", [
+                { text: "Cancel", style: "cancel" },
+                { text: "Withdraw", style: "destructive", onPress: () => change.mutate(false) },
+              ])
+            }
+          />
+        ) : (
+          <Button title="Allow" small loading={change.isPending} onPress={() => change.mutate(true)} />
+        )
+      ) : null}
+      {q.isError ? <Text variant="caption" tone="destructive">{errorMessage(q.error, { storeSafe })}</Text> : null}
+    </Card>
+  );
+}
+
+function DeleteAccount({ demo }: { demo: boolean }) {
   const router = useRouter();
   const me = useMe();
   const [open, setOpen] = useState(false);
@@ -220,6 +272,11 @@ function DeleteAccount() {
       ) : (
         <>
           <Text>Deletes your JoyoArto account, sign-in sessions, API tokens, AI connections and AI activity log, and signs you out. It cannot be undone.</Text>
+          {demo ? (
+            <Text variant="caption" tone="muted">
+              Demo account: the demo is shared by app reviewers, so instead of being removed for good its made-up data is reset and you are signed out. A real account is deleted permanently.
+            </Text>
+          ) : null}
           {preview.isPending ? <SkeletonCard lines={2} /> : null}
           {p ? (
             <View style={{ gap: 6 }}>

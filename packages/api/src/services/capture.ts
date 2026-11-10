@@ -21,6 +21,7 @@ import { todayWib } from "../lib/dashboard";
 import { reserveSlot, settleSlot } from "../lib/joyo-ai/limits";
 import { listAccounts, listCategories } from "./accounts";
 import { baseCurrency } from "./common";
+import { hasAiConsent, requireAiConsent } from "./ai-consent";
 
 export const TRANSCRIBE_MODEL = "@cf/openai/whisper-large-v3-turbo";
 /** About 60 s of webm/opus or mp4/aac. */
@@ -65,6 +66,7 @@ export async function transcribe(db: Database, p: Principal, ai: AiConfig | unde
     if (ai.fakeTranscript) return { text: DEV_TRANSCRIPT };
     unavailable();
   }
+  await requireAiConsent(db, p.userId);
   const slot = await reserveSlot(db, { userId: p.userId, householdId: p.householdId, kind: "transcribe", kinds: ["transcribe", "parse"], engine: "hosted", model: TRANSCRIBE_MODEL, cap: ai.captureCap });
   if (!slot) throw new ORPCError("TOO_MANY_REQUESTS", { message: "That's all the voice notes for today. Type it instead.", data: { reason: "cap" } });
   const started = Date.now();
@@ -146,6 +148,8 @@ export async function parseCapture(db: Database, p: Principal, ai: AiConfig | un
   const categories: DraftCategory[] = cats.map((c) => ({ slug: c.slug, name: c.name, kind: c.kind }));
   const rules = parseCaptureRules(input.text, { today, accounts, categories, currency });
   if (!ai?.anthropicKey && !ai?.workersAi) return { draft: rules, currency };
+  // Without the member's permission the text never reaches a model: the rules parser does it all.
+  if (!(await hasAiConsent(db, p.userId))) return { draft: rules, currency };
   const model = ai.anthropicKey ? ai.parseModel : ai.workersAiModel;
 
   const slot = await reserveSlot(db, { userId: p.userId, householdId: p.householdId, kind: "parse", kinds: ["transcribe", "parse"], engine: "hosted", model, cap: ai.captureCap });
@@ -238,6 +242,8 @@ export async function receiptCapture(
   input: z.infer<typeof receiptInput>,
 ): Promise<{ attachment: AttachmentView; draft: CaptureDraft; lineItems: ReceiptLine[]; paymentMethod: string | null; currency: string; ocr: ReceiptOcr }> {
   const store = requireFiles(files);
+  // Reading a receipt sends the photo to an AI: ask first (before anything is stored, so a retry stores it once).
+  if (ai?.anthropicKey || ai?.workersAi) await requireAiConsent(db, p.userId);
   const bytes = new Uint8Array(await input.image.arrayBuffer());
   const attachment = await storeImage(db, store, p, bytes, null);
   const today = todayWib();

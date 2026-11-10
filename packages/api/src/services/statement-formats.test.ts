@@ -82,7 +82,16 @@ describe("formatPreview", () => {
 });
 
 describe("requestFormat", () => {
+  test("without AI consent the skeleton is filed with no spec and nothing reaches the model", async () => {
+    const seen: string[] = [];
+    const res = await requestFormat(db, rina, atur(), fakeAi(seen), { text: bcaStatement(30), source: "pdf", platform: "web" });
+    expect(res.filed).toBe(true);
+    expect(seen).toHaveLength(0);
+    expect(String(sent[0]!.body.stack)).not.toContain("## Parser spec (AI:");
+  });
+
   test("files the skeleton and an AI spec built from the skeleton only; never the member's data", async () => {
+    await db.update(schema.user).set({ aiConsentAt: new Date() }).where(eq(schema.user.id, rina.userId));
     const seen: string[] = [];
     const res = await requestFormat(db, rina, atur(), fakeAi(seen), { text: bcaStatement(30), source: "pdf", platform: "web" });
     expect(res).toEqual({ filed: true, alreadyRequested: false, issue: { number: 52, occurrences: 1 } });

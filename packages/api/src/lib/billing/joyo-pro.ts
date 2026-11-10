@@ -3,6 +3,9 @@
 //
 //   POST {JOYOROGO_API_URL}/api/internal/joyo-pro/status   header x-joyo-internal-key: <JOYO_INTERNAL_KEY>
 //        body { googleSub?, email }  ->  { pro, until, plan, source }   (401 = wrong key)
+//   POST {JOYOROGO_API_URL}/api/internal/joyo-pro/apple    same header; iOS In-App Purchase of JoyoArto's own products
+//        body { googleSub?, email, name? }                     ->  { appAccountToken }       (before StoreKit's purchase)
+//        body { googleSub?, email, signedTransaction }         ->  { status, sandbox, joyo }  (after it: credits Joyo Pro)
 //   GET  {JOYOROGO_API_URL}/api/config                       public: the current prices, so they never drift
 //
 // Both apps sign in with the same Google OAuth client, so the Google account id (better-auth account.accountId for
@@ -69,6 +72,87 @@ export async function fetchJoyoPro(
   if (until && Number.isNaN(until.getTime())) throw new JoyoProUnavailable("joyo-pro status: bad until");
   const plan = JOYO_PRO_PLANS.find((p) => p === parsed.data.plan) ?? null;
   return { pro: parsed.data.pro, until, plan, source: parsed.data.source ?? null };
+}
+
+// ------------------------------------------------------------------------------------------------ App Store
+
+export const JOYO_PRO_APPLE_PATH = "/api/internal/joyo-pro/apple";
+const APPLE_TIMEOUT_MS = 10_000;
+
+/** JoyoRogo refused an App Store transaction: the message the buyer sees. */
+export class JoyoProAppleRefused extends Error {
+  constructor(
+    readonly reason: "receipt_invalid" | "other-account" | "wrong-product" | "busy" | "no_user" | "unknown",
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+const REFUSALS: Record<string, string> = {
+  receipt_invalid: "The App Store purchase could not be verified. Try Restore purchases.",
+  "wrong-product": "The App Store purchase could not be verified. Try Restore purchases.",
+  "other-account": "This App Store subscription already belongs to another Joyo account. Sign in with that account to use it.",
+  busy: "The purchase is still being processed. Try Restore purchases in a minute.",
+  no_user: "This account has no email to attach Joyo Pro to.",
+};
+
+const appleAnswerSchema = z.object({
+  status: z.enum(["granted", "already", "inactive"]),
+  sandbox: z.boolean().optional(),
+  joyo: answerSchema,
+});
+
+async function postApple(config: JoyoProConfig, body: Record<string, unknown>, fetchImpl: typeof fetch): Promise<unknown> {
+  let res: Response;
+  try {
+    res = await fetchImpl(`${config.apiUrl}${JOYO_PRO_APPLE_PATH}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", [JOYO_INTERNAL_KEY_HEADER]: config.key },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(APPLE_TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw new JoyoProUnavailable(`joyo-pro apple: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (res.status === 401) throw new JoyoProUnauthorized();
+  const json = (await res.json().catch(() => null)) as { error?: string } | null;
+  if (res.status >= 400 && res.status < 500 && json?.error && json.error !== "not_found" && json.error !== "invalid_body") {
+    const reason = (json.error in REFUSALS ? json.error : "unknown") as JoyoProAppleRefused["reason"];
+    throw new JoyoProAppleRefused(reason, REFUSALS[json.error] ?? "The App Store purchase could not be applied.");
+  }
+  if (!res.ok) throw new JoyoProUnavailable(`joyo-pro apple: HTTP ${res.status}`);
+  return json;
+}
+
+type AppleWho = { googleSub: string | null; email: string; name?: string | null };
+const whoBody = (who: AppleWho) => ({ ...(who.googleSub ? { googleSub: who.googleSub } : {}), email: who.email, ...(who.name ? { name: who.name } : {}) });
+
+/** The UUID to pass to StoreKit as appAccountToken: ties the purchase and its renewals to this person's Joyo Pro. */
+export async function fetchAppleAccountToken(config: JoyoProConfig, who: AppleWho, fetchImpl: typeof fetch = fetch): Promise<string> {
+  const json = await postApple(config, whoBody(who), fetchImpl);
+  const parsed = z.object({ appAccountToken: z.string().uuid() }).safeParse(json);
+  if (!parsed.success) throw new JoyoProUnavailable("joyo-pro apple: unreadable token");
+  return parsed.data.appAccountToken;
+}
+
+/** Credits a verified StoreKit 2 transaction (JWS) to this person's Joyo Pro; returns the new status. */
+export async function redeemAppleTransaction(
+  config: JoyoProConfig,
+  who: AppleWho,
+  signedTransaction: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ status: "granted" | "already" | "inactive"; sandbox: boolean; joyo: JoyoProAnswer }> {
+  const json = await postApple(config, { ...whoBody(who), signedTransaction }, fetchImpl);
+  const parsed = appleAnswerSchema.safeParse(json);
+  if (!parsed.success) throw new JoyoProUnavailable("joyo-pro apple: unreadable answer");
+  const j = parsed.data.joyo;
+  const until = j.until ? new Date(j.until) : null;
+  return {
+    status: parsed.data.status,
+    sandbox: parsed.data.sandbox ?? false,
+    joyo: { pro: j.pro, until: until && !Number.isNaN(until.getTime()) ? until : null, plan: JOYO_PRO_PLANS.find((p) => p === j.plan) ?? null, source: j.source ?? null },
+  };
 }
 
 // ------------------------------------------------------------------------------------------------ cache rules

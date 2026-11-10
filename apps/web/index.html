@@ -23,7 +23,7 @@
          The "js" class hides the prerendered #prerender body for people who run the app (see scripts/prerender.ts). -->
     <script>
       (function () {
-        var d = document.documentElement, h = location.hostname, p = location.pathname, pub = ["/", "/demo", "/pricing", "/claude", "/privasi", "/syarat"];
+        var d = document.documentElement, h = location.hostname, p = location.pathname, pub = ["/", "/demo", "/pricing", "/claude", "/privasi", "/syarat", "/support"];
         d.className += " js";
         if (h !== "arto.joyorogo.com") document.querySelector('meta[name="robots"]').setAttribute("content", "noindex");
         if (h === "baroka.by.dzulfikar.com" || (h === "arto.joyorogo.com" && pub.indexOf(p.replace(/\/$/, "") || "/") < 0))

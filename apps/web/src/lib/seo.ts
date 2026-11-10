@@ -121,7 +121,7 @@ export const FAQ: { q: string; a: string }[] = [
 // Pages
 
 export type PublicPage = {
-  path: "/" | "/demo" | "/pricing" | "/claude" | "/privasi" | "/syarat";
+  path: "/" | "/demo" | "/pricing" | "/claude" | "/privasi" | "/syarat" | "/support";
   /** File in dist/ (Workers assets serve demo.html at /demo). */
   file: string;
   /** Route sources whose last commit dates the page (sitemap lastmod). */
@@ -219,6 +219,16 @@ export const PAGES: PublicPage[] = [
     og: OG.legal,
     priority: 0.3,
     body: () => legalBody("Syarat Layanan", "Syarat penggunaan layanan JoyoArto yang kami jalankan: akun, rumah tangga dan anggotanya, langganan Joyo Pro, dan batas tanggung jawab."),
+  },
+  {
+    path: "/support",
+    file: "support.html",
+    sources: ["src/routes/support.tsx"],
+    title: "Bantuan & dukungan JoyoArto",
+    description: "Hubungi JoyoArto lewat email, cara import statement, mengelola langganan, dan menghapus akun serta datamu.",
+    og: OG.legal,
+    priority: 0.3,
+    body: supportBody,
   },
 ];
 
@@ -359,7 +369,7 @@ function softwareApplication(): Record<string, unknown> {
 const nav = () =>
   `<header><p><a href="/"><strong>JoyoArto</strong></a></p><nav aria-label="Navigasi"><a href="/#fitur">Fitur</a> · <a href="/demo">Demo</a> · <a href="/pricing">Harga</a> · <a href="/claude">Claude</a> · <a href="/#faq">FAQ</a> · <a href="https://app.arto.joyorogo.com/login">Masuk</a></nav></header>`;
 const footer = () =>
-  `<footer><p>JoyoArto oleh JoyoDigitama · <a href="/privasi">Kebijakan privasi</a> · <a href="/syarat">Syarat layanan</a> · <a href="${REPO}">Kode sumber (AGPL)</a> · <a href="${DISCORD_URL}">Discord</a> · <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></p></footer>`;
+  `<footer><p>JoyoArto oleh JoyoDigitama · <a href="/privasi">Kebijakan privasi</a> · <a href="/syarat">Syarat layanan</a> · <a href="/support">Bantuan</a> · <a href="${REPO}">Kode sumber (AGPL)</a> · <a href="${DISCORD_URL}">Discord</a> · <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></p></footer>`;
 const wrap = (main: string) => `${nav()}<main>${main}</main>${footer()}`;
 
 function homeBody(): string {
@@ -423,6 +433,19 @@ function claudeBody(): string {
       `<h2>Data apa yang dilihat Claude</h2><p>Hanya hasil alat yang dipanggil untuk permintaanmu, dari rumah tangga yang aktif. Foto struk tidak pernah dikirim. JoyoArto mencatat pemanggilan alat (bukan hasilnya) selama 90 hari dan tidak membaca percakapanmu dengan Claude. <a href="/privasi">Kebijakan privasi</a>.</p>` +
       `<h2>Cara memutuskan</h2><p>Di JoyoArto: Settings → Data &amp; privacy → Connected AI apps → Disconnect (langsung berlaku). Di Claude: Customize → Connectors → JoyoArto → Remove.</p>` +
       `<p>Bantuan: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>`,
+  );
+}
+
+/** The support page without JavaScript: the contact details and the answers reviewers and members look for first. */
+function supportBody(): string {
+  const mail = `<a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>`;
+  return wrap(
+    `<h1>Bantuan &amp; dukungan · Help &amp; support</h1>` +
+      `<p>Email: ${mail}. Discord: <a href="${DISCORD_URL}">${DISCORD_URL}</a>.</p>` +
+      `<ul><li>Hapus akun / delete your account: More → Delete account di aplikasi, atau email kami dari alamat akunmu.</li>` +
+      `<li>Langganan di iPhone / subscriptions on iPhone: Settings → [your name] → Subscriptions.</li>` +
+      `<li>Langganan di Android: Google Play → Payments &amp; subscriptions.</li></ul>` +
+      `<p><a href="/privasi">Kebijakan privasi</a> · <a href="/syarat">Syarat layanan</a></p>`,
   );
 }
 

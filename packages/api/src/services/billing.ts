@@ -12,7 +12,17 @@ import type { BillingConfig } from "../lib/billing/config";
 import { isDemoUser } from "../lib/demo";
 import { localEntitlement, resolveEntitlement, wibMonth } from "../lib/billing/entitlement";
 import type { Entitlement } from "../lib/billing/entitlement";
-import { JoyoProUnauthorized, answerIsPro, cacheRow, failOpen, fetchJoyoPricing, fetchJoyoPro } from "../lib/billing/joyo-pro";
+import {
+  JoyoProAppleRefused,
+  JoyoProUnauthorized,
+  answerIsPro,
+  cacheRow,
+  failOpen,
+  fetchAppleAccountToken,
+  fetchJoyoPricing,
+  fetchJoyoPro,
+  redeemAppleTransaction,
+} from "../lib/billing/joyo-pro";
 import type { CachedJoyoPro, JoyoPricing } from "../lib/billing/joyo-pro";
 import { PLAN_LIMITS, STATEMENT_IMPORT_METRIC } from "../lib/billing/plans";
 import type { PlanLimits, UpgradeFeature } from "../lib/billing/plans";
@@ -278,10 +288,81 @@ export async function billingStatus(db: Database, p: Principal, config: BillingC
     joyo: plan.joyo,
     /** JoyoRogo's Pro page: buy, renew or manage Joyo Pro there. Null without billing. */
     proUrl: config?.joyo ? config.proUrl : null,
+    /** The iOS app's own Joyo Pro products (In-App Purchase); empty without billing. */
+    appleProducts: config?.joyo ? APPLE_PRODUCTS : [],
     limits,
     usage: {
       statementImports: { used, limit: limits.statementImportsPerMonth, period },
       members: { used: (members?.n ?? 0) + (pending?.n ?? 0), limit: limits.members },
     },
   };
+}
+
+// ------------------------------------------------------------------------------------------------ App Store (iOS)
+
+/** JoyoArto's auto-renewable subscriptions in App Store Connect (group "Joyo Pro"). JoyoRogo credits them as Joyo Pro. */
+export const APPLE_PRODUCTS = [
+  { id: "com.joyodigitama.joyoarto.pro.monthly", plan: "monthly" as const },
+  { id: "com.joyodigitama.joyoarto.pro.yearly", plan: "yearly" as const },
+];
+
+function appleUnavailable(error: unknown): never {
+  if (error instanceof JoyoProAppleRefused) throw new ORPCError("BAD_REQUEST", { message: error.message, data: { reason: error.reason } });
+  if (error instanceof JoyoProUnauthorized) console.error(error.message);
+  else console.error("joyo-pro apple:", error instanceof Error ? error.message : error);
+  throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Joyo Pro can't be reached right now. Your purchase is safe: try again in a minute." });
+}
+
+async function appleWho(db: Database, userId: string) {
+  const who = await identity(db, userId);
+  if (!who || (!who.googleSub && !who.emailVerified)) {
+    throw new ORPCError("BAD_REQUEST", { message: "Sign in with Apple or Google to subscribe to Joyo Pro." });
+  }
+  const [u] = await db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, userId));
+  return { googleSub: who.googleSub, email: who.email, name: u?.name ?? null };
+}
+
+/**
+ * Before an App Store purchase: the appAccountToken to pass to StoreKit (null = buy without one: the demo, or a server
+ * without billing).
+ */
+export async function appleAccountToken(db: Database, p: Principal, config: BillingConfig | undefined): Promise<{ appAccountToken: string | null }> {
+  if (!config?.joyo || isDemoUser(p.userId)) return { appAccountToken: null };
+  try {
+    return { appAccountToken: await fetchAppleAccountToken(config.joyo, await appleWho(db, p.userId)) };
+  } catch (error) {
+    if (error instanceof ORPCError) throw error;
+    appleUnavailable(error);
+  }
+}
+
+/**
+ * After an App Store purchase, a restore, or a replay at start: JoyoRogo verifies the StoreKit 2 transaction and credits
+ * Joyo Pro; the fresh answer replaces the cached status so the app shows Pro at once. The phone finishes the
+ * transaction only after this succeeds.
+ */
+export async function redeemApplePurchase(
+  db: Database,
+  p: Principal,
+  config: BillingConfig | undefined,
+  signedTransaction: string,
+  now = new Date(),
+): Promise<{ status: "granted" | "already" | "inactive"; sandbox: boolean; pro: boolean }> {
+  // Store reviewers buy in the Sandbox with the demo account, which is Pro already and has no JoyoRogo account.
+  if (isDemoUser(p.userId)) return { status: "granted", sandbox: false, pro: true };
+  if (!config?.joyo) throw new ORPCError("BAD_REQUEST", { message: "This server does not sell Joyo Pro." });
+  try {
+    const result = await redeemAppleTransaction(config.joyo, await appleWho(db, p.userId), signedTransaction);
+    const [cached] = await db.select().from(jp).where(eq(jp.userId, p.userId));
+    const row = cacheRow(result.joyo, cached, now);
+    await db
+      .insert(jp)
+      .values({ userId: p.userId, ...row })
+      .onConflictDoUpdate({ target: jp.userId, set: row });
+    backoff.delete(p.userId);
+    return { status: result.status, sandbox: result.sandbox, pro: answerIsPro(result.joyo, now) };
+  } catch (error) {
+    if (error instanceof ORPCError) throw error;
+    appleUnavailable(error);
+  }
 }

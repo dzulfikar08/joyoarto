@@ -1,4 +1,5 @@
-// Settings → Data & privacy: download your data, see and disconnect AI apps, delete the household, delete the account.
+// Settings → Data & privacy: allow or withdraw AI use of your data, download your data, see and disconnect AI apps,
+// delete the household, delete the account.
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -9,6 +10,7 @@ import { Disclosure } from "@baroka/ui/components/disclosure";
 import { ShieldCheck } from "lucide-react";
 import { Input } from "@baroka/ui/components/input";
 
+import { AiConsentText, setAiConsent } from "@/lib/ai-consent";
 import { authClient } from "@/lib/auth-client";
 import { PRODUCT_NAME } from "@/lib/brand";
 import { client, errorMessage, orpc, queryClient } from "@/lib/orpc";
@@ -40,11 +42,46 @@ export function DataPrivacySettings() {
           </Link>
         </span>
       </div>
+      <AiConsentSetting />
       <DownloadData />
       <ConnectedApps />
       <DeleteHousehold />
       <DeleteAccount />
     </Disclosure>
+  );
+}
+
+/** Whether JoyoArto may send the member's data to the AI providers (lib/ai-consent.tsx; same wording as the dialog). */
+function AiConsentSetting() {
+  const q = useQuery(orpc.account.aiConsent.queryOptions());
+  const change = useMutation({ mutationFn: (allow: boolean) => setAiConsent(allow) });
+  const allowed = q.data?.allowed === true;
+  return (
+    <div className="space-y-2">
+      <div className="label">Joyo AI and your data</div>
+      <p className="text-muted-foreground">
+        {allowed && q.data?.at
+          ? `Allowed on ${date(q.data.at)}. Joyo AI chat, voice notes, receipt scans and quick add send data to Anthropic and Cloudflare Workers AI.`
+          : "Not allowed: nothing is sent to an AI. Joyo AI chat, voice notes and receipt scans ask first; quick add reads your text without AI."}
+      </p>
+      <Disclosure plain title="What is sent, and to whom">
+        <AiConsentText />
+      </Disclosure>
+      {q.data && (
+        <Button
+          size="sm"
+          variant={allowed ? "secondary" : "default"}
+          disabled={change.isPending}
+          onClick={() => {
+            if (allowed && !confirm("Stop sending data to AI? Joyo AI chat, voice notes and receipt scans stop working until you allow it again.")) return;
+            change.mutate(!allowed);
+          }}
+        >
+          {allowed ? "Withdraw" : "Allow"}
+        </Button>
+      )}
+      {(q.error ?? change.error) && <p className="text-destructive">{errorMessage(q.error ?? change.error)}</p>}
+    </div>
   );
 }
 
@@ -224,6 +261,12 @@ function DeleteAccount() {
           <p>
             Deletes your {PRODUCT_NAME} account, sign-in sessions, API tokens, AI connections and AI activity log, and signs you out. It cannot be undone.
           </p>
+          {me.data?.demo && (
+            <p className="text-muted-foreground">
+              Demo account: the demo is shared by app reviewers, so instead of being removed for good its made-up data is reset and you are signed out. A real
+              account is deleted permanently.
+            </p>
+          )}
           {preview.isLoading && <p className="text-muted-foreground">Checking your households…</p>}
           {p && (
             <ul className="list-disc space-y-1 pl-5">

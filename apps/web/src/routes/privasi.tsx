@@ -184,8 +184,10 @@ const sections: Section[] = [
               kapan saja.
             </li>
             <li>
-              <b>Joyo AI, catatan suara/teks dan foto struk</b> di tombol Tambah: hanya saat kamu memakainya. Dasarnya: pemenuhan perjanjian (fitur yang kamu minta). Joyo
-              hanya mengusulkan perubahan; tidak ada yang disimpan sebelum kamu menekan Konfirmasi atau Simpan.
+              <b>Joyo AI, catatan suara/teks dan foto struk</b> di tombol Tambah: hanya saat kamu memakainya, dan <b>hanya setelah kamu mengizinkannya</b>. Sebelum
+              data pertama dikirim ke penyedia AI, aplikasi menjelaskan data apa yang dikirim dan ke siapa (lihat bagian berikutnya), lalu meminta izinmu. Dasarnya:
+              persetujuanmu, yang bisa kamu cabut kapan saja di Pengaturan, Data & privasi; setelah dicabut tidak ada lagi yang dikirim ke AI (catatan teks tetap
+              dibaca tanpa AI). Joyo hanya mengusulkan perubahan; tidak ada yang disimpan sebelum kamu menekan Konfirmasi atau Simpan.
             </li>
             <li>
               <b>Keamanan:</b> sesi masuk, pembatasan jumlah permintaan, dan log MCP supaya kamu bisa melihat apa yang dilakukan aplikasi AI atas namamu dan supaya
@@ -215,8 +217,10 @@ const sections: Section[] = [
               <b>Connecting AI</b> such as Claude: only when you connect it and approve it yourself. Basis: your consent, which you can withdraw at any time.
             </li>
             <li>
-              <b>Joyo AI, voice/typed notes and receipt photos</b> in the Add button: only when you use them. Basis: performing our agreement (a feature you asked for). Joyo only
-              proposes changes; nothing is saved until you tap Confirm or Save.
+              <b>Joyo AI, voice/typed notes and receipt photos</b> in the Add button: only when you use them, and <b>only after you allow it</b>. Before any data first
+              goes to an AI provider, the app explains what is sent and to whom (see the next section) and asks for your permission. Basis: your consent, which you can
+              withdraw at any time in Settings, Data & privacy; after that nothing more is sent to an AI (typed notes are still read without AI). Joyo only proposes
+              changes; nothing is saved until you tap Confirm or Save.
             </li>
             <li>
               <b>Security:</b> sign-in sessions, rate limits, and the MCP log so you can see what AI apps did on your behalf and abuse can be traced. Basis: the
@@ -293,8 +297,9 @@ const sections: Section[] = [
             pertanyaanmu dan potongan percakapan sebelumnya, nama depanmu, nama rumah tangga, tanggal hari ini, dan data buku besar yang dibaca Joyo untuk menjawab
             (misalnya saldo, transaksi, ringkasan pengeluaran, baseline rencana). Untuk catatan di tombol Tambah: teks catatan, serta nama rekening dan kategori
             rumah tanggamu. Untuk foto struk: gambarnya, nama rekening dan kategori rumah tanggamu, hanya untuk membaca isinya (foto tetap disimpan di {N},
-            bukan di Anthropic). Anthropic tidak memakai data API untuk melatih modelnya dan menyimpannya sementara menurut kebijakan retensinya (umumnya 30 hari) untuk
-            keamanan. Bisa lewat Cloudflare AI Gateway.
+            bukan di Anthropic). Anthropic memprosesnya sebagai pemroses data atas instruksi kami, terikat Commercial Terms of Service dan Data Processing Addendum
+            Anthropic, yang memberi pelindungan setara dengan kebijakan ini. Anthropic tidak memakai data API untuk melatih modelnya dan menyimpannya sementara menurut
+            kebijakan retensinya (umumnya 30 hari) untuk keamanan. Bisa lewat Cloudflare AI Gateway. Tidak ada yang dikirim sebelum kamu mengizinkannya di aplikasi.
           </li>
           <li>
             <b>Cloudflare Workers AI</b>: mengubah catatan suara menjadi teks (Whisper). Rekamannya diproses lalu dibuang. Kalau Claude sedang tidak tersedia,
@@ -340,8 +345,9 @@ const sections: Section[] = [
             recent turns of the conversation, your first name, the household's name, today's date, and the ledger data Joyo reads to answer (for example balances,
             transactions, spending summaries, the plan baseline). For a note in the Add button: the note's text and your household's account and category names.
             For a receipt photo: the image and your household's account and category names, only to read it (the photo itself is stored by {N}, not by
-            Anthropic). Anthropic does not train its models on API data and keeps it briefly under its retention policy (typically 30 days) for safety. It may pass through
-            Cloudflare AI Gateway.
+            Anthropic). Anthropic processes it as a data processor on our instructions, bound by Anthropic's Commercial Terms of Service and Data Processing Addendum,
+            which give protection equal to this policy. Anthropic does not train its models on API data and keeps it briefly under its retention policy (typically 30
+            days) for safety. It may pass through Cloudflare AI Gateway. Nothing is sent before you allow it in the app.
           </li>
           <li>
             <b>Cloudflare Workers AI</b>: turns voice notes into text (Whisper). The recording is processed and discarded. When Claude is unavailable, Joyo AI and

@@ -200,8 +200,9 @@ export async function seedDemo(db: Database, now = new Date()): Promise<{ househ
   const today = wibDate(now);
   await db
     .insert(schema.user)
-    .values({ id: DEMO_USER_ID, name: DEMO_NAME, email: DEMO_EMAIL, emailVerified: true })
-    .onConflictDoUpdate({ target: schema.user.id, set: { name: DEMO_NAME, email: DEMO_EMAIL, image: null } });
+    .values({ id: DEMO_USER_ID, name: DEMO_NAME, email: DEMO_EMAIL, emailVerified: true, aiConsentAt: null })
+    // Each reviewer is asked for AI consent again (services/ai-consent.ts).
+    .onConflictDoUpdate({ target: schema.user.id, set: { name: DEMO_NAME, email: DEMO_EMAIL, image: null, aiConsentAt: null } });
 
   await pruneDemoConnections(db, now);
 
@@ -313,4 +314,19 @@ export async function demoToken(db: Database, code: string, expected: string | n
   await db.delete(schema.apiToken).where(and(eq(schema.apiToken.userId, DEMO_USER_ID), lt(schema.apiToken.expiresAt, now)));
   const token = await createToken(db, principal(), { name: "Demo (phone app)", scopes: ["finance:read", "finance:write"], expiresInDays: DEMO_TOKEN_DAYS });
   return { token: token.token, expiresAt: token.expiresAt, household: DEMO_HOUSEHOLD_NAME, note: "Demo account: the data is made up and resets every day." };
+}
+
+/**
+ * "Delete my account" on the demo account (App Review 5.1.1(v): reviewers run the whole flow). The shared demo user
+ * and household are not deleted; instead everything the reviewer changed is reset to the made-up data, the AI consent
+ * is cleared, and the demo's phone tokens are revoked so the app is signed out. Same confirmation as a real account:
+ * the demo email typed exactly. Answers in the shape of deleteAccount.
+ */
+export async function deleteDemoAccount(db: Database, input: { confirmEmail: string }, now = new Date()) {
+  if (input.confirmEmail.trim().toLowerCase() !== DEMO_EMAIL) {
+    throw new ORPCError("BAD_REQUEST", { message: "Type your account's email exactly to confirm." });
+  }
+  await seedDemo(db, now);
+  await db.delete(schema.apiToken).where(eq(schema.apiToken.userId, DEMO_USER_ID));
+  return { deleted: DEMO_USER_ID, householdsDeleted: [DEMO_HOUSEHOLD_NAME], householdsLeft: [] as string[], transactionsDeleted: 0 };
 }

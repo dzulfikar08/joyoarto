@@ -10,4 +10,4 @@ export const APP_ORIGIN = "https://app.arto.joyorogo.com";
 export const CONTROLLER = { name: "Dzulfikar Ats Tsauri", trade: "JoyoDigitama", country: "Indonesia" };
 export const CONTACT_EMAIL = "support@joyorogo.com";
 /** Effective date of the current privacy policy and terms (YYYY-MM-DD). */
-export const POLICY_EFFECTIVE = "2026-11-04";
+export const POLICY_EFFECTIVE = "2026-11-11";

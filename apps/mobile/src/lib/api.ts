@@ -53,7 +53,7 @@ export type ApiOptions = {
 };
 
 /** What a store-safe client shows for a Free-plan limit. */
-export const STORE_SAFE_LIMIT_MESSAGE = "This is not included in this account's plan. Nothing was changed.";
+export const STORE_SAFE_LIMIT_MESSAGE = "This is part of Joyo Pro (More → Joyo Pro). Nothing was changed.";
 
 /** A file to upload, as React Native's FormData takes it. */
 export type UploadFile = { uri: string; name: string; type: string };

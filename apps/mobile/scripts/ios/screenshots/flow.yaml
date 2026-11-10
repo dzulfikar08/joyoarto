@@ -97,3 +97,16 @@ appId: com.joyodigitama.joyoarto
           text: "Continue"
           below: "Speed up your typing.*"
 - takeScreenshot: 06-quick-add
+
+# The Joyo Pro screen (In-App Purchase): App Store Connect's review screenshot of the two subscriptions, not one of
+# the store screenshots. In the simulator StoreKit has no products, so the plan cards may read "Not available".
+- openLink: joyoarto://joyo-pro
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "Restore purchases"
+    timeout: 30000
+- takeScreenshot: 90-joyo-pro-review

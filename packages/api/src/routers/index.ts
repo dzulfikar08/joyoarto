@@ -7,6 +7,7 @@ import { z } from "zod";
 import { authedProcedure, publicProcedure, readProcedure, sessionProcedure, writeProcedure } from "../index";
 import { DEMO_TOKEN_DAYS, isDemoUser, refuseDemo } from "../lib/demo";
 import * as account from "../services/account";
+import * as aiConsent from "../services/ai-consent";
 import * as accounts from "../services/accounts";
 import * as attachments from "../services/attachments";
 import * as reimburse from "../services/reimburse";
@@ -34,6 +35,23 @@ const byId = z.object({ id: z.string() });
 
 /** Token management needs a signed-in browser session: a token or an AI connection cannot create more tokens. */
 const sessionOnly = sessionProcedure;
+
+/**
+ * Account deletion: a signed-in session, or the store reviewers' demo account on the phone (a `brk_` token). The demo's
+ * "deletion" resets its made-up data instead (services/demo.ts deleteDemoAccount), so reviewers can run the whole
+ * flow (App Review 5.1.1(v)).
+ */
+const sessionOrDemo = authedProcedure.use(({ context, next }) => {
+  const p = context.principal;
+  if (p.via !== "session" && !(p.via === "token" && isDemoUser(p.userId))) throw new ORPCError("FORBIDDEN", { message: "Do this from the JoyoArto web app." });
+  return next();
+});
+
+/** The member's own app (web session or the phone's token), never an AI connection: AI consent is the member's call. */
+const memberApp = authedProcedure.use(({ context, next }) => {
+  if (context.principal.via !== "session" && context.principal.via !== "token") throw new ORPCError("FORBIDDEN", { message: "Change this in the JoyoArto app." });
+  return next();
+});
 
 export const appRouter = {
   me: authedProcedure.route({ method: "GET", path: "/me", tags: ["account"] }).handler(async ({ context }) => {
@@ -335,10 +353,10 @@ export const appRouter = {
       })
       .input(account.disconnectInput)
       .handler(({ context, input }) => account.disconnectApp(context.db, context.principal, input)),
-    deletionPreview: sessionOnly
+    deletionPreview: sessionOrDemo
       .route({ method: "GET", path: "/account/deletion-preview", tags: ["account"], summary: "Which households deleting your account would delete, leave, or is blocked by" })
       .handler(({ context }) => account.accountDeletionPreview(context.db, context.principal)),
-    delete: sessionOnly
+    delete: sessionOrDemo
       .route({
         method: "POST",
         path: "/account/delete",
@@ -347,9 +365,17 @@ export const appRouter = {
       })
       .input(account.deleteAccountInput)
       .handler(({ context, input }) => {
-        refuseDemo(context.principal.userId, "deleteAccount");
+        if (isDemoUser(context.principal.userId)) return demo.deleteDemoAccount(context.db, input);
         return account.deleteAccount(context.db, context.principal, input, context.files);
       }),
+    /** Permission to send the member's data to the AI providers (Joyo AI, voice notes, receipt photos, quick add). */
+    aiConsent: memberApp
+      .route({ method: "GET", path: "/account/ai-consent", tags: ["account"], summary: "Whether you allowed sending your data to the AI providers" })
+      .handler(({ context }) => aiConsent.getAiConsent(context.db, context.principal.userId)),
+    setAiConsent: memberApp
+      .route({ method: "PUT", path: "/account/ai-consent", tags: ["account"], summary: "Allow or withdraw sending your data to the AI providers" })
+      .input(aiConsent.aiConsentInput)
+      .handler(({ context, input }) => aiConsent.setAiConsent(context.db, context.principal.userId, input)),
   },
 
   household: householdRouter,

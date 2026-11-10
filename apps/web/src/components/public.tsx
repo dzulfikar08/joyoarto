@@ -91,6 +91,9 @@ export function PublicFooter() {
           <Link to="/syarat" className="hover:underline">
             {en ? "Terms" : "Syarat"}
           </Link>
+          <Link to="/support" className="hover:underline">
+            {en ? "Support" : "Bantuan"}
+          </Link>
           {REPO_URL && (
             <a href={REPO_URL} className="hover:underline" target="_blank" rel="noreferrer">
               {en ? "Source code (AGPL)" : "Kode sumber (AGPL)"}

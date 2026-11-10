@@ -31,6 +31,7 @@ import "@/src/lib/plan-draft";
 // Captures belong to the signed-in account: deleted at sign-out, held for the same account after an expired sign-in.
 import "@/src/capture/session";
 import { bindQueryLifecycle, persistOptions, queryClient } from "@/src/lib/query";
+import { appleIapAvailable, useAppleReplay } from "@/src/lib/apple-iap";
 import { loadSettings, syncNativeConfig } from "@/src/lib/settings";
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -65,6 +66,12 @@ function ShareRouter() {
   return null;
 }
 
+/** iOS: credits App Store purchases that were interrupted, and renewals made while the app was closed. */
+function AppleReplay() {
+  useAppleReplay(appleIapAvailable);
+  return null;
+}
+
 /** Screens drawn without a stack header: the tabs (floating tab bar), Joyo AI (its own header) and sign-in. */
 const HEADERLESS = new Set(["/", "/transactions", "/add", "/joyo", "/more", "/login"]);
 const hasHeader = (path: string) => !HEADERLESS.has(path);
@@ -88,6 +95,7 @@ function Root() {
       <StatusBar style={rt.themeName === "dark" ? "light" : "dark"} />
       {session ? <CaptureSync /> : null}
       {session ? <ShareRouter /> : null}
+      {session ? <AppleReplay /> : null}
       <Stack screenOptions={header}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "Home" }} />
         <Stack.Screen name="login" options={{ title: "Sign in", headerShown: false }} />
@@ -104,6 +112,7 @@ function Root() {
         <Stack.Screen name="household" options={{ title: "Household" }} />
         <Stack.Screen name="settings" options={{ title: "Settings" }} />
         <Stack.Screen name="data-privacy" options={{ title: "Data & privacy" }} />
+        <Stack.Screen name="joyo-pro" options={{ title: "Joyo Pro" }} />
         <Stack.Screen name="reimburse" options={{ title: "Reimburse" }} />
         <Stack.Screen name="reimburse-profiles" options={{ title: "Reimbursement" }} />
       </Stack>

@@ -269,6 +269,28 @@ describe("capture", () => {
     const heard = await call(appRouter.capture.transcribe, { audio: new File([new Uint8Array(2000)], "v.webm", { type: "audio/webm" }) }, { context });
     expect(heard.text).toContain("kopi");
   });
+
+  test("nothing reaches an AI before the member allows it", async () => {
+    const seen: unknown[] = [];
+    const ai: AiConfig = { ...aiConfig(), fakeTranscript: false, workersAi: { run: async (_m, input) => (seen.push(input), { text: "kopi 25rb", response: "{}" }) } };
+    const context: Context = { db, principal: dewi, ai };
+    const audio = () => ({ audio: new File([new Uint8Array(2000)], "v.webm", { type: "audio/webm" }) });
+
+    expect((await call(appRouter.account.aiConsent, undefined, { context })).allowed).toBe(false);
+    await expect(call(appRouter.capture.transcribe, audio(), { context })).rejects.toMatchObject({ code: "PRECONDITION_FAILED", data: { aiConsent: true } });
+    const parsed = await call(appRouter.capture.parse, { text: "kopi 25rb gopay" }, { context });
+    expect(parsed.draft.source).toBe("rules");
+    expect(seen).toHaveLength(0);
+
+    await call(appRouter.account.setAiConsent, { allow: true }, { context });
+    expect((await call(appRouter.joyo.status, undefined, { context })).aiConsent).toBe(true);
+    await call(appRouter.capture.transcribe, audio(), { context });
+    expect(seen.length).toBeGreaterThan(0);
+
+    // Withdrawn: refused again.
+    await call(appRouter.account.setAiConsent, { allow: false }, { context });
+    await expect(call(appRouter.capture.transcribe, audio(), { context })).rejects.toMatchObject({ data: { aiConsent: true } });
+  });
 });
 
 test("quick_add proposals show the sign the server will save", async () => {

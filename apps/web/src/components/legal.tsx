@@ -14,7 +14,18 @@ function effective(en: boolean): string {
   return d.toLocaleDateString(en ? "en-GB" : "id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" });
 }
 
-export function LegalPage({ title, intro, sections }: { title: { id: string; en: string }; intro: { id: ReactNode; en: ReactNode }; sections: Section[] }) {
+export function LegalPage({
+  title,
+  intro,
+  sections,
+  dated = true,
+}: {
+  title: { id: string; en: string };
+  intro: { id: ReactNode; en: ReactNode };
+  sections: Section[];
+  /** Show the effective date (policies); off for the support page. */
+  dated?: boolean;
+}) {
   const lang = useLang();
   const en = lang === "en";
   return (
@@ -22,10 +33,12 @@ export function LegalPage({ title, intro, sections }: { title: { id: string; en:
       <PublicHeader />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         <h1 className="text-3xl font-semibold tracking-tight text-balance">{title[lang]}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {en ? "Effective" : "Berlaku sejak"} {effective(en)}
-          {en && " · The Indonesian version prevails if the two differ."}
-        </p>
+        {dated && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {en ? "Effective" : "Berlaku sejak"} {effective(en)}
+            {en && " · The Indonesian version prevails if the two differ."}
+          </p>
+        )}
         <div className="mt-6 text-foreground">{intro[lang]}</div>
         <nav aria-label={en ? "Contents" : "Daftar isi"} className="mt-6 rounded-xl border border-border p-4 text-sm">
           <ol className="list-decimal space-y-1 pl-5">

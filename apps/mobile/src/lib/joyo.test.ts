@@ -43,13 +43,14 @@ describe("off and daily cap", () => {
     expect(availability({ ...status, hosted: null }, null, { provider: "openai", apiKey: "sk-1234567890ab", model: "", enabled: true }, true)).toEqual({ kind: "ready", subtitle: "Your openai key" });
   });
 
-  test("cap: Android may mention Joyo Pro (no link), iOS never does", () => {
+  test("cap: both mention Joyo Pro; iOS points to the in-app screen, never JoyoRogo", () => {
     const capped = { ...status, usedToday: 5 };
     const android = availability(capped, null, null, false);
     const ios = availability(capped, null, null, true);
     expect(android.kind).toBe("cap");
     expect((android as { message: string }).message).toContain("Joyo Pro");
-    expect((ios as { message: string }).message).not.toMatch(/Pro|JoyoRogo|buy|price/i);
+    expect((ios as { message: string }).message).toContain("More → Joyo Pro");
+    expect((ios as { message: string }).message).not.toMatch(/JoyoRogo|buy|price/i);
     // The done event's usage counts too (status may be a minute old).
     expect(availability(status, { usedToday: 5, dailyCap: 5 }, null, true).kind).toBe("cap");
     expect(availability({ ...status, plan: "pro", usedToday: 30, dailyCap: 30 }, null, null, false)).toEqual({
@@ -58,9 +59,10 @@ describe("off and daily cap", () => {
     });
   });
 
-  test("the server's Free-cap error is neutral on iOS", () => {
+  test("the server's Free-cap error on iOS points to the in-app screen, not JoyoRogo", () => {
     const err = { code: "FORBIDDEN", status: 403, message: "That's all of today's 5 Joyo AI questions on Free. … Joyo Pro (bought in JoyoRogo …)", data: { upgrade: true, feature: "joyoAi", reason: "cap" } };
-    expect(chatErrorMessage(err, err.message, true)).not.toMatch(/Pro|JoyoRogo/);
+    expect(chatErrorMessage(err, err.message, true)).toContain("More → Joyo Pro");
+    expect(chatErrorMessage(err, err.message, true)).not.toMatch(/JoyoRogo/);
     expect(chatErrorMessage(err, err.message, false)).toBe(err.message);
     expect(chatErrorMessage(new Error("x"), "base", true)).toBe("base");
   });

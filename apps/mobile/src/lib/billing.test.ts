@@ -24,7 +24,7 @@ test("Android links to JoyoRogo", () => {
   expect(pro.usage).toEqual([]);
 });
 
-test("iOS (store-safe) shows status only: no link, no purchase wording, no prices", () => {
+test("iOS (store-safe): no link out, no JoyoRogo, no prices (In-App Purchase is on its own screen)", () => {
   const s = status({
     plan: "pro",
     entitlement: { plan: "pro", source: "trial", until: "2026-11-18T00:00:00Z" },
@@ -36,7 +36,7 @@ test("iOS (store-safe) shows status only: no link, no purchase wording, no price
   expect(all).not.toMatch(/JoyoRogo|buy|purchase|price|Rp/i);
   expect(v.line).toBe("Pro trial until 18 Nov 2026.");
   expect(v.notes).toEqual(["Your Joyo Pro is active until 1 Jan 2027.", "The status above is from the last check."]);
-  expect(proOnlyNote("Email import", { storeSafe: true })).not.toMatch(/JoyoRogo|Pro/);
+  expect(proOnlyNote("Email import", { storeSafe: true })).toBe("Email import is part of Joyo Pro (More → Joyo Pro).");
   expect(proOnlyNote("Email import", { storeSafe: false })).toMatch(/JoyoRogo/);
 });
 

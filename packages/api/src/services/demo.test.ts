@@ -177,7 +177,6 @@ describe("restricted actions", () => {
       () => call(appRouter.household.invites.accept, { token: "x".repeat(32) }, c),
       () => call(appRouter.household.leave, undefined, c),
       () => call(appRouter.household.delete, { confirmName: "Keluarga Demo" }, c),
-      () => call(appRouter.account.delete, { confirmEmail: "reviewer@demo.joyoarto.invalid" }, c),
       () => call(appRouter.tokens.create, { name: "forever" }, c),
       () => call(appRouter.tokens.create, { name: "month", expiresInDays: 30 }, c),
       () => call(appRouter.imports.email.regenerate, undefined, c),
@@ -187,6 +186,27 @@ describe("restricted actions", () => {
     expect((await counts(DEMO_HOUSEHOLD_ID)).accounts).toBe(5);
     expect(await db.select().from(schema.householdInvite)).toHaveLength(0);
     expect(await db.select().from(schema.emailImportAddress)).toHaveLength(0);
+  });
+
+  test("deleting the demo account resets it instead: data back to the made-up set, tokens revoked, AI consent cleared", async () => {
+    const c = { context: ctx(demo) };
+    const fresh = await counts(DEMO_HOUSEHOLD_ID);
+    await call(appRouter.transactions.quickAdd, { amountText: "25rb", description: "kopi" }, c);
+    await call(appRouter.tokens.create, { name: "day", expiresInDays: 1 }, c);
+    await call(appRouter.account.setAiConsent, { allow: true }, c);
+    expect(await counts(DEMO_HOUSEHOLD_ID)).not.toEqual(fresh);
+
+    await expect(call(appRouter.account.delete, { confirmEmail: "someone@example.com" }, c)).rejects.toThrow("email");
+    const res = await call(appRouter.account.delete, { confirmEmail: "Reviewer@demo.joyoarto.invalid" }, c);
+    expect(res.householdsDeleted).toEqual(["Keluarga Demo"]);
+
+    const [u] = await db.select().from(schema.user).where(eq(schema.user.id, DEMO_USER_ID));
+    expect(u?.aiConsentAt).toBeNull();
+    expect(await db.select().from(schema.apiToken).where(eq(schema.apiToken.userId, DEMO_USER_ID))).toHaveLength(0);
+    // Same as a fresh reset today (the made-up rows are dated from today).
+    const after = await counts(DEMO_HOUSEHOLD_ID);
+    await seedDemo(db);
+    expect(after).toEqual(await counts(DEMO_HOUSEHOLD_ID));
   });
 
   test("a one-day token and ordinary writes are allowed", async () => {

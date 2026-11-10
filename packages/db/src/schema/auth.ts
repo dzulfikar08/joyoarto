@@ -10,6 +10,11 @@ export const user = sqliteTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: integer("email_verified", { mode: "boolean" }).default(false).notNull(),
   image: text("image"),
+  /**
+   * When the user allowed JoyoArto to send their data to the AI providers (Joyo AI chat, voice notes, receipt photos,
+   * quick-add reading). Null = not allowed (or withdrawn): the server sends nothing to an AI for them. App Review 5.1.2(i).
+   */
+  aiConsentAt: integer("ai_consent_at", { mode: "timestamp_ms" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).default(nowMs).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .default(nowMs)

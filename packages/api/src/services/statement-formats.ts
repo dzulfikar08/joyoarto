@@ -17,6 +17,7 @@ import { MAX_PDF_BYTES, pdfText } from "../lib/pdf/extract";
 import { buildSkeleton, formatFingerprint, verifySkeleton } from "../lib/statements/skeleton";
 import type { Skeleton } from "../lib/statements/skeleton";
 import { isSupportedStatement } from "./statements";
+import { hasAiConsent } from "./ai-consent";
 
 const r = schema.statementFormatRequest;
 
@@ -143,6 +144,8 @@ async function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
 /** The parser spec, from the skeleton only. Null when there is no AI, today's cap is used, or the call fails. */
 async function writeSpec(db: Database, p: Principal, ai: AiConfig | undefined, skeleton: Skeleton): Promise<{ spec: string; model: string } | null> {
   if (!ai?.anthropicKey && !ai?.workersAi) return null;
+  // The masked skeleton reaches a model only with the member's permission; without it the request goes without a spec.
+  if (!(await hasAiConsent(db, p.userId))) return null;
   const model = ai.anthropicKey ? ai.parseModel : ai.workersAiModel;
   const slot = await reserveSlot(db, { userId: p.userId, householdId: p.householdId, kind: "format", engine: "hosted", model, cap: SPEC_CAP });
   if (!slot) return null;

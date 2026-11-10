@@ -111,8 +111,8 @@ export type Availability =
   | { kind: "cap"; message: string };
 
 /**
- * Whether the composer is open, and what it says when it is not. `storeSafe` (iOS): never a word about buying more
- * (App Review 3.1.1); the web's "get more with Pro" link has no counterpart on either phone (no purchases in the app yet).
+ * Whether the composer is open, and what it says when it is not. `storeSafe` (iOS): Joyo Pro is named with the way to
+ * the in-app Joyo Pro screen, never JoyoRogo or the web (App Review 3.1.1).
  */
 export function availability(status: JoyoStatusLike | undefined, usage: { usedToday: number; dailyCap: number } | null, byok: ByokSettings | null, storeSafe: boolean): Availability {
   const key = byokInput(byok);
@@ -122,17 +122,17 @@ export function availability(status: JoyoStatusLike | undefined, usage: { usedTo
   const used = Math.max(status.usedToday, usage?.usedToday ?? 0);
   const cap = usage?.dailyCap ?? status.dailyCap;
   if (cap > 0 && used >= cap) {
-    const more = !storeSafe && status.plan === "free" ? " Joyo Pro raises the daily limit." : "";
+    const more = status.plan === "free" ? (storeSafe ? " Joyo Pro (More → Joyo Pro) removes the daily limit." : " Joyo Pro raises the daily limit.") : "";
     return { kind: "cap", message: `That's all of today's ${cap} questions. They come back tomorrow (WIB), or use your own API key.${more}` };
   }
   return { kind: "ready", subtitle: `${status.hosted.model}${cap > 0 ? ` · ${used}/${cap} today` : ""}` };
 }
 
-/** A failed question as the chat shows it. The Free cap on iOS gets a neutral line (no "Joyo Pro … JoyoRogo"). */
+/** A failed question as the chat shows it. The Free cap on iOS points to the in-app Joyo Pro screen (no "… JoyoRogo"). */
 export function chatErrorMessage(e: unknown, base: string, storeSafe: boolean): string {
   if (storeSafe && isUpgradeError(e)) {
     const reason = (e as { data?: { reason?: unknown } }).data?.reason;
-    if (reason === "cap") return "That's all of today's Joyo AI questions. They come back tomorrow (WIB), or use your own API key.";
+    if (reason === "cap") return "That's all of today's Joyo AI questions. They come back tomorrow (WIB), use your own API key, or get Joyo Pro (More → Joyo Pro).";
   }
   return base;
 }

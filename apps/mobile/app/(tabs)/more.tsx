@@ -14,6 +14,7 @@ import { setAppearance, useAppearance, type Appearance } from "@/src/lib/appeara
 import { signOut, useSession } from "@/src/lib/auth";
 import { signOutOfGoogle } from "@/src/lib/google-native-device";
 import { otaLabel } from "@/src/lib/ota";
+import { appleIapAvailable } from "@/src/lib/apple-iap";
 import { storeSafe } from "@/src/lib/platform";
 
 export default function More() {
@@ -76,8 +77,10 @@ export default function More() {
         </ListSection>
 
         <ListSection title="Household & app">
+          {appleIapAvailable ? <ListRow icon="sparkles-outline" title="Joyo Pro" subtitle="Unlimited imports, Joyo AI and more" onPress={() => go("/joyo-pro")} /> : null}
           <ListRow icon="people-outline" title="Household" subtitle="Members and invites" onPress={() => go("/household")} />
           <ListRow icon="settings-outline" title="Settings" subtitle={Platform.OS === "android" ? "Tokens, Claude, data, capture" : "Tokens, Claude, data & privacy"} onPress={() => go("/settings")} />
+          <ListRow icon="shield-checkmark-outline" title="Data & privacy" subtitle="AI consent, download your data, delete your account" onPress={() => go("/data-privacy")} />
         </ListSection>
 
         <Card>
@@ -96,7 +99,9 @@ export default function More() {
         </Card>
 
         <ListSection>
+          <ListRow icon="trash-outline" iconTone="destructive" title="Delete account" subtitle="Permanently delete your JoyoArto account" onPress={() => go("/data-privacy")} />
           <ListRow icon="shield-checkmark-outline" title="Privacy policy" onPress={() => void Linking.openURL("https://arto.joyorogo.com/privasi")} />
+          <ListRow icon="help-buoy-outline" title="Help & support" onPress={() => void Linking.openURL("https://arto.joyorogo.com/support")} />
           {!storeSafe && session ? <ListRow icon="open-outline" title="JoyoArto on the web" subtitle="The same household in the browser" onPress={() => void Linking.openURL(session.server)} /> : null}
         </ListSection>
 

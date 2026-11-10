@@ -41,13 +41,14 @@ const limit = () =>
   );
 
 describe("Free-plan limits", () => {
-  test("store-safe (iOS): neutral message, no pointer to buying elsewhere", async () => {
+  test("store-safe (iOS): points to the in-app Joyo Pro screen, never to buying elsewhere", async () => {
     const api = createApi({ server: "http://x", token: "brk_test" }, async () => limit(), { storeSafe: true });
     const err = await api.me().catch((e) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(403);
     expect(err.message).toBe(STORE_SAFE_LIMIT_MESSAGE);
-    expect(err.message).not.toMatch(/JoyoRogo|Joyo Pro|Billing|buy/i);
+    expect(err.message).toContain("More → Joyo Pro");
+    expect(err.message).not.toMatch(/JoyoRogo|web|Billing|buy/i);
   });
 
   test("Android keeps the server's message", async () => {

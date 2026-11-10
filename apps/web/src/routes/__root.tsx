@@ -8,6 +8,7 @@ import { Wordmark } from "@/components/kit";
 import { NotFound } from "@/components/not-found";
 import { sessionQuery } from "@/lib/auth";
 import { syncHead } from "@/lib/head";
+import { AiConsentDialog } from "@/lib/ai-consent";
 
 // Signed-in only: kept out of the entry chunk so the public pages do not download the add sheet (comboboxes, voice).
 const AddSheet = lazy(() => import("@/components/add-sheet").then((m) => ({ default: m.AddSheet })));
@@ -18,7 +19,7 @@ function Shell() {
   const { data: session } = useQuery(sessionQuery);
   // Public pages (login, consent, the demo, privacy policy and terms, the landing page for visitors) draw their own layout.
   const bare =
-    ["/login", "/connect", "/demo", "/privasi", "/syarat"].some((p) => path.startsWith(p)) || ((path === "/" || path === "/pricing") && !session);
+    ["/login", "/connect", "/demo", "/privasi", "/syarat", "/support"].some((p) => path.startsWith(p)) || ((path === "/" || path === "/pricing") && !session);
   const nav = !bare && !!session;
   // The chat is a detail page on phones: no bottom nav, its own header with a back button, the composer at the bottom.
   const chat = path === "/joyo";
@@ -38,6 +39,8 @@ function Shell() {
           </div>
         </header>
       )}
+      {/* Joyo AI and the add sheet ask through it (lib/ai-consent.tsx); outside `nav` so every page has it. */}
+      <AiConsentDialog />
       <main className={bare ? "" : chat ? "" : `mx-auto ${wide ? "max-w-[100rem]" : "max-w-5xl"} px-4 pt-2 pb-6 sm:pt-6 ${nav ? BOTTOM_NAV_SPACE : ""}`}>
         <Outlet />
       </main>

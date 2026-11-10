@@ -24,6 +24,7 @@ import { formatMoney } from "@/lib/format";
 import { accountOptions, categoryOptions } from "@/lib/options";
 import { client, errorMessage, orpc } from "@/lib/orpc";
 import { PhotoButtons, ReimburseSwitch } from "@/components/receipts";
+import { askAiConsentOnce, ensureAiConsent } from "@/lib/ai-consent";
 
 /** Whisper reads these as-is: Chrome/Firefox record webm/opus, Safari mp4/aac. */
 const AUDIO_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
@@ -161,6 +162,8 @@ function AddFlow({ onDone }: { onDone: () => void }) {
   };
 
   const scanReceipt = async (file: File) => {
+    // The photo goes to an AI to be read: only with the member's permission.
+    if (!(await ensureAiConsent())) return;
     const controller = new AbortController();
     abortRef.current = controller;
     setError(null);
@@ -181,6 +184,8 @@ function AddFlow({ onDone }: { onDone: () => void }) {
   };
 
   const parse = async (input: string, via: Review["via"], heard: string | null) => {
+    // Typed text: asked once per page load; without consent the server reads it with rules only (no AI).
+    if (via === "manual") await askAiConsentOnce();
     const controller = new AbortController();
     abortRef.current = controller;
     setPhase("reading");
@@ -222,6 +227,8 @@ function AddFlow({ onDone }: { onDone: () => void }) {
   const startRecording = async () => {
     if (mime === null) return;
     setError(null);
+    // The recording goes to an AI to be transcribed: only with the member's permission.
+    if (!(await ensureAiConsent())) return;
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });

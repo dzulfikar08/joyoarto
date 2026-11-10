@@ -15,6 +15,7 @@ import { BYOK_PROVIDERS, PROVIDERS } from "../lib/joyo-ai/providers";
 import { resultLine, runProposal } from "../lib/joyo-ai/tools";
 import { AiError } from "../lib/joyo-ai/types";
 import type { AiErrorKind } from "../lib/joyo-ai/types";
+import { hasAiConsent, requireAiConsent } from "../services/ai-consent";
 import * as capture from "../services/capture";
 import * as joyo from "../services/joyo";
 import type { StoredMessage } from "../services/joyo";
@@ -105,6 +106,8 @@ export const joyoRouter = {
       voice: !!context.ai && (!!context.ai.workersAi || context.ai.fakeTranscript),
       /** The member's Joyo AI read-only setting in this household (joyo.settings). */
       readOnly: (await joyo.getJoyoSettings(context.db, context.principal)).readOnly,
+      /** The member allowed sending their data to the AI provider (services/ai-consent.ts). */
+      aiConsent: await hasAiConsent(context.db, context.principal.userId),
       byokProviders: BYOK_PROVIDERS.map((id) => ({ id, label: PROVIDERS[id].label, defaultModel: PROVIDERS[id].defaultModel, suggested: PROVIDERS[id].suggested, keyUrl: PROVIDERS[id].keyUrl, keyPlaceholder: PROVIDERS[id].keyPlaceholder })),
     };
   }),
@@ -150,6 +153,8 @@ export const joyoRouter = {
       if (!engine || (engine.kind === "hosted" && serverCap === 0)) {
         throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Joyo AI is off on this server. Add your own key in Joyo AI settings to use it.", data: { reason: "off" } });
       }
+      // Before anything is stored or sent: the member has to allow sending their data to the AI provider.
+      await requireAiConsent(db, principal.userId);
 
       // Only the file names are stored with the question; the files themselves reach the model with this question only.
       const files = input.attachments?.length ? `\n\n📎 ${input.attachments.map((a) => a.name).join(", ")}` : "";

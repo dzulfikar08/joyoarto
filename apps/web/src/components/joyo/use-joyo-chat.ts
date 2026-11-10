@@ -13,6 +13,7 @@ import { byokInput, loadByok, saveByok } from "@/lib/joyo";
 import type { ByokSettings } from "@/lib/joyo";
 import type { ChatAttachmentIn } from "@/lib/joyo-attachments";
 import { client, errorMessage, orpc } from "@/lib/orpc";
+import { ensureAiConsent } from "@/lib/ai-consent";
 
 export type LiveStep = Step & { running?: boolean };
 export type Live = { text: string; steps: LiveStep[]; proposals: Proposal[] };
@@ -68,6 +69,8 @@ export function useJoyoChat({
   const ask = async (question: string, attachments: readonly ChatAttachmentIn[] = []) => {
     const q = question.trim();
     if (!q || streaming) return;
+    // The question and the household data it needs go to the AI provider: only with the member's permission.
+    if (!(await ensureAiConsent())) return;
     setError(null);
     // Shown until the server echoes the stored question (which keeps the file names the same way).
     setPendingQuestion(attachments.length ? `${q}\n\n📎 ${attachments.map((a) => a.name).join(", ")}` : q);

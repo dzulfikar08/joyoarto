@@ -1,7 +1,7 @@
 import { APP_ORIGIN } from "./brand";
 
 /** Pages the public site (arto.joyorogo.com) shows itself; every other path belongs to the app host. */
-export const PUBLIC_PATHS = ["/", "/demo", "/pricing", "/claude", "/privasi", "/syarat"];
+export const PUBLIC_PATHS = ["/", "/demo", "/pricing", "/claude", "/privasi", "/syarat", "/support"];
 const LANDING_HOST = "arto.joyorogo.com";
 const OLD_HOST = "baroka.by.dzulfikar.com";
 

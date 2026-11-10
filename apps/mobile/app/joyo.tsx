@@ -17,6 +17,7 @@ import { AssistantTurn, UserBubble } from "@/components/joyo/message";
 import { Button, Disclosure, EmptyState, ErrorState, FieldLabel, Icon, IconButton, Input, ListRow, Segmented, Sheet, SkeletonRows, SwitchRow, Text } from "@/components/ui";
 import type { FetchLike } from "@/src/lib/api";
 import { currentCredentials } from "@/src/lib/auth";
+import { ensureAiConsent } from "@/src/lib/ai-consent";
 import { errorMessage } from "@/src/lib/errors";
 import { availability, BYOK_PROVIDERS, byokInput, chatErrorMessage, maskKey, MAX_CHARS, STARTERS, type ByokProvider, type ByokSettings } from "@/src/lib/joyo";
 import { loadByok, saveByok, useByok } from "@/src/lib/joyo-byok";
@@ -85,6 +86,8 @@ export default function JoyoScreen() {
     const q = question.trim().slice(0, MAX_CHARS);
     const creds = currentCredentials();
     if (!q || streaming || !creds) return;
+    // The question and the household data it needs go to the AI provider: only with the member's permission.
+    if (!(await ensureAiConsent())) return;
     setError(null);
     setText("");
     followRef.current = true;

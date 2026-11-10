@@ -107,7 +107,7 @@ signature verifies with an Apple Distribution identity; no `NotificationCaptureM
   chat, Plan & simulate, statement PDF import with the document picker (`expo-document-picker`, needs no permission
   text).
 - **Joyo AI on iOS**: a Free daily cap reads "That's all of today's Joyo AI questions. They come back tomorrow (WIB), or
-  use your own API key." (no Joyo Pro, JoyoRogo or price; `src/lib/joyo.ts` `availability` / `chatErrorMessage`). The
+  use your own API key, or get Joyo Pro (More → Joyo Pro)." (never JoyoRogo or a price; `src/lib/joyo.ts`). The
   own-key sheet has no "Get a key" link out on iOS. If App Review objects to the own API key as an unlock outside
   In-App Purchase, hide the key sheet when `storeSafe` (one condition in `app/(tabs)/joyo.tsx`).
 - **Sign in with Apple** (guideline 4.8, because Google sign-in is offered): the `com.apple.developer.applesignin`
@@ -137,8 +137,8 @@ signature verifies with an Apple Distribution identity; no `NotificationCaptureM
   then merges every pod's own manifest into it (`privacy_file_aggregation_enabled`, on by default). JoyoRogo relies on
   that merge alone; JoyoArto adds the explicit baseline so the file exists even if a pod ships none. The merged file is
   in the logs artifact.
-- **No purchase UI and no link out** (see "Joyo Pro and App Review" below): on iOS (`src/lib/platform.ts`
-  `storeSafe`) a Free-plan limit shows "This is not included in this account's plan. Nothing was changed." instead of
+- **In-App Purchase only, no link out** (see "Joyo Pro and App Review" below): on iOS (`src/lib/platform.ts`
+  `storeSafe`) a Free-plan limit shows "This is part of Joyo Pro (More → Joyo Pro). Nothing was changed." instead of
   the server's "Joyo Pro (bought in JoyoRogo …)" text, and the sign-in screen names Settings, API tokens as plain text
   instead of a button that opens the web app.
 - iPhone only (`supportsTablet: false`), portrait, iOS 16.4 or later (as JoyoRogo).
@@ -244,8 +244,8 @@ What a first App Store submission needs beyond a TestFlight build:
 
 ### Joyo Pro and App Review
 
-Joyo Pro is one subscription per account, sold only by JoyoRogo (web, JoyoRogo's iOS app with In-App Purchase, Google
-Play). JoyoArto unlocks it when the same Google account has it.
+Joyo Pro is one subscription per account; JoyoRogo's server is the only billing authority (web, JoyoRogo's and JoyoFit's
+iOS apps, Google Play, and JoyoArto's iOS app with In-App Purchase). JoyoArto unlocks it when the same account has it.
 
 Apple's rules that apply:
 
@@ -268,20 +268,22 @@ How the siblings handle it:
   3.1.1 / 3.1.3(b): "nothing is sold outside In-App Purchase in the app; Pro bought elsewhere is honoured; never a
   link out" (JoyoFit `docs/app-store.md`, `docs/pro-ios.md`).
 
-**Recommendation for JoyoArto's first App Store review:**
+**What JoyoArto does (since the 1.0.0 rejection of 2026-11-10, guideline 3.1.1):** the first review shipped with no
+purchase UI; Apple refused it because the demo's Settings showed Joyo Pro "monthly/yearly" bought elsewhere. JoyoArto now
+sells Joyo Pro with **its own StoreKit products** in its own App Store Connect app (6830908097, group "Joyo Pro"):
+`com.joyodigitama.joyoarto.pro.monthly` / `.yearly`, Rp29.000 / Rp199.000 in Indonesia, US$9.99 / US$59.99 (Apple's
+equalized points) elsewhere, the same as JoyoRogo's and JoyoFit's.
 
-1. Ship the iOS app **without any purchase UI, price, upgrade card or link out** (done in code: `storeSafe`). Free
-   limits stay enforced by the server; on iOS they read as a neutral "not included in this account's plan".
-2. Do not mention Joyo Pro, prices or JoyoRogo's shop in the App Store description or screenshots.
-3. Expect App Review to ask (2.1(b)) whether paid features exist, because a Free account hits limits (2 statement
-   imports a month, saved scenarios, the Claude connector). Answer plainly: the app itself sells nothing; some features
-   of the account are part of a subscription sold in our other app and on the web, which users may already have
-   (3.1.3(b)). If Apple then insists on In-App Purchase (the JoyoFit precedent says it will, sooner or later), do the
-   JoyoFit flow: JoyoArto's own StoreKit products in the JoyoArto app record, posted to JoyoRogo's
-   `POST /api/billing/apple` (HANDOFF item "Phone app purchases"). That is the durable answer and should be planned
-   before a public App Store release that markets Pro.
-4. Safer alternative for the review account: make the demo household Pro (on `PRO_EMAILS` or a long trial), so the
-   reviewer never hits a limit, and say in the notes that nothing is purchasable in the app.
+- App: `modules/apple-iap` (StoreKit 2 module copied from JoyoRogo), `src/lib/apple-iap.ts` (buy, restore, manage,
+  launch replay), the Joyo Pro screen `app/joyo-pro.tsx` (More → Joyo Pro, Settings → Joyo Pro card), with the 3.1.2
+  terms (price, period, auto-renewal, Apple's standard EULA as Terms of Use, privacy policy).
+- Server: `billing.appleAccountToken` and `billing.appleRedeem` (`services/billing.ts`) hand the JWS to JoyoRogo's
+  `POST /api/internal/joyo-pro/apple` (JoyoRogo `docs/joyo-pro.md`), which verifies it, finds or creates the person's
+  JoyoRogo account and credits Joyo Pro. The demo account is Pro and never reaches JoyoRogo (its purchase answers
+  "granted" without crediting anything).
+- Renewals and refunds: JoyoArto's App Store Server Notifications URL (App Store Connect, App Information) is
+  `https://api.joyorogo.com/api/billing/apple/notifications`, plus the launch replay of current entitlements.
+- iOS messages may name Joyo Pro and "More → Joyo Pro", never JoyoRogo, the web or another way to pay (`storeSafe`).
 
 Sources: App Store Review Guidelines 3.1.1, 3.1.3(a), 3.1.3(b), 4.8, 5.1.1(v), 2.1
 (https://developer.apple.com/app-store/review/guidelines/), and the JoyoFit review history above. Apple's wording

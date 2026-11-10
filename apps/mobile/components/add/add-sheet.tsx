@@ -18,6 +18,7 @@ import type { ReceiptPhoto } from "@/src/lib/receipt-photo";
 import { useRouter } from "expo-router";
 import { Button, DateField, Field, FieldLabel, Icon, Input, Loading, Picker, Row, Segmented, Sheet, Text } from "@/components/ui";
 import { closeAddSheet, useAddSheet } from "@/src/lib/add-sheet";
+import { askAiConsentOnce, ensureAiConsent } from "@/src/lib/ai-consent";
 import { errorMessage } from "@/src/lib/errors";
 import { formatMoney } from "@/src/lib/format";
 import { client, orpc } from "@/src/lib/orpc";
@@ -53,6 +54,8 @@ function AddFlow({ prefill, onDone }: { prefill?: string; onDone: () => void }) 
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const parse = async (input: string, via: Review["via"], heard: string | null) => {
+    // Typed text: asked once per app run; without consent the server reads it with rules only (no AI).
+    if (via === "manual") await askAiConsentOnce();
     const controller = new AbortController();
     abortRef.current = controller;
     setError(null);
@@ -70,6 +73,8 @@ function AddFlow({ prefill, onDone }: { prefill?: string; onDone: () => void }) 
   };
 
   const scan = async (photo: ReceiptPhoto) => {
+    // The photo goes to an AI to be read: only with the member's permission.
+    if (!(await ensureAiConsent())) return;
     const controller = new AbortController();
     abortRef.current = controller;
     setError(null);
@@ -165,7 +170,8 @@ function AddFlow({ prefill, onDone }: { prefill?: string; onDone: () => void }) 
           accessibilityLabel="Say it: record a voice note, up to 60 seconds"
           onPress={() => {
             setError(null);
-            voice.start();
+            // The recording goes to an AI to be transcribed: only with the member's permission.
+            void ensureAiConsent().then((ok) => ok && voice.start());
           }}
           style={styles.voice}
         >
