@@ -68,13 +68,10 @@ appId: com.joyodigitama.joyoarto
       visible: "Open"
     commands:
       - tapOn: "Open"
+# The whole screen fits on a 6.9" iPhone; StoreKit's prices load after the status card.
 - extendedWaitUntil:
-    visible: "Unlimited bank statement imports.*"
+    visible: "Joyo Pro Yearly"
     timeout: 30000
-- scrollUntilVisible:
-    element: "Restore purchases"
-    direction: DOWN
-    timeout: 15000
 - takeScreenshot: 90-joyo-pro-review
 
 # Quick add: the centre tab button opens the add sheet.
